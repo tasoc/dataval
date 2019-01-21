@@ -52,19 +52,23 @@ def Pixinaperture(Tmag):
     pixels = (30 + (((3-30)/(14-7)) * (Tmag-7)))*(Tmag<14) + 3*(Tmag>=14) 
     return int(np.max([pixels, 3]))
 
-def mean_flux_level(Tmag, Teff):
+def mean_flux_level(Tmag):#, Teff):
     # Magnitude system based on Sullivan et al.
-    collecting_area = np.pi*(10.5/2)**2 # square cm
-    Teff_list = np.array([2450, 3000, 3200, 3400, 3700, 4100, 4500, 5000, 5777, 6500, 7200, 9700]) # Based on Sullivan
-    Flux_list = np.array([2.38, 1.43, 1.40, 1.38, 1.39, 1.41, 1.43, 1.45, 1.45, 1.48, 1.48, 1.56])*1e6 # photons per sec; Based on Sullivan
-    Magn_list = np.array([306, -191, -202, -201, -174, -132, -101, -80, -69.5, -40, -34.1, 35])*1e-3 #Ic-Tmag (mmag)
-
-
-    Flux_int = INT.UnivariateSpline(Teff_list, Flux_list, k=1, s=0)
-    Magn_int = INT.UnivariateSpline(Teff_list, Magn_list, k=1, s=0)
-
-    Imag = Magn_int(Teff)+Tmag
-    Flux = 10**(-0.4*Imag) * Flux_int(Teff) * collecting_area
+#    collecting_area = np.pi*(10.5/2)**2 # square cm
+#    Teff_list = np.array([2450, 3000, 3200, 3400, 3700, 4100, 4500, 5000, 5777, 6500, 7200, 9700]) # Based on Sullivan
+#    Flux_list = np.array([2.38, 1.43, 1.40, 1.38, 1.39, 1.41, 1.43, 1.45, 1.45, 1.48, 1.48, 1.56])*1e6 # photons per sec; Based on Sullivan
+#    Magn_list = np.array([306, -191, -202, -201, -174, -132, -101, -80, -69.5, -40, -34.1, 35])*1e-3 #Ic-Tmag (mmag)
+#
+#
+#    Flux_int = INT.UnivariateSpline(Teff_list, Flux_list, k=1, s=0)
+#    Magn_int = INT.UnivariateSpline(Teff_list, Magn_list, k=1, s=0)
+#
+#    Imag = Magn_int(Teff)+Tmag
+#    Flux = 10**(-0.4*Imag) * Flux_int(Teff) * collecting_area
+	
+	
+    Flux = 10**(-0.4*(Tmag - 20.54))
+	
 
     return Flux
 
@@ -89,7 +93,7 @@ def phot_noise(Tmag, Teff, cad, PARAM, verbose=False, sysnoise=60):
 	Flux_factor = np.sqrt(integrations * pixels)
 
 	# Mean flux level in electrons per cadence
-	mean_level_ppm = mean_flux_level(Tmag, Teff) * cad # electrons
+	mean_level_ppm = mean_flux_level(Tmag) * cad # electrons (based on measurement) #, Teff
 
 	# Shot noise
 	shot_noise = 1e6/np.sqrt(mean_level_ppm)
@@ -196,9 +200,9 @@ def search_database(cursor, select=None, search=None, order_by=None, limit=None,
 	if search is None:
 		search = ''
 	elif isinstance(search, (list, tuple)):
-		search = "AND " + " AND ".join(search)
+		search = "WHERE " + " AND ".join(search)
 	else:
-		search = 'AND ' + search
+		search = 'WHERE ' + search
 
 	if order_by is None:
 		order_by = ''
@@ -209,7 +213,7 @@ def search_database(cursor, select=None, search=None, order_by=None, limit=None,
 
 	limit = '' if limit is None else " LIMIT %d" % limit
 
-	query = "SELECT {distinct:s}{select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status=1 {search:s}{order_by:s}{limit:s};".format(
+	query = "SELECT {distinct:s}{select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority {search:s}{order_by:s}{limit:s};".format(
 		distinct='DISTINCT ' if distinct else '',
 		select=select,
 		search=search,
@@ -218,9 +222,76 @@ def search_database(cursor, select=None, search=None, order_by=None, limit=None,
 	)
 	logger.debug("Running query: %s", query)
 
-	# Ask the database:
+	# Ask the database: status=1 
 	cursor.execute(query)
 	return [dict(row) for row in cursor.fetchall()]
+
+
+def set_val_flag(D, valtype=None):
+	
+	dv = np.zeros_like(D)
+	
+	
+	magvsflux_high = 1
+	magvsflux_low = 2
+	lc_over_sc = 4
+	sc_over_lc = 8
+	minmask = 16
+	smallmask = 32
+	largemask = 64
+	smallstamp = 128
+	lowptp = 256
+	lowrms = 512
+	contamone = 1024
+	contamhigh = 2048
+	negflux = 4096
+	
+	
+	if valtype=='hf': #high flux
+		dv[D] = magvsflux_high
+	elif valtype=='lf':
+		dv[D] = magvsflux_low
+	elif valtype=='lc_over_sc':
+		dv[D] = lc_over_sc
+	elif valtype=='sc_over_lc':
+		dv[D] = sc_over_lc
+	elif valtype=='min_mask':	
+		dv[D] = minmask
+	elif valtype=='small_mask':
+		dv[D] = smallmask
+	elif valtype=='large_mask':
+		dv[D] = largemask	
+	elif valtype=='small_stamp':
+		dv[D] = smallstamp
+	elif valtype=='low_ptp':	
+		dv[D] = lowptp
+	elif valtype=='low_rms':	
+		dv[D] = lowrms	
+	elif valtype=='contam_one':	
+		dv[D] = contamone
+	elif valtype=='contam_high':	
+		dv[D] = contamhigh	
+	elif valtype=='negflux':
+		dv[D] = negflux
+	
+	# Pretty string descriptions for each flag
+	STRINGS = {
+		1: "Star has higher flux than given by magnitude relation",
+		2: "Star has lower flux than given by magnitude relation",
+		4: "Star has higher measured flux in 30-min than 2-min",
+		5: "Star has higher measured flux in 2-min than 30-min",
+		16: "Star has minimum 4x4 mask",
+		32: "Star has smaller mask than general relation",
+		64: "Star has larger mask than general relation",
+		128: "Smaller stamp than default",
+		256: "PTP lower than theoretical",
+		512: "RMS lower than theoretical",
+		1024: "Contamination over 1",
+		2048: "Contamination high",
+		4096: "Negative mean flux"
+	}
+	
+	return dv
 
 # =============================================================================
 #
@@ -243,15 +314,21 @@ class DataValidation(object):
 		self.show = args.show
 
 		self.cursors = np.array([])
-		self.outfolders = []
+		self.conns = np.array([])
+		self.outfolders = args.output_folder
+		self.sysnoise = args.sysnoise
+
 		
 		#load sqlite to-do files
-		for i, f in enumerate(self.input_folders):
-			path = os.path.join(f, 'data_validation')
-			if not os.path.exists(path):
-				os.makedirs(path)
-			self.outfolders = np.append(self.outfolders, path)
+		if len(self.input_folders)==1:
+			if self.outfolders is None:
+				path = os.path.join(self.input_folders[0], 'data_validation')
+				self.outfolders = path
+				if not os.path.exists(self.outfolders):
+					os.makedirs(self.outfolders)
+
 			
+		for i, f in enumerate(self.input_folders):		
 			todo_file = os.path.join(f, 'todo.sqlite')
 			logger.debug("TODO file: %s", todo_file)
 			if not os.path.exists(todo_file):
@@ -260,21 +337,95 @@ class DataValidation(object):
 			# Open the SQLite file:
 			conn = sqlite3.connect(todo_file)
 			conn.row_factory = sqlite3.Row
-			self.cursors = np.append(self.cursors, conn.cursor())
+			
+			cursor = conn.cursor()
+			
+			if self.method == 'all' and self.doval == True:
+				# Create table for diagnostics:
+				cursor.execute("""CREATE TABLE IF NOT EXISTS dataval (
+					priority INT PRIMARY KEY NOT NULL,
+					starid BIGINT NOT NULL,
+					source TEXT,
+					dataval INT,
+					errors TEXT,
+					FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
+				);""")
+		
+				conn.commit()
+			
+			self.cursors = np.append(self.cursors, cursor)
+			self.conns = np.append(self.conns, conn)
 
 		print(self.cursors)
+		
 		# Run validation
 		self.Validations()	
+		
+		
+		
+		
+		
 		
 	def Validations(self):
 		
 		if self.method == 'all':
-			self.plot_magtoflux()
-			self.plot_pixinaperture()
+			val1 = self.plot_magtoflux(return_val=True)
+			val2 = self.plot_pixinaperture(return_val=True)
+			val3 = self.plot_stamp(return_val=True)
+			val4 = self.plot_mag_dist(return_val=True)
+			val5 = self.plot_onehour_noise(return_val=True)
+			
+			dv = val1['dv']+val2['dv']+val3['dv']+val4['dv']+val5['dv']
+			
+			for j, cursor in enumerate(self.cursors):
+				cursor.execute("INSERT INTO diagnostics (priority, starid, dv) VALUES (?,?,?);", (
+				val1['priority'],
+				val1['starid'],
+				dv))
+				
+#				details.get('filepath_lightcurve', None),
+#				result['time'],
+#				details.get('pos_centroid', (None, None))[0],
+#				details.get('pos_centroid', (None, None))[1],
+#				details.get('mean_flux', None),
+#				details.get('variance', None),
+#				details.get('variability', None),
+#				details.get('rms_hour', None),
+#				details.get('ptp', None),
+#				details.get('mask_size', None),
+#				details.get('contamination', None),
+#				stamp_width,
+#				stamp_height,
+#				details.get('stamp_resizes', 0),
+#				error_msg
+#			))
+				self.conns[j].commit()
+#
+#		# Write summary file:
+#		if self.summary_file and self.summary['tasks_run'] % self.summary_interval == 0:
+#			self.write_summary()
+#
+#	def start_task(self, taskid):
+#		"""
+#		Mark a task as STARTED in the TODO-list.
+#		"""
+#		self.cursor.execute("UPDATE todolist SET status=? WHERE priority=?;", (STATUS.STARTED.value, taskid))
+#		self.conn.commit()
+#		self.summary['STARTED'] += 1
+			
+			
 		elif self.method == 'mag2flux':
 			self.plot_magtoflux()
 		elif self.method == 'pixvsmag':
 			self.plot_pixinaperture()
+		elif self.method == 'stamp':
+			self.plot_stamp()
+		elif self.method == 'magdist':
+			self.plot_mag_dist()
+		elif self.method == 'noise':
+			self.plot_onehour_noise()
+		elif self.method == 'magdist':
+			self.plot_mag_dist()
 			
 			
 		
@@ -298,111 +449,23 @@ class DataValidation(object):
 
 
 
-	def plot_bg(data_paths, sector, cad=1800, sysnoise=0, version=1, savetex=False):
-		norm = colors.Normalize(vmin=1, vmax=4)
-		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
-	
-	
-		fig = plt.figure(figsize=(15, 6))
-		ax1 = fig.add_subplot(221)
-		ax2 = fig.add_subplot(222)
-		ax3 = fig.add_subplot(223)
-		ax4 = fig.add_subplot(224)
-		ax1.set_rasterization_zorder(0)
-		ax2.set_rasterization_zorder(0)
-		ax3.set_rasterization_zorder(0)
-		ax4.set_rasterization_zorder(0)
-		
-		fig.subplots_adjust(left=0.08, wspace=0.3, top=0.945, bottom=0.145, right=0.98)
-		
-		for k, d in enumerate(data_paths):
-			
-			files = np.array([])
-			for root, dirs, fil in os.walk(d):
-				for file in fil:
-					file_path = root + os.sep + file
-					if ('corr' in file_path) and ('.fits' in file_path):
-						files = np.append(files, file_path)
-						
-			for i, f in enumerate(files):
-				with fits.open(f) as hdu:
-					time = hdu[1].data['TIME']
-					bg = hdu[1].data['FLUX_BKG']
-	
-					cam = hdu[0].header['CAMERA']
-					
-					print(cam)
-					rgba_color = scalarMap.to_rgba(cam)
-					if cam==1:
-						ax1.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)
-					if cam==2:
-						ax2.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)
-					if cam==3:
-						ax3.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)
-					if cam==4:
-						ax4.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)	
-	#				ax.scatter(rms_tmag_vals[idx_lc, 0], rms_tmag_vals[idx_lc, 2], marker='s', facecolors='None', edgecolor=rgba_color)
-	
-	#	ax4.set_xlim([np.min(times)-500, np.max(times)+500])
-	#	ax4.set_ylim([-0.15, 0.15])
-						
-		ax1.text(0.05, 0.9, 'Camera 1', transform=ax1.transAxes, fontsize=14)				
-		ax2.text(0.05, 0.9, 'Camera 2', transform=ax2.transAxes, fontsize=14)				
-		ax3.text(0.05, 0.9, 'Camera 3', transform=ax3.transAxes, fontsize=14)				
-		ax4.text(0.05, 0.9, 'Camera 4', transform=ax4.transAxes, fontsize=14)
-					
-		ax3.set_xlabel('Time TBJD (days)', fontsize=16, labelpad=10)
-		ax4.set_xlabel('Time TBJD (days)', fontsize=16, labelpad=10)
-		ax1.set_ylabel(r'$\rm Counts\,\, (e^{-}/s)$', fontsize=16, labelpad=10)
-		ax3.set_ylabel(r'$\rm Counts\,\, (e^{-}/s)$', fontsize=16, labelpad=10)
-		
-	#	ax2.set_ylim([2200, 8000])
-		for ax in np.array([ax1, ax2, ax3, ax4]):
-			ax.xaxis.set_major_locator(MultipleLocator(5))
-			ax.xaxis.set_minor_locator(MultipleLocator(2.5))
-			ax.tick_params(direction='out', which='both', pad=5, length=3)
-			ax.tick_params(which='major', pad=6, length=5,labelsize='15')
-	
-		
-		if version!=1:
-			save_path = 'plots/sector%02d/v%1d/' %(sector,version)
-		else:
-			save_path = 'plots/sector%02d/' %sector
-	
-		if not os.path.exists(save_path):
-			os.makedirs(save_path)
-		fig.savefig(os.path.join(save_path, 'BG.pdf'), bb_inches='tight')		
-		fig.savefig(os.path.join(save_path, 'BG.png'), bb_inches='tight')		
-			
-		if savetex:
-			save_path2 = '../releasenote_tex/Release_note%1d/' %sector
-			fig.savefig(os.path.join(save_path2, 'BG.pdf'), bb_inches='tight')
-	
-	
-		plt.show()
-		
-	# =============================================================================
-	# 
-	# =============================================================================
-	
-#	def plot_noice_lc(data_paths, sector, cad=1800, sysnoise=0, version=1, savetex=False):
+#	def plot_bg(data_paths, sector, cad=1800, sysnoise=0, version=1, savetex=False):
+#		norm = colors.Normalize(vmin=1, vmax=4)
+#		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 #	
-#		norm = colors.Normalize(vmin=0, vmax=len(data_paths)-1)
 #	
-#		fig2 = plt.figure()
-#		fig2.subplots_adjust(left=0.18, wspace=0.3, top=0.97, bottom=0.145, right=0.97)
-#		ax2 = fig2.add_subplot(111)
+#		fig = plt.figure(figsize=(15, 6))
+#		ax1 = fig.add_subplot(221)
+#		ax2 = fig.add_subplot(222)
+#		ax3 = fig.add_subplot(223)
+#		ax4 = fig.add_subplot(224)
+#		ax1.set_rasterization_zorder(0)
+#		ax2.set_rasterization_zorder(0)
+#		ax3.set_rasterization_zorder(0)
+#		ax4.set_rasterization_zorder(0)
 #		
-#		fig3 = plt.figure()
-#		fig3.subplots_adjust(left=0.18, wspace=0.3, top=0.97, bottom=0.145, right=0.97)
-#		ax3 = fig3.add_subplot(111)
+#		fig.subplots_adjust(left=0.08, wspace=0.3, top=0.945, bottom=0.145, right=0.98)
 #		
-#		fig4 = plt.figure()
-#		fig4.subplots_adjust(left=0.18, wspace=0.3, top=0.97, bottom=0.145, right=0.97)
-#		ax4 = fig4.add_subplot(111)
-#	
-#	
-#		times = np.array([]); c1s = np.array([]); c2s = np.array([])
 #		for k, d in enumerate(data_paths):
 #			
 #			files = np.array([])
@@ -410,74 +473,48 @@ class DataValidation(object):
 #				for file in fil:
 #					file_path = root + os.sep + file
 #					if ('corr' in file_path) and ('.fits' in file_path):
-#						print(file_path)
 #						files = np.append(files, file_path)
 #						
-#	
 #			for i, f in enumerate(files):
 #				with fits.open(f) as hdu:
+#					time = hdu[1].data['TIME']
+#					bg = hdu[1].data['FLUX_BKG']
+#	
+#					cam = hdu[0].header['CAMERA']
 #					
-#					c1 = hdu[1].data['MOM_CENTR1']
-#					c2 = hdu[1].data['MOM_CENTR2']
-#					time = hdu[1].data['CADENCENO']
+#					print(cam)
+#					rgba_color = scalarMap.to_rgba(cam)
+#					if cam==1:
+#						ax1.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)
+#					if cam==2:
+#						ax2.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)
+#					if cam==3:
+#						ax3.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)
+#					if cam==4:
+#						ax4.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)	
+#	#				ax.scatter(rms_tmag_vals[idx_lc, 0], rms_tmag_vals[idx_lc, 2], marker='s', facecolors='None', edgecolor=rgba_color)
+#	
+#	#	ax4.set_xlim([np.min(times)-500, np.max(times)+500])
+#	#	ax4.set_ylim([-0.15, 0.15])
+#						
+#		ax1.text(0.05, 0.9, 'Camera 1', transform=ax1.transAxes, fontsize=14)				
+#		ax2.text(0.05, 0.9, 'Camera 2', transform=ax2.transAxes, fontsize=14)				
+#		ax3.text(0.05, 0.9, 'Camera 3', transform=ax3.transAxes, fontsize=14)				
+#		ax4.text(0.05, 0.9, 'Camera 4', transform=ax4.transAxes, fontsize=14)
 #					
-#					if '00279741379' in f:
-#						ax4.plot(time-time[0], c2-np.nanmedian(c2), ls='-',color='k', label='row')
-#						ax4.plot(time-time[0], c1-np.nanmedian(c1), ls='-',color='r', label='column')
-#	
-#					times = np.append(times, time)
-#					c1s = np.append(c1s, c1-np.nanmedian(c1))
-#					c2s = np.append(c2s, c2-np.nanmedian(c2))
-#				
-#			
-#		idx = np.argsort(times)	
-#		c1s = c1s[idx]
-#		c2s = c2s[idx]
-#		times = times[idx]
-#		times -= times[0]
+#		ax3.set_xlabel('Time TBJD (days)', fontsize=16, labelpad=10)
+#		ax4.set_xlabel('Time TBJD (days)', fontsize=16, labelpad=10)
+#		ax1.set_ylabel(r'$\rm Counts\,\, (e^{-}/s)$', fontsize=16, labelpad=10)
+#		ax3.set_ylabel(r'$\rm Counts\,\, (e^{-}/s)$', fontsize=16, labelpad=10)
 #		
-#		ax2.plot(times, c2s, ls='-',color='k', label='row')
-#		ax2.plot(times, c1s, ls='-',color='r', label='column')
-#		
-#	#	ax2.scatter(times, c2s, marker='o',color='k', alpha=0.1, label='row')
-#	#	ax2.scatter(times, c1s, marker='o',color='r', alpha=0.1, label='column')
+#	#	ax2.set_ylim([2200, 8000])
+#		for ax in np.array([ax1, ax2, ax3, ax4]):
+#			ax.xaxis.set_major_locator(MultipleLocator(5))
+#			ax.xaxis.set_minor_locator(MultipleLocator(2.5))
+#			ax.tick_params(direction='out', which='both', pad=5, length=3)
+#			ax.tick_params(which='major', pad=6, length=5,labelsize='15')
 #	
-#		idx_zoom = (times<15870) & (times>15840)
-#		ax3.scatter((times[idx_zoom]-15855), c2s[idx_zoom], marker='o', edgecolors='k', facecolors='none',label='row')
-#		ax3.scatter((times[idx_zoom]-15855), c1s[idx_zoom], marker='o' ,edgecolors='r', facecolors='none',label='column')
-#		ax3.set_xlabel('Cadence number - 15855', fontsize=16, labelpad=10)
-#		ax3.set_ylabel(r'$\rm Relative\,\, position\,\, (pixels)$', fontsize=16, labelpad=10)
-#		ax3.xaxis.set_major_locator(MultipleLocator(5))
-#		ax3.xaxis.set_minor_locator(MultipleLocator(1))
-#		ax3.tick_params(direction='out', which='both', pad=5, length=3)
-#		ax3.tick_params(which='major', pad=6, length=5,labelsize='15')
-#		ax3.yaxis.set_ticks_position('both')
-#		ax3.legend(loc='upper right')
 #		
-#		
-#		ax4.set_xlim([np.min(times)-500, np.max(times)+500])
-#		ax4.set_ylim([-0.15, 0.15])
-#		ax4.set_xlabel('Cadence number', fontsize=16, labelpad=10)
-#		ax4.set_ylabel(r'$\rm Relative\,\, position\,\, (pixels)$', fontsize=16, labelpad=10)
-#		ax4.xaxis.set_major_locator(MultipleLocator(5000))
-#		ax4.xaxis.set_minor_locator(MultipleLocator(2500))
-#		ax4.tick_params(direction='out', which='both', pad=5, length=3)
-#		ax4.tick_params(which='major', pad=6, length=5,labelsize='15')
-#		ax4.yaxis.set_ticks_position('both')
-#		ax4.legend(loc='upper right')
-#	
-#	#	###########
-#		ax2.set_xlim([np.min(times)-500, np.max(times)+500])
-#		ax2.set_ylim([-0.3,0.3])
-#		ax2.set_xlabel('Cadence number', fontsize=16, labelpad=10)
-#		ax2.set_ylabel(r'$\rm Relative\,\, position\,\, (pixels)$', fontsize=16, labelpad=10)
-#		ax2.xaxis.set_major_locator(MultipleLocator(5000))
-#		ax2.xaxis.set_minor_locator(MultipleLocator(2500))
-#		ax2.tick_params(direction='out', which='both', pad=5, length=3)
-#		ax2.tick_params(which='major', pad=6, length=5,labelsize='15')
-#		ax2.yaxis.set_ticks_position('both')
-#		ax2.legend(loc='upper right')
-#	
 #		if version!=1:
 #			save_path = 'plots/sector%02d/v%1d/' %(sector,version)
 #		else:
@@ -485,215 +522,160 @@ class DataValidation(object):
 #	
 #		if not os.path.exists(save_path):
 #			os.makedirs(save_path)
+#		fig.savefig(os.path.join(save_path, 'BG.pdf'), bb_inches='tight')		
+#		fig.savefig(os.path.join(save_path, 'BG.png'), bb_inches='tight')		
 #			
-#		fig2.savefig(os.path.join(save_path, 'pixelpos.pdf'), bb_inches='tight')
-#		fig3.savefig(os.path.join(save_path, 'pixelpos_zoom.pdf'), bb_inches='tight')
-#		fig4.savefig(os.path.join(save_path, 'pixel_specific.pdf'), bb_inches='tight')
-#		fig2.savefig(os.path.join(save_path, 'pixelpos.png'), bb_inches='tight')
-#		fig3.savefig(os.path.join(save_path, 'pixelpos_zoom.png'), bb_inches='tight')
-#		fig4.savefig(os.path.join(save_path, 'pixel_specific.png'), bb_inches='tight')
-#		
-#		
 #		if savetex:
 #			save_path2 = '../releasenote_tex/Release_note%1d/' %sector
-#			fig2.savefig(os.path.join(save_path2, 'pixelpos.pdf'), bb_inches='tight')
-#			fig3.savefig(os.path.join(save_path2, 'pixelpos_zoom.pdf'), bb_inches='tight')
-#			fig4.savefig(os.path.join(save_path2, 'pixel_specific.pdf'), bb_inches='tight')
-#		
+#			fig.savefig(os.path.join(save_path2, 'BG.pdf'), bb_inches='tight')
+#	
 #	
 #		plt.show()
-	
+		
+
 	# =============================================================================
 	# 
 	# =============================================================================
 	
-	def plot_onehour_noise(self, data_paths, sector, cad=1800, sysnoise=0, version=1, savetex=False, labels=None):
+	def plot_onehour_noise(self):
+		#, data_paths, sector, cad=1800, version=1, savetex=False, labels=None):
+		
+		"""
+		Function to plot the light curve noise against the stellar TESS magnitudes
+
+		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+		"""
 	
-		norm = colors.Normalize(vmin=0, vmax=len(data_paths)+5)
+		logger=logging.getLogger(__name__)
+		
+		logger.info('------------------------------------------')
+		logger.info('Plotting Noise vs. Magnitude')
+		
+		norm = colors.Normalize(vmin=1, vmax=len(self.cursors)+6)
 		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 	
 	
-		fig = plt.figure()
-		fig.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
-		ax = fig.add_subplot(111)
+		fig1 = plt.figure(figsize=(15, 5))
+		fig1.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
+		ax11 = fig1.add_subplot(121)
+		ax12 = fig1.add_subplot(122)
 	
-		fig2 = plt.figure()
+		fig2 = plt.figure(figsize=(15, 5))
 		fig2.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
-		ax2 = fig2.add_subplot(111)
+		ax21 = fig2.add_subplot(121)
+		ax22 = fig2.add_subplot(122)
 	
 		PARAM = {}
-	
-		# Add data values
-	#	files = np.array([])
-	#	files = files.flatten()
-	
-	#	cols = np.array(['r', 'b', 'c', 'g', 'm'])
-	
-		# Add data values
 		
-		
-		for k, d in enumerate(data_paths):
+		for i, c in enumerate(self.cursors):
+			star_vals = search_database(c, search=['status in (1,3)'], select=['todolist.datasource', 'todolist.tmag','rms_hour', 'ptp', 'ccd'])
 			
-			files = np.array([])
-			for root, dirs, fil in os.walk(d):
-				for file in fil:
-					file_path = root + os.sep + file
-					if ('corr' in file_path) and ('.fits' in file_path):
-						print(file_path)
-						files = np.append(files, file_path)
-						
-	#		files = np.append(files, np.array([os.path.join(d, f) for f in os.listdir(d) if f.endswith('.fits')]))
-	#		files = np.array([os.path.join(d, f) for f in os.listdir(d) if f.endswith('.fits.gz')])
+#			sector = get_sector(c)
+#			logger.info('Including data from Sector %i' %int(sector[0]['sector']))
+			
+			rgba_color = scalarMap.to_rgba(i+1)
+			
+			tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
+			rms = np.array([star['rms_hour']*1e6 for star in star_vals], dtype=float)
+			ptp = np.array([star['ptp']*1e6 for star in star_vals], dtype=float)
+			source = np.array([star['datasource'] for star in star_vals], dtype=str)
+
+
+			# TODO: Update elat+elon based on observing sector?
+			PARAM['RA'] = 0#hdu[0].header['RA_OBJ']
+			PARAM['DEC'] = 0#hdu[0].header['DEC_OBJ']
+				
+				
+			idx_lc = (source=='ffi') & (rms!=0)
+			idx_sc = (source=='tpf') & (rms!=0)
+
+			ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
+			ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='2-min cadence')
+
+			ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
+			ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='2-min cadence')
 	
-			print(k, d)
-	#		if k==0:
-	#			tot_rms_tmag_vals = np.zeros([len(files), 6])
-	
-			rms_tmag_vals = np.zeros([len(files), 5])
-			for i, f in enumerate(files):
-				with fits.open(f) as hdu:
-					tmag = hdu[0].header['TESSMAG']
-					flux = hdu[1].data['FLUX_CORR']
-	
-					rms_tmag_vals[i, 0] = tmag
-	
-		#			if k==0:
-		#				tot_rms_tmag_vals[i, 0] = tmag
-	
-					if hdu[1].header.get('NUM_FRM', 60) == 60:
-						rms, ptp = compute_onehour_rms(flux, 120)
-						rms_tmag_vals[i, 1] = rms
-						rms_tmag_vals[i, 3] = ptp
-	
-		#				tot_rms_tmag_vals[i,k+1] = rms
-		#				tot_rms_tmag_vals[i,k+1] = np.nanmedian(np.diff(flux))
-					else:
-						rms, ptp = compute_onehour_rms(flux, 1800)
-						rms_tmag_vals[i, 2] = rms
-						rms_tmag_vals[i, 4] = ptp
-	
-					# TODO: Update elat+elon based on observing sector?
-					PARAM['RA'] = hdu[0].header['RA_OBJ']
-					PARAM['DEC'] = hdu[0].header['DEC_OBJ']
-	
-	
-	
-			idx_sc = np.nonzero(rms_tmag_vals[:, 1])
-			idx_lc = np.nonzero(rms_tmag_vals[:, 2])
-	
-			rgba_color = scalarMap.to_rgba(k)
-	
-			if not labels is None:
-				lab = labels[k]
-			else:
-				lab=''
-	
-			ax.scatter(rms_tmag_vals[idx_sc, 0], rms_tmag_vals[idx_sc, 1], marker='o', facecolors='None', edgecolor=rgba_color, label=lab)
-			ax.scatter(rms_tmag_vals[idx_lc, 0], rms_tmag_vals[idx_lc, 2], marker='s', facecolors='None', edgecolor=rgba_color)
-	
-			ax2.scatter(rms_tmag_vals[idx_sc, 0], rms_tmag_vals[idx_sc, 3], marker='o', facecolors='None', edgecolor=rgba_color, label=lab)
-			ax2.scatter(rms_tmag_vals[idx_lc, 0], rms_tmag_vals[idx_lc, 4], marker='s', facecolors='None', edgecolor=rgba_color)
 	
 		# Plot theoretical lines
-		mags = np.linspace(3.5, 16.5, 50)
+		mags = np.linspace(np.min(tmags)-0.5, np.max(tmags)+0.5, 50)
 		vals = np.zeros([len(mags), 4])
 		vals2 = np.zeros([len(mags), 4])
-	
-	#	print(tot_rms_tmag_vals)
-	
-	#	plt.figure()
-	#	plt.scatter(tot_rms_tmag_vals[:, 0], tot_rms_tmag_vals[:, 1] - tot_rms_tmag_vals[:, 3], facecolors='r', marker='+', color='r')
-	#	plt.scatter(tot_rms_tmag_vals[:, 0], tot_rms_tmag_vals[:, 2] - tot_rms_tmag_vals[:, 3], facecolors='b', marker='+', color='b')
-	#	plt.scatter(tot_rms_tmag_vals[:, 0], tot_rms_tmag_vals[:, 4] - tot_rms_tmag_vals[:, 3], facecolors='g', marker='+', color='g')
-	#	plt.scatter(tot_rms_tmag_vals[:, 0], tot_rms_tmag_vals[:, 5] - tot_rms_tmag_vals[:, 3], facecolors='m', marker='+', color='m')
-	
+		
+		# Expected *1-hour* RMS noise
 		for i in range(len(mags)):
-			vals[i,:], _ = phot_noise(mags[i], 5775, cad, PARAM, sysnoise=sysnoise, verbose=False)
+			vals[i,:], _ = phot_noise(mags[i], 5775, 3600, PARAM, sysnoise=self.sysnoise, verbose=False)
 	
-		ax.semilogy(mags, vals[:, 0], 'r-')
-		ax.semilogy(mags, vals[:, 1], 'g--')
-		ax.semilogy(mags, vals[:, 2], '-')
-		ax.semilogy(mags, np.sqrt(np.sum(vals**2, axis=1)), 'k-')
-		ax.axhline(y=sysnoise, color='b', ls='--')
+		ax11.semilogy(mags, vals[:, 0], 'r-')
+		ax11.semilogy(mags, vals[:, 1], 'g--')
+		ax11.semilogy(mags, vals[:, 2], '-')
+		ax11.semilogy(mags, np.sqrt(np.sum(vals**2, axis=1)), 'k-')
+		ax11.axhline(y=self.sysnoise, color='b', ls='--')
+		
+		ax12.semilogy(mags, vals[:, 0], 'r-')
+		ax12.semilogy(mags, vals[:, 1], 'g--')
+		ax12.semilogy(mags, vals[:, 2], '-')
+		ax12.semilogy(mags, np.sqrt(np.sum(vals**2, axis=1)), 'k-')
+		ax12.axhline(y=self.sysnoise, color='b', ls='--')
 	
+		# Expected ptp for 30-min
 		for i in range(len(mags)):
-			vals2[i,:], _ = phot_noise(mags[i], 5775, 120, PARAM, sysnoise=sysnoise, verbose=False)
+			vals[i,:], _ = phot_noise(mags[i], 5775, 1800, PARAM, sysnoise=self.sysnoise, verbose=False)
+		
+		ax21.semilogy(mags, vals[:, 0], 'r-')
+		ax21.semilogy(mags, vals[:, 1], 'g--')
+		ax21.semilogy(mags, vals[:, 2], '-')
+		ax21.semilogy(mags, np.sqrt(np.sum(vals**2, axis=1)), 'k-')
+		ax21.axhline(y=self.sysnoise, color='b', ls='--')
 	
-		ax2.semilogy(mags, vals2[:, 0], 'r-')
-		ax2.semilogy(mags, vals2[:, 1], 'g--')
-		ax2.semilogy(mags, vals2[:, 2], '-')
-		ax2.semilogy(mags, np.sqrt(np.sum(vals2**2, axis=1)), 'k-')
-	
+		# Expected ptp for 2-min
 		for i in range(len(mags)):
-			vals[i,:], _ = phot_noise(mags[i], 5775, cad, PARAM, sysnoise=sysnoise, verbose=False)
-		tot_noise = np.sqrt(np.sum(vals**2, axis=1))
+			vals2[i,:], _ = phot_noise(mags[i], 5775, 120, PARAM, sysnoise=self.sysnoise, verbose=False)
 	
-		noi_vs_mag = INT.UnivariateSpline(mags, tot_noise)
-		idx = (rms_tmag_vals[:, 1]/noi_vs_mag(rms_tmag_vals[:, 0]) < 1)
-		print([int(x) for x in rms_tmag_vals[idx, -1]])
-		print([x for x in rms_tmag_vals[idx, 0]])
+		ax22.semilogy(mags, vals2[:, 0], 'r-')
+		ax22.semilogy(mags, vals2[:, 1], 'g--')
+		ax22.semilogy(mags, vals2[:, 2], '-')
+		ax22.semilogy(mags, np.sqrt(np.sum(vals2**2, axis=1)), 'k-')
+		ax22.axhline(y=self.sysnoise, color='b', ls='--')
+
 	
-		ax.semilogy(mags, vals[:, 0], 'r-')
-		ax.semilogy(mags, vals[:, 1], 'g--')
-		ax.semilogy(mags, vals[:, 2], '-')
-		ax.semilogy(mags, tot_noise, 'k-')
-		ax.axhline(y=sysnoise, color='b', ls='--')
+#		noi_vs_mag = INT.UnivariateSpline(mags, tot_noise)
+#		idx = (rms_tmag_vals[:, 1]/noi_vs_mag(rms_tmag_vals[:, 0]) < 1)
+#		print([int(x) for x in rms_tmag_vals[idx, -1]])
+#		print([x for x in rms_tmag_vals[idx, 0]])	
 	
-		for i in range(len(mags)):
-			vals2[i,:], _ = phot_noise(mags[i], 5775, 120, PARAM, sysnoise=sysnoise, verbose=False)
-		tot_noise2 = np.sqrt(np.sum(vals2**2, axis=1))
-	
-		ax2.semilogy(mags, vals2[:, 0], 'r-')
-		ax2.semilogy(mags, vals2[:, 1], 'g--')
-		ax2.semilogy(mags, vals2[:, 2], '-')
-		ax2.semilogy(mags, tot_noise2, 'k-')
-	
-		ax.set_xlim([3.5, 16.5])
-		ax.set_ylim([10, 1e5])
-		ax.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-		ax.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$', fontsize=16, labelpad=10)
-		ax.xaxis.set_major_locator(MultipleLocator(2))
-		ax.xaxis.set_minor_locator(MultipleLocator(1))
-		ax.tick_params(direction='out', which='both', pad=5, length=3)
-		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
-		ax.yaxis.set_ticks_position('both')
+		
+		ax11.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$', fontsize=16, labelpad=10)
+		ax21.set_ylabel('point-to-point MDV (ppm)', fontsize=16, labelpad=10)
+		
+		for axx in np.array([ax11, ax12, ax21, ax22]):
+			axx.set_xlim([np.min(tmags)-0.5, np.max(tmags)+0.5])
+			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+			axx.xaxis.set_major_locator(MultipleLocator(2))
+			axx.xaxis.set_minor_locator(MultipleLocator(1))
+			axx.tick_params(direction='out', which='both', pad=5, length=3)
+			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
+			axx.yaxis.set_ticks_position('both')
+			axx.set_yscale("log", nonposy='clip')
+			axx.legend(loc='upper left', prop={'size': 12})
 	
 		###########
-		ax2.set_xlim([3.5, 16.5])
-		ax2.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-		ax2.set_ylabel('point-to-point MDV (ppm)', fontsize=16, labelpad=10)
-		ax2.set_yscale("log", nonposy='clip')
-		ax2.xaxis.set_major_locator(MultipleLocator(2))
-		ax2.xaxis.set_minor_locator(MultipleLocator(1))
-		ax2.tick_params(direction='out', which='both', pad=5, length=3)
-		ax2.tick_params(which='major', pad=6, length=5,labelsize='15')
-		ax2.yaxis.set_ticks_position('both')
-	
-	
-		ax.legend(loc='upper left', prop={'size': 12})
-		ax2.legend(loc='upper left', prop={'size': 12})
-	#	plt.tight_layout()
-		
-		if version!=1:
-			save_path = 'plots/sector%02d/v%1d/' %(sector,version)
+
+		if len(self.cursors)>1:
+			filename = 'rms_joint.%s' %self.extension
+			filename2 = 'ptp_joint.%s' %self.extension
 		else:
-			save_path = 'plots/sector%02d/' %sector
-	
-		if not os.path.exists(save_path):
-			os.makedirs(save_path)
+			filename = 'rms.%s' %self.extension
+			filename2 = 'ptp.%s' %self.extension
 			
-		fig.savefig(os.path.join(save_path, 'rms_noise.pdf'), bb_inches='tight')
-		fig.savefig(os.path.join(save_path, 'rms_noise.png'), bb_inches='tight')
-		fig2.savefig(os.path.join(save_path, 'mvd_noise.pdf'), bb_inches='tight')
-		fig2.savefig(os.path.join(save_path, 'mvd_noise.png'), bb_inches='tight')
-		
-		if savetex:
-			save_path2 = '../releasenote_tex/Release_note%1d/' %sector
+			
+		fig1.savefig(os.path.join(self.outfolders, filename))
+		fig2.savefig(os.path.join(self.outfolders, filename2))
+			
+		if self.show:
+			plt.show()
+		else:
+			plt.close('all')
 	
-			fig.savefig(os.path.join(save_path2, 'rms_noise.pdf'), bb_inches='tight')
-			fig2.savefig(os.path.join(save_path2, 'mvd_noise.pdf'), bb_inches='tight')
-	
-		plt.show()
 	
 	# =============================================================================
 	#
@@ -712,8 +694,9 @@ class DataValidation(object):
 		logger.info('------------------------------------------')
 		logger.info('Plotting Pixels in aperture vs. Magnitude')
 		
-		fig = plt.figure()
-		ax = fig.add_subplot(111)
+		fig = plt.figure(figsize=(15, 5))
+		ax1 = fig.add_subplot(121)
+		ax2 = fig.add_subplot(122)
 		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
 		norm = colors.Normalize(vmin=0, vmax=len(self.cursors)+5)
 		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
@@ -722,49 +705,51 @@ class DataValidation(object):
 		vy = np.array([])
 	
 		for i, c in enumerate(self.cursors):
-			star_vals = search_database(c, search=['corr_status=1'], select=['todolist.datasource', 'todolist.tmag','ccd','diagnostics.mask_size'])
-			sector = get_sector(c)
+			star_vals = search_database(c, search=['status in (1,3)'], select=['todolist.datasource', 'todolist.tmag','ccd','diagnostics.mask_size'])
 			
-			
-			logger.info('Including data from Sector %i' %int(sector[0]['sector']))
-			
+#			sector = get_sector(c)
+#			logger.info('Including data from Sector %i' %int(sector[0]['sector']))
+#			lab = 'Sector %i' %int(sector[0]['sector'])
+
 			rgba_color = scalarMap.to_rgba(i)
 			
-			tmags = np.array([star_vals[j]['tmag'] for j in range(len(star_vals))])
-			masksizes = np.array([star_vals[j]['mask_size'] for j in range(len(star_vals))])
-			source = np.array([star_vals[j]['datasource'] for j in range(len(star_vals))])
+			tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
+			masksizes = np.array([star['mask_size'] for star in star_vals], dtype=float)
+			source = np.array([star['datasource'] for star in star_vals], dtype=str)
 
 			vx = np.append(vx, tmags)
 			vy = np.append(vy, masksizes)
 
-			lab = 'Sector %i' %int(sector[0]['sector'])
-
 			idx_lc = (source=='ffi')
 			idx_sc = (source=='tpf')
-			ax.scatter(tmags[idx_lc], masksizes[idx_lc], marker='s', facecolors='None', color=rgba_color)
-			ax.scatter(tmags[idx_sc], masksizes[idx_sc], marker='o', facecolors='None', color=rgba_color, label=lab)
+			ax1.scatter(tmags[idx_lc][::10], masksizes[idx_lc][::10], marker='o', color=rgba_color, alpha=0.1, label='30-min cadence') #facecolors='None', 
+			ax2.scatter(tmags[idx_sc][::10], masksizes[idx_sc][::10], marker='o', color=rgba_color, alpha=0.1, label='2-min cadence') #facecolors='None', 
 	
+		print(masksizes[idx_lc])
 		mags = np.linspace(np.nanmin(vx)-1, np.nanmax(vx)+1, 500)
 		pix = np.asarray([Pixinaperture(m) for m in mags], dtype='float64')
-		ax.plot(mags, pix, color='k', ls='-')
+		ax1.plot(mags, pix, color='k', ls='-')
+		ax2.plot(mags, pix, color='k', ls='-')
 	
-		ax.set_xlim([np.nanmin(vx)-1, np.nanmax(vx)+1])
-		ax.set_ylim([3, np.nanmax(vy)+100])
+		ax1.set_xlim([np.nanmin(vx)-1, np.nanmax(vx)+1])
+		ax1.set_ylim([3, np.nanmax(vy)+100])
 	
-		ax.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-		ax.set_ylabel('Pixels in aperture', fontsize=16, labelpad=10)
+		
 	
-		xtick_major = np.median(np.diff(ax.get_xticks()))
-		ax.xaxis.set_minor_locator(MultipleLocator(xtick_major/2))
-		ytick_major = np.median(np.diff(ax.get_yticks()))
-		ax.yaxis.set_minor_locator(MultipleLocator(ytick_major/2))
-		ax.tick_params(direction='out', which='both', pad=5, length=3)
-		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
-		ax.yaxis.set_ticks_position('both')
-		ax.xaxis.set_ticks_position('both')
-		ax.set_yscale("log", nonposy='clip')
-		ax.yaxis.set_major_formatter(ScalarFormatter())
-		ax.legend(loc='upper right', prop={'size': 12})
+		for axx in np.array([ax1, ax2]):
+			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+			axx.set_ylabel('Pixels in aperture', fontsize=16, labelpad=10)
+			xtick_major = np.median(np.diff(axx.get_xticks()))
+			axx.xaxis.set_minor_locator(MultipleLocator(xtick_major/2))
+			ytick_major = np.median(np.diff(axx.get_yticks()))
+			axx.yaxis.set_minor_locator(MultipleLocator(ytick_major/2))
+			axx.tick_params(direction='out', which='both', pad=5, length=3)
+			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
+			axx.yaxis.set_ticks_position('both')
+			axx.xaxis.set_ticks_position('both')
+			axx.set_yscale("log", nonposy='clip')
+			axx.yaxis.set_major_formatter(ScalarFormatter())
+			axx.legend(loc='upper right', prop={'size': 12})
 	
 		if len(self.cursors)>1:
 			filename = 'pix_in_aper_joint.%s' %self.extension
@@ -772,13 +757,12 @@ class DataValidation(object):
 			filename = 'pix_in_aper.%s' %self.extension
 			
 			
-		for i, fol in enumerate(self.outfolders):
-			fig.savefig(os.path.join(fol, filename))
+		fig.savefig(os.path.join(self.outfolders, filename))
 			
 		if self.show:
 			plt.show()
-			
-		plt.close(fig)
+		else:
+			plt.close(fig)
 	
 	
 	# =============================================================================
@@ -786,7 +770,6 @@ class DataValidation(object):
 	# =============================================================================
 	
 	def plot_magtoflux(self):
-		
 		"""
 		Function to plot flux values from apertures against the stellar TESS magnitudes, 
 		and determine coefficient describing the relation
@@ -799,73 +782,132 @@ class DataValidation(object):
 		logger.info('--------------------------------------')
 		logger.info('Plotting Magnitude to Flux conversion')
 		
-		fig = plt.figure()
-		ax = fig.add_subplot(111)
+		fig = plt.figure(figsize=(15, 5))
+		ax1 = fig.add_subplot(121)
+		ax2 = fig.add_subplot(122)
 	
 		norm = colors.Normalize(vmin=0, vmax=len(self.cursors)+5)
 		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
 		
-		vx = np.array([])
-		vy = np.array([])
+		vx = np.array([], dtype=float)
+		vy = np.array([], dtype=float)
 	
 		for i, c in enumerate(self.cursors):
-			star_vals = search_database(c, search=['corr_status=1'], select=['todolist.datasource','todolist.tmag','ccd','mean_flux'])
-			sector = get_sector(c)
-			
-			logger.info('Including data from Sector %i' %int(sector[0]['sector']))
+			star_vals = search_database(c, search=["status in (1,3)"], select=['todolist.datasource','todolist.starid','todolist.tmag','ccd','mean_flux'])
+#			sector = get_sector(c)
+#			logger.info('Including data from Sector %i' %int(sector[0]['sector']))
+#			lab = 'Sector %i' %int(sector[0]['sector'])			
 			
 			rgba_color = scalarMap.to_rgba(i)
 			
-			tmags = np.array([star_vals[j]['tmag'] for j in range(len(star_vals))])
-			meanfluxes = np.array([star_vals[j]['mean_flux'] for j in range(len(star_vals))])
-			source = np.array([star_vals[j]['datasource'] for j in range(len(star_vals))])
-			
+			tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
+			meanfluxes = np.array([star['mean_flux'] for star in star_vals], dtype=float)
+			source = np.array([star['datasource'] for star in star_vals], dtype=str)
+			tics = np.array([str(star['starid']) for star in star_vals], dtype=str)	
+
 			vx = np.append(vx, tmags)
 			vy = np.append(vy, meanfluxes)
 				
-			lab = 'Sector %i' %int(sector[0]['sector'])
 			idx_lc = (source=='ffi')
 			idx_sc = (source=='tpf')
-			ax.scatter(tmags[idx_lc], meanfluxes[idx_lc], marker='s', facecolors='None', color=rgba_color)
-			ax.scatter(tmags[idx_sc], meanfluxes[idx_sc], marker='o', facecolors='None', color=rgba_color, label=lab)
+			ax1.scatter(tmags[idx_lc], meanfluxes[idx_lc], marker='o', facecolors='None', color=rgba_color, alpha=0.1, label='30-min cadence')
+			ax2.scatter(tmags[idx_sc], meanfluxes[idx_sc], marker='o', facecolors='None', color=rgba_color, alpha=0.1, label='2-min cadence')
 	
+		
+		tics_sc = tics[idx_sc]
+		tics_lc = tics[idx_lc]
+		tt=np.array([t for t in tics_sc if t in tics_lc])
+		
+		vy_lc = np.array([vy[(tics==t) & (source=='ffi')][0] for t in tt])
+		vy_sc = np.array([vy[(tics==t) & (source=='tpf')][0] for t in tt])
+		vx_lc = np.array([vx[(tics==t) & (source=='ffi')][0] for t in tt])
+
+
+		plt.figure()
+		
+		bin_means, bin_edges, binnumber = binning(vx_lc, np.abs(vy_lc/vy_sc - 1), statistic='median', bins=15, range=(1.5,10))
+		bin_width = (bin_edges[1] - bin_edges[0])
+		bin_centers = bin_edges[1:] - bin_width/2
+		
+		plt.scatter(vx_lc, np.abs(vy_lc/vy_sc - 1), alpha=0.1)
+		plt.scatter(bin_centers, 1.4826*bin_means, marker='o', color='r')
+		plt.scatter(bin_centers, 1.4826*3*bin_means, marker='.', color='r')
 	
+		idx0 = np.isfinite(vy) & np.isfinite(vx)
+		idx1 = np.isfinite(vy) & np.isfinite(vx) & (source=='ffi')
+		idx2 = np.isfinite(vy) & np.isfinite(vx) & (source=='tpf')
+
 		logger.info('Optimising coefficient of relation')
-		z = lambda c: np.sum((np.log10(vy) + 0.4*(vx - c))**2)
+		z = lambda c: np.log10(np.sum((vy[idx1] -  10**(-0.4*(vx[idx1] - c)))**2))
+		z2 = lambda c: np.log10(np.sum((vy[idx2] -  10**(-0.4*(vx[idx2] - c)))**2))
 		cc = OP.minimize(z, 20.5, method='Nelder-Mead', options={'disp':False})
+		cc2 = OP.minimize(z2, 20.5, method='Nelder-Mead', options={'disp':False})
 		
 		logger.info('Optimisation terminated successfully? %s' %cc.success)
 		logger.info('Coefficient is found to be %1.4f' %cc.x)
 		
 		C=np.linspace(19, 22, 100)
 		fig2 = plt.figure()
-		ax2=fig2.add_subplot(111)
-		[ax2.scatter(c, z(c), marker='o', color='k') for c in C] 
-		ax2.axvline(x=cc.x, color='r')
-		ax2.set_xlabel('Coefficient')
-		ax2.set_ylabel(r'$\chi^2$')
+		ax21=fig2.add_subplot(111)
+		[ax21.scatter(c, z(c), marker='o', color='k') for c in C] 
+		[ax21.scatter(c, z2(c), marker='o', color='b') for c in C] 
+		ax21.axvline(x=cc.x, color='k', label='30-min')
+		ax21.axvline(x=cc2.x, color='b', ls='--', label='2-min')
+		ax21.set_xlabel('Coefficient')
+		ax21.set_ylabel(r'$\chi^2$')
+		ax21.legend(loc='upper left', prop={'size': 12})
+		
+		
+		plt.figure()
+		d0 = vy[idx0]/(10**(-0.4*(vx[idx0] - cc.x))) - 1
+		d1 = vy[idx1]/(10**(-0.4*(vx[idx1] - cc.x))) - 1
+		d2 = vy[idx2]/(10**(-0.4*(vx[idx2] - cc.x))) - 1
+		plt.scatter(vx[idx1], np.abs(d1), alpha=0.1)
+		plt.scatter(vx[idx2], np.abs(d2), color='k', alpha=0.1)
+		plt.axhline(y=0, ls='--', color='k')
+		
+		bin_means1, bin_edges1, binnumber1 = binning(vx[idx1], np.abs(d1), statistic='median', bins=15, range=(1.5,10))
+		bin_width1 = (bin_edges1[1] - bin_edges1[0])
+		bin_centers1 = bin_edges1[1:] - bin_width1/2
+		
+		bin_means2, bin_edges2, binnumber2 = binning(vx[idx2], np.abs(d2), statistic='median', bins=15, range=(1.5,10))
+		bin_width2 = (bin_edges2[1] - bin_edges2[0])
+		bin_centers2 = bin_edges2[1:] - bin_width2/2
+		
+		plt.scatter(bin_centers1, 1.4826*bin_means1, marker='o', color='r')
+		plt.scatter(bin_centers1, 1.4826*3*bin_means1, marker='.', color='r')
+		plt.plot(bin_centers1, 1.4826*3*bin_means1, color='r')
+		
+		plt.scatter(bin_centers2, 1.4826*bin_means2, marker='o', color='g')
+		plt.scatter(bin_centers2, 1.4826*3*bin_means2, marker='.', color='g')
+		plt.plot(bin_centers2, 1.4826*3*bin_means2, color='g')
+#		plt.yscale("log", nonposy='clip')
+		
 		
 		
 		mag = np.linspace(np.nanmin(vx)-1, np.nanmax(vx)+1,100)
-		ax.plot(mag, 10**(-0.4*(mag - cc.x)), color='k', ls='--')
-		ax.set_yscale("log", nonposy='clip')
-	
-		ax.set_xlim([np.nanmin(vx)-1, np.nanmax(vx)+1])
-		ax.set_xlim(ax.get_xlim()[::-1])
-	
-		ax.text(8, 1000, r'$\rm Flux = 10^{-0.4\,(T_{mag} - %1.2f)}$' %cc.x, fontsize=14)
-		ax.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-		ax.set_ylabel('Mean flux', fontsize=16, labelpad=10)
-	
-		ax.xaxis.set_major_locator(MultipleLocator(2))
-		ax.xaxis.set_minor_locator(MultipleLocator(1))
-		ax.tick_params(direction='out', which='both', pad=5, length=3)
-		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
-		ax.yaxis.set_ticks_position('both')
-		ax.xaxis.set_ticks_position('both')
-		ax.legend(loc='upper left', prop={'size': 12})
+		for axx in np.array([ax1, ax2]):
+			axx.plot(mag, 10**(-0.4*(mag - cc.x)), color='k', ls='--')
+			axx.set_yscale("log", nonposy='clip')
 		
+			axx.set_xlim([np.nanmin(vx)-1, np.nanmax(vx)+1])
+			axx.set_xlim(axx.get_xlim()[::-1])
+		
+			
+			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+			
+		
+			axx.xaxis.set_major_locator(MultipleLocator(2))
+			axx.xaxis.set_minor_locator(MultipleLocator(1))
+			axx.tick_params(direction='out', which='both', pad=5, length=3)
+			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
+			axx.yaxis.set_ticks_position('both')
+			axx.xaxis.set_ticks_position('both')
+			axx.legend(loc='upper left', prop={'size': 12})
+		
+		ax1.text(10, 1e7, r'$\rm Flux = 10^{-0.4\,(T_{mag} - %1.2f)}$' %cc.x, fontsize=14)
+		ax1.set_ylabel('Mean flux', fontsize=16, labelpad=10)
 		
 		if len(self.cursors)>1:
 			filename = 'mag_to_flux_joint.%s' %self.extension
@@ -874,15 +916,195 @@ class DataValidation(object):
 			filename = 'mag_to_flux.%s' %self.extension
 			filename2 = 'mag_to_flux_optimize.%s' %self.extension
 			
-		for i, fol in enumerate(self.outfolders):
-			fig.savefig(os.path.join(fol, filename))
-			fig2.savefig(os.path.join(fol, filename2))
+		fig.savefig(os.path.join(self.outfolders, filename))
+		fig2.savefig(os.path.join(self.outfolders, filename2))
+			
+		if self.show:
+			plt.show(block=True)
+		else:	
+			plt.close('all')
+		
+		
+	# =========================================================================
+	# 		
+	# =========================================================================
+	
+	def plot_stamp(self):
+		
+		"""
+		Function to plot width and height of pixel stamps against the stellar TESS magnitudes
+
+		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+		"""
+	
+		logger=logging.getLogger(__name__)
+		
+		logger.info('--------------------------------------')
+		logger.info('Plotting Stamp sizes')
+		
+
+		fig1 = plt.figure(figsize=(15, 10))
+		ax11 = fig1.add_subplot(221)
+		ax12 = fig1.add_subplot(222)
+		ax13 = fig1.add_subplot(223)
+		ax14 = fig1.add_subplot(224)
+		
+		fig2 = plt.figure(figsize=(15, 7))
+		ax21 = fig2.add_subplot(121)
+		ax22 = fig2.add_subplot(122)
+		
+	
+		norm = colors.Normalize(vmin=0, vmax=len(self.cursors)+5)
+		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
+		
+		
+		for i, c in enumerate(self.cursors):
+			star_vals = search_database(c, search=["status in (1,3)"], select=['todolist.datasource','todolist.tmag','stamp_resizes','stamp_width','stamp_height','elaptime'])
+			
+#			sector = get_sector(c)
+#			logger.info('Including data from Sector %i' %int(sector[0]['sector']))
+#			tics = np.array([star['starid'] for star in star_vals])			
+			
+			rgba_color = scalarMap.to_rgba(i)
+			
+			tmags = np.array([star['tmag'] for star in star_vals], dtype=float)	
+			et = np.array([star['elaptime'] for star in star_vals], dtype=float)	
+			width = np.array([star['stamp_width'] for star in star_vals], dtype=float)		
+			height = np.array([star['stamp_height'] for star in star_vals], dtype=float)	
+			resize = np.array([star['stamp_resizes'] for star in star_vals], dtype=float)	
+			ds = np.array([star['datasource']=='ffi' for star in star_vals], dtype=bool)	
+			
+			idx1 = (resize<1) & (ds==True)
+			idx2 = (resize<1) & (ds==False)
+			idx3 = (resize>0) & (ds==True)
+			idx4 = (resize>0) & (ds==False)
+			
+			ax12.scatter(tmags[idx1], width[idx1], marker='o', facecolors='None', color=rgba_color, label='30-min cadence, no resize', alpha=0.5, zorder=2)
+			ax14.scatter(tmags[idx2], width[idx2], marker='o', facecolors='None', color=rgba_color, label='2-min cadence, no resize', alpha=0.5, zorder=2)
+			
+			ax12.scatter(tmags[idx3], width[idx3], marker='o', facecolors='None', color='k', label='30-min cadence, resized', alpha=0.5)
+			ax14.scatter(tmags[idx4], width[idx4], marker='o', facecolors='None', color='k', label='2-min cadence, resized', alpha=0.5)
+			
+			ax11.scatter(tmags[idx1], height[idx1], marker='o', facecolors='None', color=rgba_color, label='30-min cadence, no resize', alpha=0.5, zorder=2)
+			ax13.scatter(tmags[idx2], height[idx2], marker='o', facecolors='None', color=rgba_color, label='2-min cadence, no resize', alpha=0.5, zorder=2)
+			
+			ax11.scatter(tmags[idx3], height[idx3], marker='o', facecolors='None', color='k', label='30-min cadence, resized', alpha=0.5)
+			ax13.scatter(tmags[idx4], height[idx4], marker='o', facecolors='None', color='k', label='2-min cadence, resized', alpha=0.5)
+
+			
+			bin_means, bin_edges, binnumber = binning(tmags[(ds==True)], height[(ds==True)], statistic='median', bins=20, range=(1.5,10))
+			bin_width = (bin_edges[1] - bin_edges[0])
+			bin_centers = bin_edges[1:] - bin_width/2
+			
+			
+			bin_means2, bin_edges2, binnumber2 = binning(tmags[(ds==True)], width[(ds==True)], statistic='median', bins=20, range=(1.5,10))
+			bin_width2 = (bin_edges2[1] - bin_edges2[0])
+			bin_centers2 = bin_edges2[1:] - bin_width2/2
+			
+			ax12.scatter(bin_centers2, bin_means2, marker='o', color='b', zorder=3)
+			ax11.scatter(bin_centers, bin_means, marker='o', color='b', zorder=3)
+				
+			normalize2 = colors.Normalize(vmin=0, vmax=np.max(resize))	
+			scalarMap = cmx.ScalarMappable(norm=normalize2, cmap=plt.get_cmap('Set1') )
+			for jj in range(0, int(np.max(resize))):
+				rgba_color = scalarMap.to_rgba(jj)
+				try:
+					kde1 = KDE(et[(ds==True)][(resize[(ds==True)]==jj) & (et[(ds==True)]<50)])
+					kde1.fit(gridsize=1000)
+					ax21.plot(kde1.support, kde1.density, color=rgba_color)
+				except:
+					pass
+								
+			kde1 = KDE(et[(ds==True) & (et<50)])
+			kde2 = KDE(et[(ds==False) & (et<50)])
+			kde1.fit(gridsize=1000)
+			kde2.fit(gridsize=1000)
+			ax21.plot(kde1.support, kde1.density, color='k', lw=2, label='30-min cadence')
+			ax22.plot(kde2.support, kde2.density, color='k', lw=2, label='2-min candence')
+			ax21.set_xlim([0, 50])
+			
+		
+		# Decide how many pixels to use based on lookup tables as a function of Tmag:
+		mags = np.array([ 0.        ,  0.52631579,  1.05263158,  1.57894737,  2.10526316,
+       2.63157895,  3.15789474,  3.68421053,  4.21052632,  4.73684211,
+       5.26315789,  5.78947368,  6.31578947,  6.84210526,  7.36842105,
+       7.89473684,  8.42105263,  8.94736842,  9.47368421, 10.        ])
+		nhei = np.array([831.98319063, 533.58494422, 344.0840884 , 223.73963332,
+      147.31365728,  98.77856016,  67.95585074,  48.38157414,
+       35.95072974,  28.05639497,  23.043017  ,  19.85922009,
+       17.83731732,  16.5532873 ,  15.73785092,  15.21999971,
+       14.89113301,  14.68228285,  14.54965042,  14.46542084])
+		nwid = np.array([157.71602062, 125.1238281 ,  99.99440209,  80.61896267,
+       65.6799962 ,  54.16166547,  45.28073365,  38.4333048 ,
+       33.15375951,  29.08309311,  25.94450371,  23.52456986,
+       21.65873807,  20.22013336,  19.1109318 ,  18.25570862,
+       17.59630936,  17.08789543,  16.69589509,  16.39365266])	
+	
+	
+		mags2 = np.linspace(np.min(tmags)-0.2, np.max(tmags)+0.2, 500)
+		nwid2 = np.array([2*(np.ceil(np.interp(m, mags, nwid))//2)+1 for m in mags2])
+		nhei2 = np.array([2*(np.ceil(np.interp(m, mags, nhei))//2)+1 for m in mags2])
+		
+		nwid2[(nwid2<15)] = 15
+		nhei2[(nhei2<15)] = 15
+		
+					
+		ax12.plot(mags2,nwid2, 'b--')	
+		ax11.plot(mags2,nhei2, 'b--')	
+	
+		ax12.set_ylabel('Stamp width (pixels)', fontsize=16, labelpad=10)
+		ax14.set_ylabel('Stamp width (pixels)', fontsize=16, labelpad=10)
+		ax11.set_ylabel('Stamp height (pixels)', fontsize=16, labelpad=10)
+		ax13.set_ylabel('Stamp height (pixels)', fontsize=16, labelpad=10)
+	
+	
+		ax12.yaxis.set_major_locator(MultipleLocator(20))
+		ax12.yaxis.set_minor_locator(MultipleLocator(10))
+		
+		ax11.yaxis.set_major_locator(MultipleLocator(50))
+		ax11.yaxis.set_minor_locator(MultipleLocator(25))
+		
+		
+		for axx in np.array([ax11, ax12, ax13, ax14]):
+			axx.xaxis.set_major_locator(MultipleLocator(2))
+			axx.xaxis.set_minor_locator(MultipleLocator(1))
+			
+			axx.tick_params(direction='out', which='both', pad=5, length=3)
+			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
+			axx.yaxis.set_ticks_position('both')
+			axx.xaxis.set_ticks_position('both')
+
+			
+			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+			axx.legend(loc='upper right', prop={'size': 12})
+	
+		for axx in np.array([ax21, ax22]):
+			axx.xaxis.set_major_locator(MultipleLocator(5))
+			axx.xaxis.set_minor_locator(MultipleLocator(2.5))
+			
+			axx.tick_params(direction='out', which='both', pad=5, length=3)
+			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
+			axx.yaxis.set_ticks_position('both')
+			
+			axx.set_xlabel('Calculation time (sec)', fontsize=16, labelpad=10)
+			axx.legend(loc='upper right', prop={'size': 12})
+
+	
+		if len(self.cursors)>1:
+			filename = 'stamp_size_joint.%s' %self.extension
+			filename2 = 'calc_time_joint.%s' %self.extension
+		else:
+			filename = 'stamp_size.%s' %self.extension
+			filename2 = 'calc_time.%s' %self.extension
+			
+		fig1.savefig(os.path.join(self.outfolders, filename))
+		fig2.savefig(os.path.join(self.outfolders, filename2))
 			
 		if self.show:
 			plt.show()
-			
-		plt.close(fig)
-		
+		else:
+			plt.close('all')
+	
 			
 	# =============================================================================
 	#
@@ -891,8 +1113,7 @@ class DataValidation(object):
 	def plot_mag_dist(self):
 		
 		"""
-		Function to plot flux values from apertures against the stellar TESS magnitudes, 
-		and determine coefficient describing the relation
+		Function to plot magnitude distribution for targets
 
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
@@ -900,113 +1121,52 @@ class DataValidation(object):
 		logger=logging.getLogger(__name__)
 		
 		logger.info('--------------------------------------')
-		logger.info('Plotting Magnitude to Flux conversion')
+		logger.info('Plotting Magnitude distribution')
 		
-		fig = plt.figure()
+		fig = plt.figure(figsize=(10,5))
 		ax = fig.add_subplot(111)
 	
-		norm = colors.Normalize(vmin=0, vmax=len(self.cursors)+5)
+		norm = colors.Normalize(vmin=0, vmax=len(self.cursors)*2+5)
 		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
 		
-
+		tmag_all = np.array([])
 	
 		for i, c in enumerate(self.cursors):
-			star_vals = search_database(c, search=['corr_status=1'], select=['todolist.datasource','todolist.tmag'])
-			sector = get_sector(c)
+			star_vals = search_database(c, search=["status in (1,3)"], select=['todolist.datasource','todolist.tmag'])
 			
-			logger.info('Including data from Sector %i' %int(sector[0]['sector']))
+#			sector = get_sector(c)
+#			logger.info('Including data from Sector %i' %int(sector[0]['sector']))
+#			lab = 'Sector %i' %int(sector[0]['sector'])			
 			
-			rgba_color = scalarMap.to_rgba(i)
+			rgba_color1 = scalarMap.to_rgba(i*2)
+			rgba_color2 = scalarMap.to_rgba(i*2+1)
 			
 			tmags = np.array([star_vals[j]['tmag'] for j in range(len(star_vals))])
-			meanfluxes = np.array([star_vals[j]['mean_flux'] for j in range(len(star_vals))])
 			source = np.array([star_vals[j]['datasource'] for j in range(len(star_vals))])
-			
-#			vx = np.append(vx, tmags)
-#			vy = np.append(vy, meanfluxes)
-				
-			lab = 'Sector %i' %int(sector[0]['sector'])
+		
 			idx_lc = (source=='ffi')
 			idx_sc = (source=='tpf')
 			
-			if len(tmag_vals_lc) > 0:
-				kde_lc = KDE(tmag_vals_lc)
+			if sum(idx_lc) > 0:
+				kde_lc = KDE(tmags[idx_lc])
 				kde_lc.fit(gridsize=1000)
-				ax.fill_between(kde_lc.support, 0, kde_lc.density*len(tmag_vals_lc), color='b', alpha=0.3, label='1800s')
-				ax.scatter(tmag_vals_lc, np.zeros_like(tmag_vals_lc), lw=1, marker='|', c='k', s=80)
+				ax.fill_between(kde_lc.support, 0, kde_lc.density*sum(idx_lc), color=rgba_color1, alpha=0.3, label='30-min cadence')
+#				ax.scatter(tmags[idx_lc], -300*np.ones_like(tmags[idx_lc]), lw=1, marker='|', c=rgba_color1, s=30, alpha=0.1)
 	
-			if len(tmag_vals_sc) > 0:
-				kde_sc = KDE(tmag_vals_sc)
+			if sum(idx_sc) > 0:
+				kde_sc = KDE(tmags[idx_sc])
 				kde_sc.fit(gridsize=1000)
-				ax.fill_between(kde_sc.support, 0, kde_sc.density*len(tmag_vals_sc), color='r', alpha=0.3, label='120s')
-				ax.scatter(tmag_vals_sc, np.zeros_like(tmag_vals_sc), lw=1, marker='|', c='k', s=80)
+				ax.fill_between(kde_sc.support, 0, kde_sc.density*sum(idx_sc), color=rgba_color2, alpha=0.3, label='2-min cadence')
+#				ax.scatter(tmags[idx_sc], -300*np.ones_like(tmags[idx_sc]), lw=1, marker='|', c=rgba_color2, s=30, alpha=0.1)
 		
-			tmag_all = np.append(tmag_vals_lc, tmag_vals_sc)
+			tmag_all = np.append(tmag_all, tmags)
 			kde_all = KDE(tmag_all)
 			kde_all.fit(gridsize=1000)
 			ax.plot(kde_all.support, kde_all.density*len(tmag_all), 'k-', lw=1.5, label='All')
 			
 			
-			ax.scatter(tmags[idx_lc], meanfluxes[idx_lc], marker='s', facecolors='None', color=rgba_color)
-			ax.scatter(tmags[idx_sc], meanfluxes[idx_sc], marker='o', facecolors='None', color=rgba_color, label=lab)
 			
-			
-	
-		# Add data values
-		files = np.array([])
-		for root, dirs, fil in os.walk(data_path):
-			for file in fil:
-				file_path = root + os.sep + file
-				if ('corr' in file_path) and ('.fits' in file_path):
-					print(file_path)
-					files = np.append(files, file_path)
-			
-			
-		tmag_vals_sc = np.array([])
-		tmag_vals_lc = np.array([])
-		for f in files:
-			with fits.open(f) as hdu:
-				tmag = hdu[0].header['TESSMAG']
-				dt = hdu[1].header['TIMEDEL'] * 86400
-				
-				print(tmag, dt)
-	
-				if dt < 1000:
-					tmag_vals_sc = np.append(tmag_vals_sc, tmag)
-				else:
-					tmag_vals_lc = np.append(tmag_vals_lc, tmag)
-	
-		fig = plt.figure()
-		ax = fig.add_subplot(111)
-	
-		if len(tmag_vals_lc) > 0:
-			kde_lc = KDE(tmag_vals_lc)
-			kde_lc.fit(gridsize=1000)
-			ax.fill_between(kde_lc.support, 0, kde_lc.density*len(tmag_vals_lc), color='b', alpha=0.3, label='1800s')
-			ax.scatter(tmag_vals_lc, np.zeros_like(tmag_vals_lc), lw=1, marker='|', c='k', s=80)
-	
-		if len(tmag_vals_sc) > 0:
-			kde_sc = KDE(tmag_vals_sc)
-			kde_sc.fit(gridsize=1000)
-			ax.fill_between(kde_sc.support, 0, kde_sc.density*len(tmag_vals_sc), color='r', alpha=0.3, label='120s')
-			ax.scatter(tmag_vals_sc, np.zeros_like(tmag_vals_sc), lw=1, marker='|', c='k', s=80)
-	
-		tmag_all = np.append(tmag_vals_lc, tmag_vals_sc)
-		kde_all = KDE(tmag_all)
-		kde_all.fit(gridsize=1000)
-		ax.plot(kde_all.support, kde_all.density*len(tmag_all), 'k-', lw=1.5, label='All')
-	
-		
-	#	try:
-	#		kde_sc = KDE(tmag_vals_sc)
-	#		kde_sc.fit(gridsize=1000)
-	#		ax.plot(kde_sc.support, kde_sc.density*len(tmag_vals_sc), label='SC')
-	#		ax.scatter(tmag_vals_sc, np.zeros_like(tmag_vals_sc), lw=1, marker='+', s=80)
-	#	except:
-	#		pass		
-		
-	#	ax.set_xlim([3.5, 16.5])
 		ax.set_ylim(ymin=0)
 		ax.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
 		ax.set_ylabel('Number of stars', fontsize=16, labelpad=10)
@@ -1015,29 +1175,22 @@ class DataValidation(object):
 		ax.tick_params(direction='out', which='both', pad=5, length=3)
 		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
 		ax.yaxis.set_ticks_position('both')
-		plt.tight_layout()
-		ax.legend(frameon=False, prop={'size':12} ,loc='upper right', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
+		ax.xaxis.set_ticks_position('both')
+		ax.legend(frameon=False, prop={'size':12} ,loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
 	
-		ax.yaxis.set_ticks_position('both')
-	
-		if version!=1:
-			save_path = 'plots/sector%02d/v%1d/' %(sector,version)
+
+		if len(self.cursors)>1:
+			filename = 'mag_dist_joint.%s' %self.extension
 		else:
-			save_path = 'plots/sector%02d/' %sector
-	
-		if not os.path.exists(save_path):
-			os.makedirs(save_path)
-	
-		fig.savefig(os.path.join(save_path, 'magnitudes.pdf'), bb_inches='tight')
-		fig.savefig(os.path.join(save_path, 'magnitudes.png'), bb_inches='tight')
+			filename = 'mag_dist.%s' %self.extension
+			
+		fig.savefig(os.path.join(self.outfolders, filename))
+			
+		if self.show:
+			plt.show()
+		else:
+			plt.close('all')
 		
-		if savetex:
-			save_path2 = '../releasenote_tex/Release_note%1d/' %sector
-				
-			fig.savefig(os.path.join(save_path2, 'magnitudes.pdf'), bb_inches='tight')
-		
-		
-		plt.show()
 
 
 # =============================================================================
@@ -1048,17 +1201,25 @@ if __name__ == '__main__':
 
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run TESS Corrector pipeline on single star.')
-	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'mag2flux'))
+	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'mag2flux', 'stamp', 'noise', 'magdist'))
 	parser.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png', 'eps'))
 	parser.add_argument('-s', '--show', help='Show plots.', default=False, choices=('True', 'False'))
+	parser.add_argument('-v', '--validate', help='Compute validation (only run is method is "all").', default=True, choices=('True', 'False'))
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('input_folders', type=str, help='Directory to create catalog files in.', nargs='?', default=None)
+	parser.add_argument('output_folder', type=str, help='Directory in which to place output if several input folders are given.', nargs='?', default=None)
+	parser.add_argument('-sn', '--sysnoise', type=float, help='systematic noise level for noise plot.', nargs='?', default=0)
 	args = parser.parse_args()
 
-	# Make sure at least one setting is given:
-#	if not args.all and args.starid is None and not args.random:
-#		parser.error("Please select either a specific STARID or RANDOM.")
+
+	args.show = 'True'
+	args.method = 'noise'
+	args.sysnoise = 5
+	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-2127753/'
+	
+	if args.output_folder is None and len(args.input_folders.split(';'))>1:
+		parser.error("Please specify an output directory!")
 
 	# Set logging level:
 	logging_level = logging.INFO
@@ -1078,17 +1239,9 @@ if __name__ == '__main__':
 	logger_parent.addHandler(console)
 	logger_parent.setLevel(logging_level)
 
-	# Get input and output folder from environment variables:
-#	input_folder = args.input_folder
-#	if input_folder is None:
-#		test_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), 'tests', 'input'))
-#		if args.test:
-#			input_folder = test_folder
-#		else:
-#			input_folder = os.environ.get('TESSCORR_INPUT', test_folder)
-#	output_folder = os.environ.get('TESSCORR_OUTPUT', os.path.abspath('.'))
-#	logger.info("Loading input data from '%s'", input_folder)
-#	logger.info("Putting output data in '%s'", output_folder)
+
+	logger.info("Loading input data from '%s'", args.input_folders)
+	logger.info("Putting output data in '%s'", args.output_folder)
 
 	# Get the class for the selected method:
 	DataValidation(args)
@@ -1117,20 +1270,3 @@ if __name__ == '__main__':
 #					break
 
 #	plt.close('all')
-#
-#
-#	path0 = '/media/mikkelnl/Elements/TASOC/TASOC_S01_fasttrack_thres08_newWS/'
-#	path1 = '/media/mikkelnl/Elements/TASOC/TASOC_S02_fasttrack_thres08_newWS/'
-#	
-##	path0 = r'C:\Users\au195407\Downloads\Ny mappe'
-##	data_paths = np.array([path0 + '08', path0 + '09', path0 + '10', path0 + '11', path0 + '12'])
-#	#data_paths = np.array([path0 + '10',]
-#
-#	magtoflux([path0, path1], sector=1, version=5, savetex=False, labels=np.array(['Sector 1','Sector 2']))
-##	plot_bg([path0, path1], cad=120, sector=1, version=3, sysnoise=0, savetex=False)
-##	plot_noice_lc([path0, path1], cad=120, sector=1, version=4, sysnoise=0, savetex=False)
-#	plot_onehour_noise([path0, path1], cad=120, sector=1, version=5, sysnoise=0, savetex=False, labels=np.array(['Sector 1','Sector 2']))
-#	plot_pixinaperture([path0, path1], sector=1, version=5, savetex=False, labels=np.array(['Sector 1','Sector 2']))
-##	plot_mag_dist([path0, path1], sector=1, version=3, savetex=False)
-
-	
