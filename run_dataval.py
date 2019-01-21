@@ -126,6 +126,9 @@ def phot_noise(Tmag, Teff, cad, PARAM, verbose=False, sysnoise=60):
 	noise_vals = np.array([shot_noise, zodiacal_noise, read_noise, systematic_noise_ppm])
 	return noise_vals, PARAM # ppm per cadence
 
+def reduce_percentile(x):
+	return np.percentile(x[np.isfinite(x)], 95)
+
 # =============================================================================
 #
 # =============================================================================
@@ -162,16 +165,6 @@ def compute_onehour_rms(flux, cad):
 
 	return RMS, PTP
 
-
-def get_sector(cursor):
-	logger = logging.getLogger(__name__)
-
-	query = "SELECT sector FROM settings;"
-	logger.debug("Running query: %s", query)
-
-	# Ask the database:
-	cursor.execute(query)
-	return [dict(row) for row in cursor.fetchall()]
 
 
 def search_database(cursor, select=None, search=None, order_by=None, limit=None, distinct=False):
@@ -230,7 +223,6 @@ def search_database(cursor, select=None, search=None, order_by=None, limit=None,
 def set_val_flag(D, valtype=None):
 	
 	dv = np.zeros_like(D)
-	
 	
 	magvsflux_high = 1
 	magvsflux_low = 2
@@ -374,8 +366,9 @@ class DataValidation(object):
 			val3 = self.plot_stamp(return_val=True)
 			val4 = self.plot_mag_dist(return_val=True)
 			val5 = self.plot_onehour_noise(return_val=True)
+			val6 = self.plot_contam(return_val=True)	
 			
-			dv = val1['dv']+val2['dv']+val3['dv']+val4['dv']+val5['dv']
+			dv = val1['dv']+val2['dv']+val3['dv']+val4['dv']+val5['dv']+val6['dv']
 			
 			for j, cursor in enumerate(self.cursors):
 				cursor.execute("INSERT INTO diagnostics (priority, starid, dv) VALUES (?,?,?);", (
@@ -426,115 +419,127 @@ class DataValidation(object):
 			self.plot_onehour_noise()
 		elif self.method == 'magdist':
 			self.plot_mag_dist()
-			
-			
+		elif self.method == 'contam':
+			val = self.plot_contam()	
+			print(val['dv'])
 		
 
-		
-#	def plot_folder(self, todo):
-#		"""
-#		Return folder path where plots for a given lightcurve should be saved.
-#
-#		Parameters:
-#			lc (``lightkurve.TessLightCurve``): Lightcurve to return plot path for.
-#
-#		Returns:
-#			string: Path to directory where plots should be saved.
-#
-#		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
-#		"""
-#		lcfile = os.path.join(self.input_folder, lc.meta['task']['lightcurve'])
-#		plot_folder = os.path.join(os.path.dirname(lcfile), 'plots', '%011d' % lc.targetid)
-#		return plot_folder	
-
-
-
-#	def plot_bg(data_paths, sector, cad=1800, sysnoise=0, version=1, savetex=False):
-#		norm = colors.Normalize(vmin=1, vmax=4)
-#		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
-#	
-#	
-#		fig = plt.figure(figsize=(15, 6))
-#		ax1 = fig.add_subplot(221)
-#		ax2 = fig.add_subplot(222)
-#		ax3 = fig.add_subplot(223)
-#		ax4 = fig.add_subplot(224)
-#		ax1.set_rasterization_zorder(0)
-#		ax2.set_rasterization_zorder(0)
-#		ax3.set_rasterization_zorder(0)
-#		ax4.set_rasterization_zorder(0)
-#		
-#		fig.subplots_adjust(left=0.08, wspace=0.3, top=0.945, bottom=0.145, right=0.98)
-#		
-#		for k, d in enumerate(data_paths):
-#			
-#			files = np.array([])
-#			for root, dirs, fil in os.walk(d):
-#				for file in fil:
-#					file_path = root + os.sep + file
-#					if ('corr' in file_path) and ('.fits' in file_path):
-#						files = np.append(files, file_path)
-#						
-#			for i, f in enumerate(files):
-#				with fits.open(f) as hdu:
-#					time = hdu[1].data['TIME']
-#					bg = hdu[1].data['FLUX_BKG']
-#	
-#					cam = hdu[0].header['CAMERA']
-#					
-#					print(cam)
-#					rgba_color = scalarMap.to_rgba(cam)
-#					if cam==1:
-#						ax1.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)
-#					if cam==2:
-#						ax2.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)
-#					if cam==3:
-#						ax3.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)
-#					if cam==4:
-#						ax4.scatter(time, bg, marker='o', s=1, facecolors='None', edgecolor=rgba_color, zorder=-1)	
-#	#				ax.scatter(rms_tmag_vals[idx_lc, 0], rms_tmag_vals[idx_lc, 2], marker='s', facecolors='None', edgecolor=rgba_color)
-#	
-#	#	ax4.set_xlim([np.min(times)-500, np.max(times)+500])
-#	#	ax4.set_ylim([-0.15, 0.15])
-#						
-#		ax1.text(0.05, 0.9, 'Camera 1', transform=ax1.transAxes, fontsize=14)				
-#		ax2.text(0.05, 0.9, 'Camera 2', transform=ax2.transAxes, fontsize=14)				
-#		ax3.text(0.05, 0.9, 'Camera 3', transform=ax3.transAxes, fontsize=14)				
-#		ax4.text(0.05, 0.9, 'Camera 4', transform=ax4.transAxes, fontsize=14)
-#					
-#		ax3.set_xlabel('Time TBJD (days)', fontsize=16, labelpad=10)
-#		ax4.set_xlabel('Time TBJD (days)', fontsize=16, labelpad=10)
-#		ax1.set_ylabel(r'$\rm Counts\,\, (e^{-}/s)$', fontsize=16, labelpad=10)
-#		ax3.set_ylabel(r'$\rm Counts\,\, (e^{-}/s)$', fontsize=16, labelpad=10)
-#		
-#	#	ax2.set_ylim([2200, 8000])
-#		for ax in np.array([ax1, ax2, ax3, ax4]):
-#			ax.xaxis.set_major_locator(MultipleLocator(5))
-#			ax.xaxis.set_minor_locator(MultipleLocator(2.5))
-#			ax.tick_params(direction='out', which='both', pad=5, length=3)
-#			ax.tick_params(which='major', pad=6, length=5,labelsize='15')
-#	
-#		
-#		if version!=1:
-#			save_path = 'plots/sector%02d/v%1d/' %(sector,version)
-#		else:
-#			save_path = 'plots/sector%02d/' %sector
-#	
-#		if not os.path.exists(save_path):
-#			os.makedirs(save_path)
-#		fig.savefig(os.path.join(save_path, 'BG.pdf'), bb_inches='tight')		
-#		fig.savefig(os.path.join(save_path, 'BG.png'), bb_inches='tight')		
-#			
-#		if savetex:
-#			save_path2 = '../releasenote_tex/Release_note%1d/' %sector
-#			fig.savefig(os.path.join(save_path2, 'BG.pdf'), bb_inches='tight')
-#	
-#	
-#		plt.show()
-		
 
 	# =============================================================================
 	# 
+	# =============================================================================
+	
+	def plot_contam(self, return_vals=False):
+	
+		
+		"""
+		Function to plot the contamination against the stellar TESS magnitudes
+
+		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+		"""
+	
+		logger=logging.getLogger(__name__)
+		
+		logger.info('------------------------------------------')
+		logger.info('Plotting Contamination vs. Magnitude')
+		
+		norm = colors.Normalize(vmin=1, vmax=len(self.cursors)+6)
+		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
+	
+	
+		fig = plt.figure(figsize=(15, 5))
+		fig.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
+		ax = fig.add_subplot(111)
+		
+		
+		for i, c in enumerate(self.cursors):
+			star_vals = search_database(c, search=['status in (1,3)'], select=['todolist.starid','method','todolist.datasource','todolist.tmag','contamination'])
+			
+			rgba_color = scalarMap.to_rgba(i+1)
+			
+			tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
+			cont = np.array([star['contamination'] for star in star_vals], dtype=float)
+			tics = np.array([star['starid'] for star in star_vals])
+			met = np.array([star['method'] for star in star_vals])
+			source = np.array([star['datasource'] for star in star_vals], dtype=str)
+
+			
+			
+#			idx_finite = np.isfinite(cont)
+			idx_low = (cont<=1) & np.isfinite(cont)
+			idx_high_ffi = (cont>1) & np.isfinite(cont) & (source=='ffi')
+			idx_high_tpf = (cont>1) & np.isfinite(cont) & (source=='tpf')
+			idx_low_ffi = (cont<=1) & np.isfinite(cont) & (source=='ffi')
+			idx_low_tpf = (cont<=1) & np.isfinite(cont) & (source=='tpf')
+			cont[idx_high_ffi] = 1.1
+			cont[idx_high_tpf] = 1.1
+			
+			ax.scatter(tmags[idx_low_ffi], cont[idx_low_ffi], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1)
+			ax.scatter(tmags[idx_low_tpf], cont[idx_low_tpf], marker='o', facecolors='g', color='g', alpha=0.1)
+			ax.scatter(tmags[idx_high_ffi], cont[idx_high_ffi], marker='o', facecolors='None', color=rgba_color, alpha=0.9, label='30-min')
+			ax.scatter(tmags[idx_high_tpf], cont[idx_high_tpf], marker='o', facecolors='None', color='g', alpha=0.9, label='2-min')
+
+			bin_means, bin_edges, binnumber = binning(tmags[idx_low], cont[idx_low], statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
+			bin_width = (bin_edges[1] - bin_edges[0])
+			bin_centers = bin_edges[1:] - bin_width/2
+			
+			
+			ax.scatter(bin_centers, 1.4826*bin_means, marker='o', color='k')
+			ax.scatter(bin_centers, 1.4826*5*bin_means, marker='.', color='k')
+			
+			cont_vs_mag = INT.InterpolatedUnivariateSpline(bin_centers, 1.4826*5*bin_means)
+			
+			mags = np.linspace(np.nanmin(tmags),np.nanmax(tmags),100)
+			ax.plot(mags, cont_vs_mag(mags))
+			
+			if return_vals:
+				val = {}
+				dv = set_val_flag((cont>1), valtype='contam_one')
+				val['dv'] = dv
+	
+		
+		print(sum(np.isfinite(cont)==False))
+		print(tics[np.isfinite(cont)==False])
+		print(met[np.isfinite(cont)==False])
+		ax.set_xlim([np.min(tmags)-0.5, np.max(tmags)+0.5])
+		ax.set_ylim([-0.05, 1.15])
+
+		ax.axhline(y=0, ls='--', color='k', zorder=-1)
+		ax.axhline(y=1.1, ls=':', color='k', zorder=-1)
+		ax.axhline(y=1, ls=':', color='k', zorder=-1)
+		ax.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+		ax.set_ylabel('Contamination', fontsize=16, labelpad=10)
+
+		ax.xaxis.set_major_locator(MultipleLocator(2))
+		ax.xaxis.set_minor_locator(MultipleLocator(1))
+		ax.yaxis.set_major_locator(MultipleLocator(0.2))
+		ax.yaxis.set_minor_locator(MultipleLocator(0.1))
+		ax.tick_params(direction='out', which='both', pad=5, length=3)
+		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
+		ax.yaxis.set_ticks_position('both')
+		ax.legend(loc='upper left', prop={'size': 12})
+		
+		###########
+
+		if len(self.cursors)>1:
+			filename = 'contam_joint.%s' %self.extension
+		else:
+			filename = 'contam.%s' %self.extension
+			
+			
+		fig.savefig(os.path.join(self.outfolders, filename))
+			
+		if self.show:
+			plt.show()
+		else:
+			plt.close('all')
+			
+		if return_vals:
+			return vals
+		
+	
+	# =============================================================================
+	# 	
 	# =============================================================================
 	
 	def plot_onehour_noise(self):
@@ -1201,7 +1206,7 @@ if __name__ == '__main__':
 
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run TESS Corrector pipeline on single star.')
-	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'mag2flux', 'stamp', 'noise', 'magdist'))
+	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'magdist'))
 	parser.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png', 'eps'))
 	parser.add_argument('-s', '--show', help='Show plots.', default=False, choices=('True', 'False'))
 	parser.add_argument('-v', '--validate', help='Compute validation (only run is method is "all").', default=True, choices=('True', 'False'))
@@ -1214,7 +1219,7 @@ if __name__ == '__main__':
 
 
 	args.show = 'True'
-	args.method = 'noise'
+	args.method = 'contam'
 	args.sysnoise = 5
 	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-2127753/'
 	
