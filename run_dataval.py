@@ -16,6 +16,8 @@ import six
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib import cm
+
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter,ScalarFormatter
@@ -36,12 +38,27 @@ import sqlite3
 #import pywcsgrid2.healpix_helper as healpix_helper
 from scipy.stats import binned_statistic as binning
 import contextlib
+from scipy.ndimage import filters as filt
+
 plt.ioff()
 
 
 #==============================================================================
 # Noise model as a function of magnitude and position
 #==============================================================================
+
+def sphere_distance(ra1, dec1, ra2, dec2):
+	# Convert angles to radians:
+	ra1 = np.deg2rad(ra1)
+	ra2 = np.deg2rad(ra2)
+	dec1 = np.deg2rad(dec1)
+	dec2 = np.deg2rad(dec2)
+
+	# Calculate distance using Vincenty formulae:
+	return np.rad2deg(np.arctan2(
+		np.sqrt( (np.cos(dec2)*np.sin(ra2-ra1))**2 + (np.cos(dec1)*np.sin(dec2) - np.sin(dec1)*np.cos(dec2)*np.cos(ra2-ra1))**2 ),
+		np.sin(dec1)*np.sin(dec2) + np.cos(dec1)*np.cos(dec2)*np.cos(ra2-ra1)
+	))
 
 def ZLnoise(gal_lat):
     # RMS noise from Zodiacal background
@@ -330,11 +347,11 @@ class DataValidation(object):
 				
 				if self.method == 'all' and self.doval == True:
 					# Create table for diagnostics:
-					cursor.execute('DROP TABLE IF EXISTS datavalidation')
-					cursor.execute("""CREATE TABLE IF NOT EXISTS datavalidation (
+					cursor.execute('DROP TABLE IF EXISTS datavalidation_raw')
+					cursor.execute("""CREATE TABLE IF NOT EXISTS datavalidation_raw (
 						priority INT PRIMARY KEY NOT NULL,
 						starid BIGINT NOT NULL,
-						dataval INT,
+						dataval INT, approved Boolean NOT NULL,
 						FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 					);""")
 			
@@ -353,10 +370,10 @@ class DataValidation(object):
 		if self.method == 'all':
 #			val1 = self.plot_magtoflux(return_val=True)
 			val2 = self.plot_pixinaperture(return_val=True)
-#			val3 = self.plot_stamp(return_val=True)
+#			self.plot_stamp(return_val=True)
 #			self.plot_mag_dist()
-#			val5 = self.plot_onehour_noise(return_val=True)
-#			val6 = self.plot_contam(return_val=True)	
+#			val3 = self.plot_onehour_noise(return_val=True)
+#			val4 = self.plot_contam(return_val=True)	
 			
 			val = val2
 #			for i, f in enumerate(self.input_folders):		
@@ -369,13 +386,16 @@ class DataValidation(object):
 #					cursor = conn.cursor()
 	#				dv = val1[cursorno]['dv']+val2[cursorno]['dv']+val3[cursorno]['dv']+val4[cursorno]['dv']+val5[cursorno]['dv']+val6[cursorno]['dv']
 			dv = val['dv']
+			
+			
+			app = np.ones_like(dv, dtype=bool)
 					
 	#				assert val1[cursorno]['priority'] == val2[cursorno]['priority']
 	#				assert val1[cursorno]['starid'] == val2[cursorno]['starid']
 				
 
-			[self.cursor.execute("INSERT INTO datavalidation (priority, starid, dataval) VALUES (?,?,?);", (int(v1), int(v2), int(v3))) for v1,v2,v3 in  
-					zip(val['priority'],val['starid'],dv)]
+			[self.cursor.execute("INSERT INTO datavalidation_raw (priority, starid, dataval, approved) VALUES (?,?,?,?);", (int(v1), int(v2), int(v3), bool(v4))) for v1,v2,v3,v4 in  
+					zip(val['priority'],val['starid'],dv,app)]
 		
 			self.conn.commit()
 			
@@ -537,8 +557,8 @@ class DataValidation(object):
 		logger.info('------------------------------------------')
 		logger.info('Plotting Noise vs. Magnitude')
 		
-		norm = colors.Normalize(vmin=1, vmax=len(self.cursors)+6)
-		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
+#		norm = colors.Normalize(vmin=1, vmax=len(self.cursors)+6)
+#		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 	
 	
 		fig1 = plt.figure(figsize=(15, 5))
@@ -687,7 +707,7 @@ class DataValidation(object):
 		ax2 = fig.add_subplot(122)
 		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
 	
-		star_vals = search_database(self.cursor, search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','ccd','diagnostics.mask_size'])
+		star_vals = search_database(self.cursor, search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','todolist.camera'])
 		
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
@@ -703,83 +723,198 @@ class DataValidation(object):
 		
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
 		masksizes = np.array([star['mask_size'] for star in star_vals], dtype=float)
+		ccds = np.array([star['ccd'] for star in star_vals], dtype=int)
+		camera = np.array([star['camera'] for star in star_vals], dtype=str)
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
 		pri = np.array([star['priority'] for star in star_vals], dtype=int)
 		tics = np.array([star['starid'] for star in star_vals], dtype=str)		
+		
+#		cats = {}
+#		for cams in list(set(camera)):
+#			cats[cams] = {}
+#			for jj in range(4):
+#				cam_file = os.path.join(self.input_folders[0], 'catalog_camera' + str(int(cams)) +'_ccd' + str(jj+1) + '.sqlite')
+##				with contextlib.closing(sqlite3.connect(cam_file)) as conn:
+#				with sqlite3.connect(cam_file) as conn:
+#					conn.row_factory = sqlite3.Row
+#					cursor = conn.cursor()
+#				
+#					cats[cams][str(jj+1)] = cursor
+					
+#		cams_cen = {}
+#		cams_cen['1','ra'] = 324.566998914166
+#		cams_cen['1','decl'] = -33.172999301379
+#		cams_cen['2','ra'] = 338.5766
+#		cams_cen['2','decl'] = -55.0789
+#		cams_cen['3','ra'] = 19.4927
+#		cams_cen['3','decl'] = -71.9781
+#		cams_cen['4','ra'] = 90.0042
+#		cams_cen['4','decl'] = -66.5647			
+#		
+#		dists = np.zeros(len(tics))
+#		for ii, tic in enumerate(tics):
+#			query = "SELECT ra,decl FROM catalog where starid=%s" %tic
+#			# Ask the database: status=1 
+#			cc = cats[camera[ii]][str(ccds[ii])]
+#			cc.execute(query)
+#			star_vals = cc.fetchone()
+#			dists[ii] = sphere_distance(star_vals['ra'], star_vals['decl'], cams_cen[camera[ii],'ra'], cams_cen[camera[ii],'decl'])
+			
+
+#		cmap = cm.get_cmap('viridis')
+#		normalize = colors.Normalize(vmin=min(dists), vmax=max(dists))
+#		cols = [cmap(normalize(value)) for value in dists]
+		
+		
+#		norm = colors.Normalize(vmin=min(dists), vmax=max(dists))
+#		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('viridis') )
+#		rgba_color = np.array([scalarMap.to_rgba(s) for s in dists])
 
 		# Get rid of stupid halo targets
 		masksizes[np.isnan(masksizes)] = 0
 
-		idx_lc = (source=='ffi') & (masksizes>4)
-		idx_sc = (source=='tpf') & (masksizes>4)
-		ax1.scatter(tmags[idx_lc], masksizes[idx_lc], marker='o', color=rgba_color, alpha=0.01, label='30-min cadence') 
-		ax2.scatter(tmags[idx_sc], masksizes[idx_sc], marker='o', color=rgba_color, alpha=0.01, label='2-min cadence') 
+		idx_lc = (source=='ffi') #& (masksizes>4)
+		idx_sc = (source=='tpf') #& (masksizes>4)
+		ax1.scatter(tmags[idx_lc], masksizes[idx_lc], marker='o', color='k', alpha=0.5, label='30-min cadence') 
+		ax2.scatter(tmags[idx_sc], masksizes[idx_sc], marker='o', color='k', alpha=0.5, label='2-min cadence') 
 	
+					
+		# Compute median-bin curve
+		bin_means, bin_edges, binnumber = binning(tmags[idx_lc], masksizes[idx_lc], statistic='median', bins=15, range=(np.nanmin(tmags[idx_lc]),np.nanmax(tmags[idx_lc])))
+		bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
+		ax1.scatter(bin_centers, bin_means, marker='o', color='r')
+
+		bin_means, bin_edges, binnumber = binning(tmags[idx_sc], masksizes[idx_sc], statistic='median', bins=15, range=(np.nanmin(tmags[idx_sc]),np.nanmax(tmags[idx_sc])))
+		bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
+		ax2.scatter(bin_centers, bin_means, marker='o', color='r')
+
+#		pix_vs_mag = INT.InterpolatedUnivariateSpline(bin_centers, bin_means)
+#		normed0 = masksizes[idx_lc]/med_vs_mag(tmags[idx_lc])
+#		normed1 = masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc])
+		
+		
+#		bin_mad, bin_edges, binnumber = binning(tmags[idx_lc], np.abs(normed1), statistic='median', bins=15, range=(np.nanmin(tmags[idx_lc]),np.nanmax(tmags[idx_lc])))
+#		bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
+#		bin_var = bin_mad*1.4826
+#		var_vs_mag = INT.InterpolatedUnivariateSpline(bin_centers, bin_var)
+
+#		plt.figure()
+#		plt.scatter(tmags[idx_lc], normed1/var_vs_mag(tmags[idx_lc]), color=rgba_color[idx_lc], alpha=0.5)
+#		
+#		plt.figure()
+#		red = masksizes[idx_lc]/pix_vs_mag(tmags[idx_lc])
+#		bin_means, bin_edges, binnumber = binning(dists[idx_lc], red, statistic='median', bins=15, range=(np.nanmin(dists[idx_lc]),np.nanmax(dists[idx_lc])))
+#		bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
+#		plt.scatter(dists[idx_lc], red, alpha=0.1, color='k')
+#		plt.scatter(bin_centers, bin_means, color='r')
+
+		
+		# Plot median-bin curve (1 and 5 times standadised MAD)
+#		ax1.scatter(bin_centers, 1.4826*5*bin_means, marker='.', color='r')
+#		print(masksizes[(tmags>15) & (source=='tpf')])
+#		print(np.max(tmags[idx_lc]))
+#		print(bin_centers, bin_means)
+		
+#		print(masksizes[idx_lc])
+#		print(any(np.isnan(masksizes[idx_lc])))
+#		print(pix_vs_mag(tmags[idx_lc]))
+#		diff = np.abs(masksizes[idx_lc] - pix_vs_mag(tmags[idx_lc]))
+		
+#		fig00=plt.figure()
+#		ax00=fig00.add_subplot(111)
+#		d = masksizes[idx_lc] - pix_vs_mag(tmags[idx_lc])
+#		ax00.hist(d, bins=500)
+#		ax00.axvline(x=np.percentile(d, 99.9), c='k')
+#		ax00.axvline(x=np.percentile(d, 0.1), c='k')
+		
+		
+		
+		xmin = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 11.6, 16])
+		ymin = np.array([2600, 846, 526, 319, 238, 159, 118, 62, 44, 32, 23, 15.7, 11.15, 8, 5, 4, 4])
+		min_bound = INT.InterpolatedUnivariateSpline(xmin, ymin, k=1)
+		xmax = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 12, 12.7, 13.3, 14, 14.5, 15, 16])
+		ymax = np.array([10000, 3200, 2400, 1400, 1200, 900, 800, 470, 260, 200, 170, 130, 120, 100, 94, 86, 76, 67, 59, 54, 50, 50])
+		max_bound = INT.InterpolatedUnivariateSpline(xmax, ymax, k=1)
+		ax1.plot(xmin, ymin, marker='o', color='r')
+		ax1.plot(xmax, ymax, marker='o', color='r')
+		
+
+		
+		
+#		idx_lc2 = (source=='ffi') & (masksizes>4) & (tmags>8)
+#		idx_sort = np.argsort(tmags[idx_lc2])
+#		perfilt95 = filt.percentile_filter(masksizes[idx_lc2][idx_sort], 99.8, size=1000)
+##		perfilt95 = filt.uniform_filter1d(perfilt95, 5000)
+#		perfilt95 = filt.gaussian_filter1d(perfilt95, 10000)
+#		perfilt05 = filt.percentile_filter(masksizes[idx_lc2][idx_sort], 0.2, size=1000)
+##		perfilt05 = filt.uniform_filter1d(perfilt05, 5000)
+#		perfilt05 = filt.gaussian_filter1d(perfilt05, 10000)
+#
+#		ax1.plot(tmags[idx_lc2][idx_sort], perfilt95, color='m')
+#		ax1.plot(tmags[idx_lc2][idx_sort], perfilt05, color='m')
+#		print(tmags[idx_lc2][idx_sort])
+#		perh_vs_mag = INT.interp1d(tmags[idx_lc2][idx_sort], perfilt95)
+#		perl_vs_mag = INT.interp1d(tmags[idx_lc2][idx_sort], perfilt05)
+
+
+#		ticsh = tics[idx_lc2][(masksizes[idx_lc2]>perh_vs_mag(tmags[idx_lc2]))]
+#		ticsl = tics[idx_lc2][(masksizes[idx_lc2]<perl_vs_mag(tmags[idx_lc2]))]
+		
+		
+		ticsh = tics[idx_lc][(masksizes[idx_lc]>max_bound(tmags[idx_lc]))]
+		ticsh_m = tmags[idx_lc][(masksizes[idx_lc]>max_bound(tmags[idx_lc]))]
+		ticsh_mm = masksizes[idx_lc][(masksizes[idx_lc]>max_bound(tmags[idx_lc]))]
+		ticsl = tics[idx_lc][(masksizes[idx_lc]<min_bound(tmags[idx_lc]))]
+		ticsl_m = tmags[idx_lc][(masksizes[idx_lc]<min_bound(tmags[idx_lc]))]
+		ticsl_mm = masksizes[idx_lc][(masksizes[idx_lc]<min_bound(tmags[idx_lc]))]
+
+		print('HIGH')
+
+		for ii, tic in enumerate(ticsh):
+			print(tic, ticsh_m[ii], ticsh_mm[ii])
+			
+		print('LOW')	
+		for ii, tic in enumerate(ticsl):
+			print(tic, ticsl_m[ii], ticsl_mm[ii])	
+
+		print(len(ticsh))
+		print(len(ticsl))
+		
+		
+#		bin_means1, bin_edges1, binnumber1 = binning(tmags[idx_lc], masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc]), statistic=reduce_percentile1, bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
+#		bin_means2, bin_edges2, binnumber2 = binning(tmags[idx_lc], masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc]), statistic=reduce_percentile2, bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
+#		bin_means1, bin_edges1, binnumber1 = binning(tmags[idx_lc][d>0], d[d>0], statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
+#		bin_means2, bin_edges2, binnumber2 = binning(tmags[idx_lc][d<0], d[d<0], statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
+#		ax1.scatter(bin_centers, bin_means+bin_means1, marker='o', color='b')
+#		ax1.scatter(bin_centers, bin_means+5*bin_means1, marker='o', color='b')
+#		ax1.scatter(bin_centers, bin_means+4*bin_means2, marker='o', color='b')
+#		ax1.scatter(bin_centers, bin_means+bin_means2, marker='o', color='b')
+#		ax1.scatter(tmags[idx_lc][idx_sort], P.values, marker='o', color='m')
+
+
 		# Assign validation bits
 		if return_val:
 			val = {}
 			dv1 = set_val_flag((masksizes==4), valtype='min_mask')
-#			dv2 = set_val_flag((masksizes<mask_vs_mag(tmags) & (masksizes>4)), valtype='small_mask')
-#			dv3 = set_val_flag((masksizes>mask_vs_mag(tmags)), valtype='large_mask')
-			val['dv'] = dv1#+dv2+dv3
+			dv2 = set_val_flag((masksizes<min_bound(tmags)), valtype='small_mask')
+			dv3 = set_val_flag((masksizes>max_bound(tmags)), valtype='large_mask')
+			
+			
+			val['dv'] = dv1+dv2+dv3
 			val['priority'] = pri
 			val['starid'] = tics
-			
-		# Compute median-bin curve
-		bin_means, bin_edges, binnumber = binning(tmags[idx_lc], masksizes[idx_lc], statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
-		bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
-		
-		# Plot median-bin curve (1 and 5 times standadised MAD)
-		ax1.scatter(bin_centers, bin_means, marker='o', color='r')
-#		ax1.scatter(bin_centers, 1.4826*5*bin_means, marker='.', color='r')
-		print(bin_centers, bin_means)
-		pix_vs_mag = INT.InterpolatedUnivariateSpline(bin_centers, bin_means)
-		print(masksizes[idx_lc])
-		print(tics[idx_lc][np.isnan(masksizes[idx_lc])])
-		print(pix_vs_mag(tmags[idx_lc]))
-		diff = np.abs(masksizes[idx_lc] - pix_vs_mag(tmags[idx_lc]))
-		
-		fig00=plt.figure()
-		ax00=fig00.add_subplot(111)
-		d = masksizes[idx_lc] - pix_vs_mag(tmags[idx_lc])
-		ax00.hist(d, bins=500)
-		ax00.axvline(x=np.percentile(d, 99.9), c='k')
-		ax00.axvline(x=np.percentile(d, 0.1), c='k')
-		
-#		def strided_app(a, L, S ):  # Window len = L, Stride len/stepsize = S
-#		    nrows = ((a.size-L)//S)+1
-#		    n = a.strides[0]
-#		    return np.lib.stride_tricks.as_strided(a, shape=(nrows,L), strides=(S*n,n))
-		
-#		idx_sort = np.argsort(tmags[idx_lc])
-##		d2 = np.pad(d, 50, 'constant', constant_values=(np.nan))
-##		P=np.percentile(strided_app(d2, W,1), 50)
-#		import pandas as pd
-#		series = pd.Series(masksizes[idx_lc][idx_sort])
-#		P=series.rolling(window = 501, center = True).quantile(.99)
 
-		bin_means1, bin_edges1, binnumber1 = binning(tmags[idx_lc], masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc]), statistic=reduce_percentile1, bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
-		bin_means2, bin_edges2, binnumber2 = binning(tmags[idx_lc], masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc]), statistic=reduce_percentile2, bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
-#		bin_means1, bin_edges1, binnumber1 = binning(tmags[idx_lc][d>0], d[d>0], statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
-#		bin_means2, bin_edges2, binnumber2 = binning(tmags[idx_lc][d<0], d[d<0], statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
-		ax1.scatter(bin_centers, bin_means+bin_means1, marker='o', color='b')
-#		ax1.scatter(bin_centers, bin_means+5*bin_means1, marker='o', color='b')
-#		ax1.scatter(bin_centers, bin_means+4*bin_means2, marker='o', color='b')
-		ax1.scatter(bin_centers, bin_means+bin_means2, marker='o', color='b')
-#		ax1.scatter(tmags[idx_lc][idx_sort], P.values, marker='o', color='m')
 
-		
-#		mags = np.linspace(np.nanmin(tmags),np.nanmax(tmags),100)
-		
-		
-		print(masksizes[idx_lc])
-		mags = np.linspace(np.nanmin(tmags)-1, np.nanmax(tmags)+1, 500)
-		pix = np.asarray([Pixinaperture(m) for m in mags], dtype='float64')
-		ax1.plot(mags, pix, color='k', ls='-')
-		ax2.plot(mags, pix, color='k', ls='-')
+
+
+#		mags = np.linspace(np.nanmin(tmags)-1, np.nanmax(tmags)+1, 500)
+#		pix = np.asarray([Pixinaperture(m) for m in mags], dtype='float64')
+#		ax1.plot(mags, pix, color='k', ls='-')
+#		ax2.plot(mags, pix, color='k', ls='-')
 	
-		ax1.set_xlim([np.nanmin(tmags)-0.5, np.nanmax(tmags)+0.5])
-		ax1.set_ylim([3, np.nanmax(masksizes)+100])
+		ax1.set_xlim([np.nanmin(tmags[idx_lc])-0.5, np.nanmax(tmags[idx_lc])+0.5])
+		ax1.set_ylim([0.99, np.nanmax(masksizes)+500])
+		ax2.set_ylim([0.99, np.nanmax(masksizes)+500])
 	
 		for axx in np.array([ax1, ax2]):
 			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
@@ -851,7 +986,10 @@ class DataValidation(object):
 				rgba_color = 'k'
 		else:
 			rgba_color = 'k'
-						
+		
+		
+		
+		print('I am here 1')
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
 		meanfluxes = np.array([star['mean_flux'] for star in star_vals], dtype=float)
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
@@ -862,25 +1000,27 @@ class DataValidation(object):
 		ax1.scatter(tmags[idx_lc], meanfluxes[idx_lc], marker='o', facecolors='None', color=rgba_color, alpha=0.1, label='30-min cadence')
 		ax2.scatter(tmags[idx_sc], meanfluxes[idx_sc], marker='o', facecolors='None', color=rgba_color, alpha=0.1, label='2-min cadence')
 	
-		tics_sc = tics[idx_sc]
-		tics_lc = tics[idx_lc]
-		tt=np.array([t for t in tics_sc if t in tics_lc])
-		
-		meanfluxes_lc = np.array([meanfluxes[(tics==t) & (source=='ffi')][0] for t in tt])
-		meanfluxes_sc = np.array([meanfluxes[(tics==t) & (source=='tpf')][0] for t in tt])
-		tmags_lc = np.array([tmags[(tics==t) & (source=='ffi')][0] for t in tt])
-
-		rat = np.abs(meanfluxes_lc/meanfluxes_sc - 1)
-		bin_means, bin_edges, binnumber = binning(tmags_lc, rat, statistic='median', bins=15, range=(1.5,10))
-		bin_width = (bin_edges[1] - bin_edges[0])
-		bin_centers = bin_edges[1:] - bin_width/2
-		
-		ax32.scatter(tmags_lc, rat, alpha=0.1)
-		ax32.scatter(bin_centers, 1.4826*bin_means, marker='o', color='r')
-		ax32.scatter(bin_centers, 1.4826*3*bin_means, marker='.', color='r')
+#		tics_sc = tics[idx_sc]
+#		tics_lc = tics[idx_lc]
+#		tt=np.array([t for t in tics_sc if t in tics_lc])
+#		
+#		meanfluxes_lc = np.array([meanfluxes[(tics==t) & (source=='ffi')][0] for t in tt])
+#		meanfluxes_sc = np.array([meanfluxes[(tics==t) & (source=='tpf')][0] for t in tt])
+#		tmags_lc = np.array([tmags[(tics==t) & (source=='ffi')][0] for t in tt])
+#		print('I am here 2')
+#
+#		rat = np.abs(meanfluxes_lc/meanfluxes_sc - 1)
+#		bin_means, bin_edges, binnumber = binning(tmags_lc, rat, statistic='median', bins=15, range=(1.5,10))
+#		bin_width = (bin_edges[1] - bin_edges[0])
+#		bin_centers = bin_edges[1:] - bin_width/2
+#		
+#		ax32.scatter(tmags_lc, rat, alpha=0.1)
+#		ax32.scatter(bin_centers, 1.4826*bin_means, marker='o', color='r')
+#		ax32.scatter(bin_centers, 1.4826*3*bin_means, marker='.', color='r')
 	
 		idx1 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source=='ffi')
 		idx2 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source=='tpf')
+		print('I am here 3')
 
 		logger.info('Optimising coefficient of relation')
 		z = lambda c: np.log10(np.sum((meanfluxes[idx1] -  10**(-0.4*(tmags[idx1] - c)))**2))
@@ -906,11 +1046,11 @@ class DataValidation(object):
 		ax31.scatter(tmags[idx2], np.abs(d2), color='k', alpha=0.1)
 		ax31.axhline(y=0, ls='--', color='k')
 		
-		bin_means1, bin_edges1, binnumber1 = binning(tmags[idx1], np.abs(d1), statistic='median', bins=15, range=(1.5,10))
+		bin_means1, bin_edges1, binnumber1 = binning(tmags[idx1], np.abs(d1), statistic='median', bins=15, range=(1.5,15))
 		bin_width1 = (bin_edges1[1] - bin_edges1[0])
 		bin_centers1 = bin_edges1[1:] - bin_width1/2
 		
-		bin_means2, bin_edges2, binnumber2 = binning(tmags[idx2], np.abs(d2), statistic='median', bins=15, range=(1.5,10))
+		bin_means2, bin_edges2, binnumber2 = binning(tmags[idx2], np.abs(d2), statistic='median', bins=15, range=(1.5,15))
 		bin_width2 = (bin_edges2[1] - bin_edges2[0])
 		bin_centers2 = bin_edges2[1:] - bin_width2/2
 		
@@ -987,8 +1127,8 @@ class DataValidation(object):
 		ax22 = fig2.add_subplot(122)
 		
 	
-		norm = colors.Normalize(vmin=0, vmax=len(self.cursors)+5)
-		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
+#		norm = colors.Normalize(vmin=0, vmax=len(self.cursors)+5)
+#		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 		
 		star_vals = search_database(self.cursor, search=["status in (1,3)"], select=['todolist.datasource','todolist.sector','todolist.tmag','stamp_resizes','stamp_width','stamp_height','elaptime'])
 			
@@ -1000,9 +1140,9 @@ class DataValidation(object):
 				scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 				rgba_color = np.array([scalarMap.to_rgba(s) for s in sec])
 			else:
-				rgba_color = 'k'
+				rgba_color = 'r'
 		else:
-			rgba_color = 'k'
+			rgba_color = 'r'
 		
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)	
 		et = np.array([star['elaptime'] for star in star_vals], dtype=float)	
@@ -1036,8 +1176,8 @@ class DataValidation(object):
 		bin_width2 = (bin_edges2[1] - bin_edges2[0])
 		bin_centers2 = bin_edges2[1:] - bin_width2/2
 		
-		ax12.scatter(bin_centers2, bin_means2, marker='o', color='b', zorder=3)
-		ax11.scatter(bin_centers, bin_means, marker='o', color='b', zorder=3)
+#		ax12.scatter(bin_centers2, bin_means2, marker='o', color='b', zorder=3)
+#		ax11.scatter(bin_centers, bin_means, marker='o', color='b', zorder=3)
 			
 		normalize2 = colors.Normalize(vmin=0, vmax=np.max(resize))	
 		scalarMap = cmx.ScalarMappable(norm=normalize2, cmap=plt.get_cmap('Set1') )
@@ -1082,8 +1222,8 @@ class DataValidation(object):
 		nwid2[(nwid2<15)] = 15
 		nhei2[(nhei2<15)] = 15
 		
-		ax12.plot(mags2,nwid2, 'b--')	
-		ax11.plot(mags2,nhei2, 'b--')	
+#		ax12.plot(mags2,nwid2, 'b--')	
+#		ax11.plot(mags2,nhei2, 'b--')	
 	
 		ax12.set_ylabel('Stamp width (pixels)', fontsize=16, labelpad=10)
 		ax14.set_ylabel('Stamp width (pixels)', fontsize=16, labelpad=10)
@@ -1152,6 +1292,8 @@ class DataValidation(object):
 		star_vals = search_database(self.cursor, search=["status in (1,3)"], select=['todolist.datasource','todolist.tmag'])
 		
 		tmags = np.array([star['tmag'] for star in star_vals])
+		
+		print(len(tmags))
 		source = np.array([star['datasource'] for star in star_vals])
 	
 		idx_lc = (source=='ffi')
@@ -1215,8 +1357,11 @@ if __name__ == '__main__':
 
 	args.show = 'True'
 	args.method = 'all'
+	args.validate = True
 	args.sysnoise = 5
-	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-2127753/'
+#	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-2127753/'
+	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/'
+#	args.input_folders = '/media/mikkelnl/Elements/TESS/S02_tests/'
 	
 	if args.output_folder is None and len(args.input_folders.split(';'))>1:
 		parser.error("Please specify an output directory!")
