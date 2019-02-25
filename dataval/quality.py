@@ -91,8 +91,8 @@ class DatavalQualityFlags(QualityFlagsBase):
 	STRINGS = {
 		MagVsFluxHigh: "Star has higher flux than given by magnitude relation",
 		MagVsFluxLow: "Star has lower flux than given by magnitude relation",
-		4: "Star has higher measured flux in 30-min than 2-min",
-		5: "Star has higher measured flux in 2-min than 30-min",
+		FluxFFIOverTPF: "Star has higher measured flux in FFIs than TPFs",
+		FluxTPFOverFFI: "Star has higher measured flux in TPFs than FFIs",
 		MinimalMask: "Star has minimum 4x4 mask",
 		SmallMask: "Star has smaller mask than general relation",
 		LargeMask: "Star has larger mask than general relation",
