@@ -1,0 +1,6 @@
+six
+numpy
+matplotlib
+astropy
+scipy
+statsmodels
