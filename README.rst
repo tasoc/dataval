@@ -1,6 +1,6 @@
-**********************
-Data validation module
-**********************
+********************************
+The TASOC Data Validation module
+********************************
 .. image:: https://travis-ci.org/tasoc/dataval.svg?branch=devel
     :target: https://travis-ci.org/tasoc/dataval
 .. image:: https://img.shields.io/github/license/tasoc/dataval.svg
