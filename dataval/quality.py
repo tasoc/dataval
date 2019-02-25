@@ -70,36 +70,36 @@ class QualityFlagsBase(object):
 #------------------------------------------------------------------------------
 class DatavalQualityFlags(QualityFlagsBase):
 
-	magvsflux_high = 1
-	magvsflux_low = 2
-	lc_over_sc = 4
-	sc_over_lc = 8
-	minmask = 16
+	MagVsFluxHigh = 1
+	MagVsFluxLow = 2
+	FluxFFIOverTPF = 4
+	FluxTPFOverFFI = 8
+	MinimalMask = 16
 	SmallMask = 32
 	LargeMask = 64
 	SmallStamp = 128
 	LowPTP = 256
 	LowRMS = 512
-	contamone = 1024
-	contamhigh = 2048
+	ContaminationOne = 1024
+	ContaminationHigh = 2048
 	NegativeFlux = 4096
-	
+
 	# Default bitmask
 	DEFAULT_BITMASK = (NegativeFlux)
-	
+
 	# Pretty string descriptions for each flag
 	STRINGS = {
-		1: "Star has higher flux than given by magnitude relation",
-		2: "Star has lower flux than given by magnitude relation",
+		MagVsFluxHigh: "Star has higher flux than given by magnitude relation",
+		MagVsFluxLow: "Star has lower flux than given by magnitude relation",
 		4: "Star has higher measured flux in 30-min than 2-min",
 		5: "Star has higher measured flux in 2-min than 30-min",
-		16: "Star has minimum 4x4 mask",
-		32: "Star has smaller mask than general relation",
-		64: "Star has larger mask than general relation",
-		128: "Smaller stamp than default",
-		256: "PTP lower than theoretical",
-		512: "RMS lower than theoretical",
-		1024: "Contamination over 1",
-		2048: "Contamination high",
+		MinimalMask: "Star has minimum 4x4 mask",
+		SmallMask: "Star has smaller mask than general relation",
+		LargeMask: "Star has larger mask than general relation",
+		SmallStamp: "Smaller stamp than default",
+		LowPTP: "PTP lower than theoretical",
+		LowRMS: "RMS lower than theoretical",
+		ContaminationOne: "Contamination over 1",
+		ContaminationHigh: "Contamination high",
 		NegativeFlux: "Negative mean flux"
 	}
