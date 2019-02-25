@@ -9,7 +9,7 @@ The TASOC Data Validation module
 
 This module provides the data-validation setup for the TESS Asteroseismic Science Operations Center (TASOC) pipeline.
 
-The code is available through our GitHub organization (https://github.com/tasoc/photometry) and full documentation for this code can be found on https://tasoc.dk/code/.
+The code is available through our GitHub organization (https://github.com/tasoc/dataval) and full documentation for this code can be found on https://tasoc.dk/code/.
 
 Installation instructions
 =========================
