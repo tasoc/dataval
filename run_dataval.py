@@ -330,14 +330,14 @@ class DataValidation(object):
 		if self.method == 'all':
 #			val1 = self.plot_magtoflux(return_val=True)
 #			val2 = self.plot_pixinaperture(return_val=True)
-			val3 = self.plot_contam(return_val=True)
-
-			print(val3)
-
+			val3 = self.plot_contam(return_val=True)		
+			
+#			print(val3)
+			
 			val4 = self.plot_onehour_noise(return_val=True)
-
-			print(val4)
-
+			
+#			print(val4)
+			
 #			self.plot_stamp()
 #			self.plot_mag_dist()
 
@@ -363,15 +363,15 @@ class DataValidation(object):
 				print(len(val3), len(val4), len(val))
 
 				dv = np.array(list(val.values()), dtype="int32")
-
-				print(dv)
-
+				
+#				print(dv)
+				
 				#Reject: Small/High apertures; Contamination>1;
 				app = np.ones_like(dv, dtype='bool')
 				qf = DatavalQualityFlags.filter(dv)
 				app[~qf] = False
 
-				[self.cursor.execute("INSERT INTO datavalidation_raw (priority, starid, dataval, approved) VALUES (?,?,?);", (int(v1), int(v2), bool(v4))) for v1,v2,v4 in
+				[self.cursor.execute("INSERT INTO datavalidation_raw (priority, dataval, approved) VALUES (?,?,?);", (int(v1), int(v2), bool(v4))) for v1,v2,v4 in
 						zip(np.array(list(val.keys()), dtype="int32"),dv,app)]
 
 				self.conn.commit()
@@ -514,11 +514,10 @@ class DataValidation(object):
 			val0['dv'] = np.zeros_like(pri, dtype="int32")
 			val0['dv'][cont>=1] |= DatavalQualityFlags.ContaminationOne
 			val0['dv'][(cont>cont_vs_mag(tmags)) & (cont<1)] |= DatavalQualityFlags.ContaminationHigh
-			val0['priority'] = pri
-
-			val = dict(zip(val0['priority'], val0['dv']))
-
-
+						
+			val = dict(zip(pri, val0['dv']))
+			
+			
 		###########
 		filename = 'contam.%s' %self.extension
 		fig.savefig(os.path.join(self.outfolders, filename))
@@ -683,34 +682,21 @@ class DataValidation(object):
 
 		# Assign validation bits, for both FFI and TPF
 		if return_val:
-
-#			val0 = {}
+		
 			dv = np.zeros_like(pri, dtype="int32")
-			dv[idx_sc][(ptp[idx_sc] < ptp_tpf_vs_mag(tmags[idx_sc]))] |= DatavalQualityFlags.LowPTP
-			dv[idx_lc][(ptp[idx_lc] < ptp_ffi_vs_mag(tmags[idx_lc]))] |= DatavalQualityFlags.LowPTP
-			dv[idx_sc][(rms[idx_sc] < rms_tpf_vs_mag(tmags[idx_sc]))] |= DatavalQualityFlags.LowRMS
-			dv[idx_lc][(rms[idx_lc] < rms_ffi_vs_mag(tmags[idx_lc]))] |= DatavalQualityFlags.LowRMS
-#			val0['dv'] =
-#			val0['dv'][idx_sc][(ptp[idx_sc] < ptp_tpf_vs_mag(tmags[idx_sc]))] |= DatavalQualityFlags.LowPTP
-#			val0['dv'][idx_lc][(ptp[idx_lc] < ptp_ffi_vs_mag(tmags[idx_lc]))] |= DatavalQualityFlags.LowPTP
-#			val0['dv'][idx_sc][(rms[idx_sc] < rms_tpf_vs_mag(tmags[idx_sc]))] |= DatavalQualityFlags.LowRMS
-#			val0['dv'][idx_lc][(rms[idx_lc] < rms_ffi_vs_mag(tmags[idx_lc]))] |= DatavalQualityFlags.LowRMS
-
-#			val0['priority'] = np.zeros_like(pri, dtype=str)
-#			prio = np.zeros_like(pri, dtype=str)
-#			prio[idx_lc] = pri[idx_lc]
-#			prio[idx_sc] = pri[idx_sc]
-#			val0['priority'][idx_lc] = pri[idx_lc]
-#			val0['priority'][idx_sc] = pri[idx_sc]
-
-			print(pri)
-#			print(prio)
-			print(dv)
-
+			
+			idx_tpf_ptp = (ptp < ptp_tpf_vs_mag(tmags))
+			idx_ffi_ptp = (ptp < ptp_ffi_vs_mag(tmags))
+			idx_tpf_rms = (rms < rms_tpf_vs_mag(tmags))
+			idx_ffi_rms = (rms < rms_ffi_vs_mag(tmags))
+			
+			dv[idx_sc & idx_tpf_ptp] |= DatavalQualityFlags.LowPTP
+			dv[idx_lc & idx_ffi_ptp] |= DatavalQualityFlags.LowPTP
+			dv[idx_sc & idx_tpf_rms] |= DatavalQualityFlags.LowRMS
+			dv[idx_lc & idx_ffi_rms] |= DatavalQualityFlags.LowRMS
+						
 			val = dict(zip(list(pri), list(dv)))
-
-			print(len(dv), len(pri), len(val), np.max(dv))
-
+			
 		if self.show:
 			plt.show()
 		else:
