@@ -703,7 +703,7 @@ class DataValidation(object):
 		fig = plt.figure(figsize=(15, 5))
 		ax1 = fig.add_subplot(121)
 		ax2 = fig.add_subplot(122)
-		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
+		fig.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
 
 
 		if self.doval:
@@ -785,11 +785,14 @@ class DataValidation(object):
 
 		idx_lc1 = (source=='ffi') & (dataval&(32+64) != 0)
 		idx_sc1 = (source=='tpf') & (dataval&(32+64) != 0)
+		
+		perm_lc = np.random.permutation(sum(idx_lc0))
+		perm_sc = np.random.permutation(sum(idx_sc0))
 
-		ax1.scatter(tmags[idx_lc0], masksizes[idx_lc0], marker='o', c=contam[idx_lc0], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'), label='30-min cadence')
+		ax1.scatter(tmags[idx_lc0][perm_lc], masksizes[idx_lc0][perm_lc], marker='o', c=contam[idx_lc0][perm_lc], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'))
 		ax1.scatter(tmags[idx_lc1], masksizes[idx_lc1], marker='.', c=contam[idx_lc1], alpha=0.2, norm=norm, cmap=plt.get_cmap('PuOr'))
 
-		ax2.scatter(tmags[idx_sc0], masksizes[idx_sc0], marker='o', c=contam[idx_sc0], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'), label='2-min cadence')
+		ax2.scatter(tmags[idx_sc0][perm_sc], masksizes[idx_sc0][perm_sc], marker='o', c=contam[idx_sc0][perm_sc], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'))
 		ax2.scatter(tmags[idx_sc1], masksizes[idx_sc1], marker='.', c=contam[idx_sc1], alpha=0.2, norm=norm, cmap=plt.get_cmap('PuOr'))
 
 		# Compute median-bin curve
@@ -846,15 +849,15 @@ class DataValidation(object):
 		ymax = np.array([10000, 3200, 2400, 1400, 1200, 900, 800, 470, 260, 200, 170, 130, 120, 100, 94, 86, 76, 67, 59, 54, 50, 50])
 		max_bound = INT.InterpolatedUnivariateSpline(xmax, ymax, k=1)
 
-		ax1.plot(xmin, ymin, marker='o', color='r')
-		ax1.plot(xmax, ymax, marker='o', color='r')
+		ax1.plot(xmin, ymin, ls='-', color='r')
+		ax1.plot(xmax, ymax, ls='-', color='r')
 
 		# Minimum bound on TPF data
 		xmin_sc = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 11.6, 16, 19])
 		ymin_sc = np.array([220, 200, 130, 70, 55, 43, 36, 30, 27, 22, 16, 10, 8, 6, 5, 4, 4, 4])
 		min_bound_sc = INT.InterpolatedUnivariateSpline(xmin_sc, ymin_sc, k=1)
 
-		ax2.plot(xmin_sc, ymin_sc, marker='o', color='r')
+		ax2.plot(xmin_sc, ymin_sc, ls='-', color='r')
 
 #		idx_lc2 = (source=='ffi') & (masksizes>4) & (tmags>8)
 #		idx_sort = np.argsort(tmags[idx_lc2])
@@ -930,7 +933,13 @@ class DataValidation(object):
 			axx.xaxis.set_ticks_position('both')
 			axx.set_yscale("log", nonposy='clip')
 			axx.yaxis.set_major_formatter(ScalarFormatter())
-			axx.legend(loc='upper right', prop={'size': 12})
+#			axx.legend(loc='upper right', prop={'size': 12})
+
+		pos = ax2.get_position()
+		axc = fig.add_axes([pos.x0 + pos.width+0.01, pos.y0, 0.01, pos.height], zorder=-1)
+		cb = mpl.colorbar.ColorbarBase(axc, cmap=plt.get_cmap('PuOr'), norm=norm, orientation='vertical')
+		cb.set_label('Contamination', fontsize=12, labelpad=6)
+		cb.ax.tick_params(axis='y', direction='out') 
 
 		filename = 'pix_in_aper.%s' %self.extension
 		fig.savefig(os.path.join(self.outfolders, filename))
@@ -978,12 +987,12 @@ class DataValidation(object):
 		logger.info('Plotting Magnitude to Flux conversion')
 
 		fig = plt.figure(figsize=(15, 5))
-		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
+		fig.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
 		ax1 = fig.add_subplot(121)
 		ax2 = fig.add_subplot(122)
 
 		fig2 = plt.figure()
-		fig2.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
+		fig2.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
 		ax21 = fig2.add_subplot(111)
 
 #		fig3 = plt.figure(figsize=(15, 5))
@@ -1017,16 +1026,20 @@ class DataValidation(object):
 		idx_sc = (source=='tpf') 
 
 		norm = colors.Normalize(vmin=0, vmax=1)
-		ax1.scatter(tmags[idx_lc], meanfluxes[idx_lc], marker='o', c=contam[idx_lc], norm = norm, cmap=plt.get_cmap('PuOr'), alpha=0.1, label='30-min cadence')
-		ax2.scatter(tmags[idx_sc], meanfluxes[idx_sc], marker='o', c=contam[idx_sc], norm = norm, cmap=plt.get_cmap('PuOr'), alpha=0.1, label='2-min cadence')
+		
+		perm_lc = np.random.permutation(sum(idx_lc))
+		perm_sc = np.random.permutation(sum(idx_sc))
+
+		ax1.scatter(tmags[idx_lc][perm_lc], meanfluxes[idx_lc][perm_lc], marker='o', c=contam[idx_lc][perm_lc], norm = norm, cmap=plt.get_cmap('PuOr'), alpha=0.1)#, label='30-min cadence')
+		ax2.scatter(tmags[idx_sc][perm_sc], meanfluxes[idx_sc][perm_sc], marker='o', c=contam[idx_sc][perm_sc], norm = norm, cmap=plt.get_cmap('PuOr'), alpha=0.1)#, label='2-min cadence')
 
 		xmin = np.array([0, 1.5, 9, 12.6, 13, 14, 15, 16, 17, 18, 19])
 		ymin = np.array([8e7, 1.8e7, 12500, 250, 59, 5, 1, 1, 1, 1, 1])
 
 		min_bound = INT.InterpolatedUnivariateSpline(xmin, ymin, k=1)
 
-		ax1.plot(xmin, ymin, ls='-', color='r', marker='o')
-		ax2.plot(xmin, ymin, ls='-', color='r', marker='o')
+		ax1.plot(xmin, ymin, ls='-', color='r')
+		ax2.plot(xmin, ymin, ls='-', color='r')
 
 		idx1 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source=='ffi') & (contam<0.15)
 		idx2 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source=='tpf') & (contam<0.15)
@@ -1084,7 +1097,6 @@ class DataValidation(object):
 
 		for axx in np.array([ax1, ax2]):
 			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-			axx.set_xlim([np.nanmin(tmags)-1, np.nanmax(tmags)+1])
 
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
@@ -1094,10 +1106,16 @@ class DataValidation(object):
 			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
 			axx.yaxis.set_ticks_position('both')
 			axx.xaxis.set_ticks_position('both')
-			axx.legend(loc='upper left', prop={'size': 12})
 
-		ax1.text(10, 1e7, r'$\rm Flux = 10^{-0.4\,(T_{mag} - %1.2f)}$' %cc.x, fontsize=14)
+#		ax1.text(10, 1e7, r'$\rm Flux = 10^{-0.4\,(T_{mag} - %1.2f)}$' %cc.x, fontsize=14)
 		ax1.set_ylabel('Mean flux', fontsize=16, labelpad=10)
+		
+		pos = ax2.get_position()
+		axc = fig.add_axes([pos.x0 + pos.width+0.01, pos.y0, 0.01, pos.height], zorder=-1)
+		cb = mpl.colorbar.ColorbarBase(axc, cmap=plt.get_cmap('PuOr'), norm=norm, orientation='vertical')
+		cb.set_label('Contamination', fontsize=12, labelpad=6)
+		cb.ax.tick_params(axis='y', direction='out') 
+		
 
 		filename = 'mag_to_flux.%s' %self.extension
 		filename2 = 'mag_to_flux_optimize.%s' %self.extension
@@ -1315,8 +1333,6 @@ class DataValidation(object):
 		star_vals = self.search_database(search=["status in (1,3)"], select=['todolist.datasource','todolist.tmag'])
 
 		tmags = np.array([star['tmag'] for star in star_vals])
-
-		print(len(tmags))
 		source = np.array([star['datasource'] for star in star_vals])
 
 		idx_lc = (source=='ffi')
@@ -1325,20 +1341,22 @@ class DataValidation(object):
 		if sum(idx_lc) > 0:
 			kde_lc = KDE(tmags[idx_lc])
 			kde_lc.fit(gridsize=1000)
-			ax.fill_between(kde_lc.support, 0, kde_lc.density*sum(idx_lc), color='r', alpha=0.3, label='30-min cadence')
+#			ax.fill_between(kde_lc.support, 0, kde_lc.density*sum(idx_lc), color='r', alpha=0.3, label='30-min cadence')
+			ax.fill_between(kde_lc.support, 0, kde_lc.density/np.max(kde_lc.density), color='r', alpha=0.3, label='30-min cadence')
 
 		if sum(idx_sc) > 0:
 			kde_sc = KDE(tmags[idx_sc])
 			kde_sc.fit(gridsize=1000)
-			ax.fill_between(kde_sc.support, 0, kde_sc.density*sum(idx_sc), color='b', alpha=0.3, label='2-min cadence')
+#			ax.fill_between(kde_sc.support, 0, kde_sc.density*sum(idx_sc), color='b', alpha=0.3, label='2-min cadence')
+			ax.fill_between(kde_sc.support, 0, kde_sc.density/np.max(kde_sc.density), color='b', alpha=0.3, label='2-min cadence')
 
-		kde_all = KDE(tmags)
-		kde_all.fit(gridsize=1000)
-		ax.plot(kde_all.support, kde_all.density*len(tmags), 'k-', lw=1.5, label='All')
+#		kde_all = KDE(tmags)
+#		kde_all.fit(gridsize=1000)
+#		ax.plot(kde_all.support, kde_all.density/, 'k-', lw=1.5, label='All')
 
 		ax.set_ylim(ymin=0)
 		ax.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-		ax.set_ylabel('Number of stars', fontsize=16, labelpad=10)
+		ax.set_ylabel('Normalised Density', fontsize=16, labelpad=10)
 		ax.xaxis.set_major_locator(MultipleLocator(2))
 		ax.xaxis.set_minor_locator(MultipleLocator(1))
 		ax.tick_params(direction='out', which='both', pad=5, length=3)
@@ -1354,6 +1372,16 @@ class DataValidation(object):
 			plt.show()
 		else:
 			plt.close('all')
+
+
+	# =============================================================================
+	# 
+	# =============================================================================
+	
+	def plot_dist_to_edge(self, return_val=False):
+		
+		pass
+
 
 
 #------------------------------------------------------------------------------
@@ -1375,10 +1403,9 @@ if __name__ == '__main__':
 
 	# TODO: Remove this before going into production... Baaaaaaddddd Mikkel!
 	args.show = True
-	args.method = 'all'
-	args.validate = True
+	args.method = 'pixvsmag'
+	args.validate = False
 	args.sysnoise = 5
-#	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-2127753/'
 	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/'
 #	args.input_folders = '/media/mikkelnl/Elements/TESS/S02_tests/'
 
