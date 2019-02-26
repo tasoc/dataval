@@ -209,6 +209,9 @@ def compute_onehour_rms(flux, cad):
 
 	return RMS, PTP
 
+def combine_flag_dicts(a, b):
+	return {key: a.get(key, 0) | b.get(key, 0) for key in set().union(a.keys(), b.keys())}
+
 #------------------------------------------------------------------------------
 class DataValidation(object):
 
