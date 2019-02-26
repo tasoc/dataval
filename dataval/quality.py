@@ -82,10 +82,11 @@ class DatavalQualityFlags(QualityFlagsBase):
 	LowRMS = 512
 	ContaminationOne = 1024
 	ContaminationHigh = 2048
-	NegativeFlux = 4096
+	InvalidFlux = 4096
+	InvalidNoise = 8192
 
 	# Default bitmask
-	DEFAULT_BITMASK = (NegativeFlux)
+	DEFAULT_BITMASK = (InvalidFlux | ContaminationOne | SmallMask | LargeMask | InvalidNoise)
 
 	# Pretty string descriptions for each flag
 	STRINGS = {
@@ -101,5 +102,5 @@ class DatavalQualityFlags(QualityFlagsBase):
 		LowRMS: "RMS lower than theoretical",
 		ContaminationOne: "Contamination over 1",
 		ContaminationHigh: "Contamination high",
-		NegativeFlux: "Negative mean flux"
+		InvalidFlux: "Invalid mean flux (not finite or negative)"
 	}
