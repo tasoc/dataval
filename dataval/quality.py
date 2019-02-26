@@ -83,9 +83,10 @@ class DatavalQualityFlags(QualityFlagsBase):
 	ContaminationOne = 1024
 	ContaminationHigh = 2048
 	InvalidFlux = 4096
+	InvalidNoise = 8192
 
 	# Default bitmask
-	DEFAULT_BITMASK = (InvalidFlux + ContaminationOne + SmallMask + LargeMask)
+	DEFAULT_BITMASK = (InvalidFlux | ContaminationOne | SmallMask | LargeMask | InvalidNoise)
 
 	# Pretty string descriptions for each flag
 	STRINGS = {
