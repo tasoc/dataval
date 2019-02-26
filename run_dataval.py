@@ -14,10 +14,9 @@ import argparse
 import logging
 import six
 import numpy as np
-import matplotlib.pyplot as plt
+from dataval.plots import plt
 import matplotlib as mpl
 from matplotlib import cm
-
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter,ScalarFormatter
@@ -36,9 +35,7 @@ import sqlite3
 from scipy.stats import binned_statistic as binning
 import contextlib
 from scipy.ndimage import filters as filt
-
-
-from dataval.quality import DatavalQualityFlags, QualityFlagsBase
+from dataval.quality import DatavalQualityFlags
 
 plt.ioff()
 
@@ -348,14 +345,14 @@ class DataValidation(object):
 	#				dv = val1[cursorno]['dv']+val2[cursorno]['dv']+val3[cursorno]['dv']+val4[cursorno]['dv']+val5[cursorno]['dv']+val6[cursorno]['dv']
 			dv = val['dv']
 
-			app = np.ones_like(dv, dtype=bool)
-
-			#Reject: Small/High apertures; Contamination>1;
-			qf = QualityFlagsBase.filter(dv, DatavalQualityFlags.DEFAULT_BITMASK)
-			app[~qf] = 0
 
 
-			if self.doval == True:
+			if self.doval:
+				#Reject: Small/High apertures; Contamination>1;
+				app = np.ones_like(dv, dtype='bool')
+				qf = DatavalQualityFlags.filter(dv)
+				app[~qf] = False
+
 				[self.cursor.execute("INSERT INTO datavalidation_raw (priority, starid, dataval, approved) VALUES (?,?,?,?);", (int(v1), int(v2), int(v3), bool(v4))) for v1,v2,v3,v4 in
 						zip(val['priority'],val['starid'],dv,app)]
 
