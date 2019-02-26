@@ -274,17 +274,17 @@ def search_database(cursor, select=None, search=None, order_by=None, limit=None,
 class DataValidation(object):
 
 
-	def __init__(self, args):
+	def __init__(self, input_folders, output_folder=None, validate=True, method='all', colorbysector=False, ext='png', showplots=False, sysnoise=0):
 
-		self.input_folders = args.input_folders.split(';')
-		self.method = args.method
-		self.extension = args.ext
-		self.show = args.show
+		self.input_folders = input_folders
+		self.method = method
+		self.extension = ext
+		self.show = showplots
 
-		self.outfolders = args.output_folder
-		self.sysnoise = args.sysnoise
-		self.doval = args.validate
-		self.color_by_sector = args.colorbysector
+		self.outfolders = output_folder
+		self.sysnoise = sysnoise
+		self.doval = validate
+		self.color_by_sector = colorbysector
 
 		#load sqlite to-do files
 		if len(self.input_folders)==1:
@@ -318,9 +318,6 @@ class DataValidation(object):
 				);""")
 
 				self.conn.commit()
-
-			# Run validation
-			self.Validations()
 
 	def close(self):
 		"""Close DataValidation object and all associated objects."""
@@ -1446,18 +1443,18 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
 	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'magdist'))
 	parser.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png', 'eps'))
-	parser.add_argument('-s', '--show', help='Show plots.', default=False, choices=('True', 'False'))
+	parser.add_argument('-s', '--show', help='Show plots.', action='store_true')
 	parser.add_argument('-v', '--validate', help='Compute validation (only run is method is "all").', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-cbs', '--colorbysector', help='Color by sector', action='store_true')
+	parser.add_argument('-sn', '--sysnoise', type=float, help='systematic noise level for noise plot.', nargs='?', default=0)
 	parser.add_argument('input_folders', type=str, help='Directory to create catalog files in.', nargs='?', default=None)
 	parser.add_argument('output_folder', type=str, help='Directory in which to place output if several input folders are given.', nargs='?', default=None)
-	parser.add_argument('-sn', '--sysnoise', type=float, help='systematic noise level for noise plot.', nargs='?', default=0)
 	args = parser.parse_args()
 
 	# TODO: Remove this before going into production... Baaaaaaddddd Mikkel!
-	args.show = 'True'
+	args.show = True
 	args.method = 'all'
 	args.validate = True
 	args.sysnoise = 5
@@ -1490,6 +1487,12 @@ if __name__ == '__main__':
 	logger.info("Loading input data from '%s'", args.input_folders)
 	logger.info("Putting output data in '%s'", args.output_folder)
 
+	input_folders = args.input_folders.split(';')
+
 	# Create DataValidation object:
-	with DataValidation(args) as dataval:
-		pass
+	with DataValidation(input_folders, output_folder=args.output_folder,
+		validate=args.validate, method=args.method, colorbysector=args.colorbysector,
+		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise) as dataval:
+
+		# Run validation
+		dataval.Validations()
