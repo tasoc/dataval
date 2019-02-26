@@ -330,21 +330,21 @@ class DataValidation(object):
 		if self.method == 'all':
 #			val1 = self.plot_magtoflux(return_val=True)
 #			val2 = self.plot_pixinaperture(return_val=True)
-			val3 = self.plot_contam(return_val=True)		
-			
+			val3 = self.plot_contam(return_val=True)
+
 			print(val3)
-			
+
 			val4 = self.plot_onehour_noise(return_val=True)
-			
+
 			print(val4)
-			
+
 #			self.plot_stamp()
 #			self.plot_mag_dist()
-			
+
 #			from collections import Counter
-			
+
 #			val = val4
-#			for i, f in enumerate(self.input_folders):		
+#			for i, f in enumerate(self.input_folders):
 #				todo_file = os.path.join(f, 'todo.sqlite')
 #				# Open the SQLite file:
 #				with contextlib.closing(sqlite3.connect(todo_file)) as conn:
@@ -353,19 +353,19 @@ class DataValidation(object):
 #
 #					cursor = conn.cursor()
 	#				dv = val1[cursorno]['dv']+val2[cursorno]['dv']+val3[cursorno]['dv']+val4[cursorno]['dv']+val5[cursorno]['dv']+val6[cursorno]['dv']
-			
+
 
 
 
 			if self.doval:
 				val = combine_flag_dicts(val3, val4)
-			
+
 				print(len(val3), len(val4), len(val))
-				
+
 				dv = np.array(list(val.values()), dtype="int32")
-				
+
 				print(dv)
-				
+
 				#Reject: Small/High apertures; Contamination>1;
 				app = np.ones_like(dv, dtype='bool')
 				qf = DatavalQualityFlags.filter(dv)
@@ -373,7 +373,7 @@ class DataValidation(object):
 
 				[self.cursor.execute("INSERT INTO datavalidation_raw (priority, starid, dataval, approved) VALUES (?,?,?);", (int(v1), int(v2), bool(v4))) for v1,v2,v4 in
 						zip(np.array(list(val.keys()), dtype="int32"),dv,app)]
-			
+
 				self.conn.commit()
 
 
@@ -481,7 +481,7 @@ class DataValidation(object):
 
 		cont_vs_mag = INT.InterpolatedUnivariateSpline(xmax, ymax)
 #		mags = np.linspace(np.nanmin(tmags),np.nanmax(tmags),100)
-			
+
 		ax1.set_xlim([np.min(tmags[(source=='ffi')])-0.5, np.max(tmags[(source=='ffi')])+0.5])
 		ax2.set_xlim([np.min(tmags[(source=='tpf')])-0.5, np.max(tmags[(source=='tpf')])+0.5])
 
@@ -506,8 +506,8 @@ class DataValidation(object):
 			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
 			axx.yaxis.set_ticks_position('both')
 #			axx.legend(loc='upper left', prop={'size': 12})
-		
-		
+
+
 		# Assign validation bits
 		if return_val:
 			val0 = {}
@@ -515,10 +515,10 @@ class DataValidation(object):
 			val0['dv'][cont>=1] |= DatavalQualityFlags.ContaminationOne
 			val0['dv'][(cont>cont_vs_mag(tmags)) & (cont<1)] |= DatavalQualityFlags.ContaminationHigh
 			val0['priority'] = pri
-						
+
 			val = dict(zip(val0['priority'], val0['dv']))
-			
-			
+
+
 		###########
 		filename = 'contam.%s' %self.extension
 		fig.savefig(os.path.join(self.outfolders, filename))
@@ -548,8 +548,8 @@ class DataValidation(object):
 
 		logger.info('------------------------------------------')
 		logger.info('Plotting Noise vs. Magnitude')
-		
-	
+
+
 		fig1 = plt.figure(figsize=(15, 5))
 		fig1.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
 		ax11 = fig1.add_subplot(121)
@@ -587,7 +587,7 @@ class DataValidation(object):
 		# TODO: Update elat+elon based on observing sector?
 		PARAM['RA'] = 0
 		PARAM['DEC'] = 0
-			
+
 		idx_lc = (source=='ffi') & (rms!=0)
 		idx_sc = (source=='tpf') & (rms!=0)
 
@@ -596,30 +596,30 @@ class DataValidation(object):
 
 		ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
 		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='2-min cadence')
-	
+
 		# Plot theoretical lines
 		mags = np.linspace(np.min(tmags)-0.5, np.max(tmags)+0.5, 50)
 		vals_rms_tpf = np.zeros([len(mags), 4])
 		vals_rms_ffi = np.zeros([len(mags), 4])
 		vals_ptp_ffi = np.zeros([len(mags), 4])
 		vals_ptp_tpf = np.zeros([len(mags), 4])
-		
+
 		# Expected *1-hour* RMS noise fii
 		for i in range(len(mags)):
 			vals_rms_ffi[i,:], _ = phot_noise(mags[i], 5775, 3600, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_rms_ffi = np.sqrt(np.sum(vals_rms_ffi**2, axis=1))
-		
+
 		ax11.semilogy(mags, vals_rms_ffi[:, 0], 'r-')
 		ax11.semilogy(mags, vals_rms_ffi[:, 1], 'g--')
 		ax11.semilogy(mags, vals_rms_ffi[:, 2], '-')
 		ax11.semilogy(mags, tot_noise_rms_ffi, 'k-')
 		ax11.axhline(y=self.sysnoise, color='b', ls='--')
-		
+
 		# Expected *1-hour* RMS noise tpf
 		for i in range(len(mags)):
 			vals_rms_tpf[i,:], _ = phot_noise(mags[i], 5775, 3600, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_rms_tpf = np.sqrt(np.sum(vals_rms_tpf**2, axis=1))
-		
+
 		ax12.semilogy(mags, vals_rms_tpf[:, 0], 'r-')
 		ax12.semilogy(mags, vals_rms_tpf[:, 1], 'g--')
 		ax12.semilogy(mags, vals_rms_tpf[:, 2], '-')
@@ -630,7 +630,7 @@ class DataValidation(object):
 		for i in range(len(mags)):
 			vals_ptp_ffi[i,:], _ = phot_noise(mags[i], 5775, 1800, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_ptp_ffi = np.sqrt(np.sum(vals_ptp_ffi**2, axis=1))
-		
+
 		ax21.semilogy(mags, vals_ptp_ffi[:, 0], 'r-')
 		ax21.semilogy(mags, vals_ptp_ffi[:, 1], 'g--')
 		ax21.semilogy(mags, vals_ptp_ffi[:, 2], '-')
@@ -641,14 +641,14 @@ class DataValidation(object):
 		for i in range(len(mags)):
 			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 5775, 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_ptp_tpf = np.sqrt(np.sum(vals_ptp_tpf**2, axis=1))
-		
-		
+
+
 		ax22.semilogy(mags, vals_ptp_tpf[:, 0], 'r-')
 		ax22.semilogy(mags, vals_ptp_tpf[:, 1], 'g--')
 		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-')
 		ax22.semilogy(mags, tot_noise_ptp_tpf, 'k-')
 		ax22.axhline(y=self.sysnoise, color='b', ls='--')
-		
+
 		ptp_tpf_vs_mag = INT.UnivariateSpline(mags, tot_noise_ptp_tpf)
 		ptp_ffi_vs_mag = INT.UnivariateSpline(mags, tot_noise_ptp_ffi)
 		rms_tpf_vs_mag = INT.UnivariateSpline(mags, tot_noise_rms_tpf)
@@ -657,7 +657,7 @@ class DataValidation(object):
 #		print(tics[idx_sc][(ptp[idx_sc] < 0.5*ptp_tpf_vs_mag(tmags[idx_sc]))])
 #		print(ptp[idx_sc][(ptp[idx_sc] < 0.5*ptp_tpf_vs_mag(tmags[idx_sc]))])
 #		print(tmags[idx_sc][(ptp[idx_sc] < 0.5*ptp_tpf_vs_mag(tmags[idx_sc]))])
-		
+
 		ax11.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$', fontsize=16, labelpad=10)
 		ax21.set_ylabel('point-to-point MDV (ppm)', fontsize=16, labelpad=10)
 
@@ -683,42 +683,42 @@ class DataValidation(object):
 
 		# Assign validation bits, for both FFI and TPF
 		if return_val:
-		
+
 #			val0 = {}
 			dv = np.zeros_like(pri, dtype="int32")
 			dv[idx_sc][(ptp[idx_sc] < ptp_tpf_vs_mag(tmags[idx_sc]))] |= DatavalQualityFlags.LowPTP
 			dv[idx_lc][(ptp[idx_lc] < ptp_ffi_vs_mag(tmags[idx_lc]))] |= DatavalQualityFlags.LowPTP
 			dv[idx_sc][(rms[idx_sc] < rms_tpf_vs_mag(tmags[idx_sc]))] |= DatavalQualityFlags.LowRMS
 			dv[idx_lc][(rms[idx_lc] < rms_ffi_vs_mag(tmags[idx_lc]))] |= DatavalQualityFlags.LowRMS
-#			val0['dv'] = 
+#			val0['dv'] =
 #			val0['dv'][idx_sc][(ptp[idx_sc] < ptp_tpf_vs_mag(tmags[idx_sc]))] |= DatavalQualityFlags.LowPTP
 #			val0['dv'][idx_lc][(ptp[idx_lc] < ptp_ffi_vs_mag(tmags[idx_lc]))] |= DatavalQualityFlags.LowPTP
 #			val0['dv'][idx_sc][(rms[idx_sc] < rms_tpf_vs_mag(tmags[idx_sc]))] |= DatavalQualityFlags.LowRMS
 #			val0['dv'][idx_lc][(rms[idx_lc] < rms_ffi_vs_mag(tmags[idx_lc]))] |= DatavalQualityFlags.LowRMS
-					
+
 #			val0['priority'] = np.zeros_like(pri, dtype=str)
 #			prio = np.zeros_like(pri, dtype=str)
 #			prio[idx_lc] = pri[idx_lc]
 #			prio[idx_sc] = pri[idx_sc]
 #			val0['priority'][idx_lc] = pri[idx_lc]
 #			val0['priority'][idx_sc] = pri[idx_sc]
-					
+
 			print(pri)
 #			print(prio)
 			print(dv)
-			
+
 			val = dict(zip(list(pri), list(dv)))
-			
+
 			print(len(dv), len(pri), len(val), np.max(dv))
-			
+
 		if self.show:
 			plt.show()
 		else:
 			plt.close('all')
-	
+
 		if return_val:
 			return val
-	
+
 	# =============================================================================
 	#
 	# =============================================================================
@@ -743,9 +743,9 @@ class DataValidation(object):
 
 
 		if self.doval:
-			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera'])
+			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors'])
 		else:
-			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','datavalidation_raw.dataval'])
+			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors','datavalidation_raw.dataval'])
 
 
 
@@ -768,8 +768,9 @@ class DataValidation(object):
 		contam = np.array([star['contamination'] for star in star_vals], dtype=float)
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
 		pri = np.array([star['priority'] for star in star_vals], dtype=int)
+		minimal_mask_used = np.array([('Using minimum aperture.' in star['errors']) for star in star_vals], dtype='bool')
 
-		dataval = np.zeros_like(pri)
+		dataval = np.zeros_like(pri, dtype='int32')
 		if not self.doval:
 			dataval = np.array([star['dataval'] for star in star_vals], dtype=int)
 
@@ -964,25 +965,19 @@ class DataValidation(object):
 
 		# Assign validation bits, for both FFI and TPF
 		if return_val:
-
+			# Create validation dict:
 			val = {}
+			val['priority'] = np.asarray(pri, dtype="int32")
+			val['starid'] = np.asarray(tics, dtype="int64")
 			val['dv'] = np.zeros_like(pri, dtype="int32")
-			val['dv'][idx_lc][(masksizes[idx_lc]==4)] |= DatavalQualityFlags.MinimalMask
-			val['dv'][idx_lc][(masksizes[idx_lc]<min_bound(tmags[idx_lc])) & (masksizes[idx_lc]>0) & (masksizes[idx_lc]!=4)] |= DatavalQualityFlags.SmallMask
+
+			# Minimal masks were used:
+			val['dv'][minimal_mask_used] |= DatavalQualityFlags.MinimalMask
+
+			# Small and Large masks:
+			val['dv'][idx_lc][(masksizes[idx_lc]<min_bound(tmags[idx_lc])) & (masksizes[idx_lc]>0)] |= DatavalQualityFlags.SmallMask
 			val['dv'][idx_lc][(masksizes[idx_lc]>max_bound(tmags[idx_lc]))] |= DatavalQualityFlags.LargeMask
-
-			val['dv'][idx_sc][(masksizes[idx_sc]==4)] |= DatavalQualityFlags.MinimalMask
-			val['dv'][idx_sc][(masksizes[idx_sc]<min_bound_sc(tmags[idx_sc])) & (masksizes[idx_sc]>0) & (masksizes[idx_sc]!=4)] |= DatavalQualityFlags.SmallMask
-
-			val['priority'] = np.zeros_like(pri, dtype="int32")
-			val['starid'] = np.zeros_like(pri, dtype="int32")
-
-			val['priority'][idx_lc] = pri[idx_lc]
-			val['priority'][idx_sc] = pri[idx_sc]
-
-			val['starid'][idx_lc] = tics[idx_lc]
-			val['starid'][idx_sc] = tics[idx_sc]
-
+			val['dv'][idx_sc][(masksizes[idx_sc]<min_bound_sc(tmags[idx_sc])) & (masksizes[idx_sc]>0)] |= DatavalQualityFlags.SmallMask
 
 #		mags = np.linspace(np.nanmin(tmags)-1, np.nanmax(tmags)+1, 500)
 #		pix = np.asarray([Pixinaperture(m) for m in mags], dtype='float64')
