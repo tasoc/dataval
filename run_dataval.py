@@ -14,7 +14,9 @@ import argparse
 import logging
 import six
 import numpy as np
-from dataval.plots import plt
+import matplotlib.pyplot as plt
+
+#from dataval.plots import plt
 import matplotlib as mpl
 from matplotlib import cm
 import matplotlib.colors as colors
@@ -253,7 +255,6 @@ class DataValidation(object):
 					self.cursor.execute('DROP TABLE IF EXISTS datavalidation_raw')
 				self.cursor.execute("""CREATE TABLE IF NOT EXISTS datavalidation_raw (
 					priority INT PRIMARY KEY NOT NULL,
-					starid BIGINT NOT NULL,
 					dataval INT NOT NULL,
 					approved BOOLEAN NOT NULL,
 					FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
@@ -341,9 +342,7 @@ class DataValidation(object):
 #			self.plot_mag_dist()
 			
 #			from collections import Counter
-			val = {val3[key] | val4.get(key, 0) for key in val3.keys()}
 			
-			print(len(val3), len(val4), len(val))
 #			val = val4
 #			for i, f in enumerate(self.input_folders):		
 #				todo_file = os.path.join(f, 'todo.sqlite')
@@ -354,37 +353,26 @@ class DataValidation(object):
 #
 #					cursor = conn.cursor()
 	#				dv = val1[cursorno]['dv']+val2[cursorno]['dv']+val3[cursorno]['dv']+val4[cursorno]['dv']+val5[cursorno]['dv']+val6[cursorno]['dv']
-			dv = val['dv']
+			
 
 
 
 			if self.doval:
+				val = combine_flag_dicts(val3, val4)
+			
+				print(len(val3), len(val4), len(val))
+				
+				dv = np.array(list(val.values()), dtype="int32")
+				
+				print(dv)
+				
 				#Reject: Small/High apertures; Contamination>1;
 				app = np.ones_like(dv, dtype='bool')
 				qf = DatavalQualityFlags.filter(dv)
 				app[~qf] = False
 
-				[self.cursor.execute("INSERT INTO datavalidation_raw (priority, starid, dataval, approved) VALUES (?,?,?,?);", (int(v1), int(v2), int(v3), bool(v4))) for v1,v2,v3,v4 in
-						zip(val['priority'],val['starid'],dv,app)]
-
-#			dv = val['dv']
-			
-			dv = np.array(list(val.values()), dtype="int32")
-			
-			app = np.ones_like(dv, dtype=bool)
-			
-			#Reject: Small/High apertures; Contamination>1; 
-			qf = QualityFlagsBase.filter(dv, DatavalQualityFlags.DEFAULT_BITMASK)
-			app[~qf] = 0
-					
-				
-			if self.doval == True:
-#				[self.cursor.execute("INSERT INTO datavalidation_raw (priority, starid, dataval, approved) VALUES (?,?,?,?);", (int(v1), int(v2), int(v3), bool(v4))) for v1,v2,v3,v4 in  
-#						zip(val['priority'],val['starid'],dv,app)]
-				
-				
-				[self.cursor.execute("INSERT INTO datavalidation_raw (priority, dataval, approved) VALUES (?,?,?);", (int(v1), int(v2), bool(v4))) for v1,v2,v4 in  
-						zip(list(val.keys()),dv,app)]
+				[self.cursor.execute("INSERT INTO datavalidation_raw (priority, starid, dataval, approved) VALUES (?,?,?);", (int(v1), int(v2), bool(v4))) for v1,v2,v4 in
+						zip(np.array(list(val.keys()), dtype="int32"),dv,app)]
 			
 				self.conn.commit()
 
@@ -709,17 +697,19 @@ class DataValidation(object):
 #			val0['dv'][idx_lc][(rms[idx_lc] < rms_ffi_vs_mag(tmags[idx_lc]))] |= DatavalQualityFlags.LowRMS
 					
 #			val0['priority'] = np.zeros_like(pri, dtype=str)
-			prio = np.zeros_like(pri, dtype=str)
-			prio[idx_lc] = pri[idx_lc]
-			prio[idx_sc] = pri[idx_sc]
+#			prio = np.zeros_like(pri, dtype=str)
+#			prio[idx_lc] = pri[idx_lc]
+#			prio[idx_sc] = pri[idx_sc]
 #			val0['priority'][idx_lc] = pri[idx_lc]
 #			val0['priority'][idx_sc] = pri[idx_sc]
-						
+					
+			print(pri)
+#			print(prio)
+			print(dv)
 			
+			val = dict(zip(list(pri), list(dv)))
 			
-			val = dict(zip(prio, dv))
-			
-			print(len(dv), len(pri), len(val))
+			print(len(dv), len(pri), len(val), np.max(dv))
 			
 		if self.show:
 			plt.show()
