@@ -212,75 +212,17 @@ def compute_onehour_rms(flux, cad):
 
 	return RMS, PTP
 
-
-def search_database(cursor, select=None, search=None, order_by=None, limit=None, distinct=False):
-	"""
-	Search list of lightcurves and return a list of tasks/stars matching the given criteria.
-
-	Parameters:
-		search (list of strings or None): Conditions to apply to the selection of stars from the database
-		order_by (list, string or None): Column to order the database output by.
-		limit (int or None): Maximum number of rows to retrieve from the database. If limit is None, all the rows are retrieved.
-		distinct (boolean): Boolean indicating if the query should return unique elements only.
-
-	Returns:
-		list of dicts: Returns all stars retrieved by the call to the database as dicts/tasks that can be consumed directly by load_lightcurve
-
-	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
-	"""
-
-	logger = logging.getLogger(__name__)
-
-	if select is None:
-		select = '*'
-	elif isinstance(select, (list, tuple)):
-		select = ",".join(select)
-
-	if search is None:
-		search = ''
-	elif isinstance(search, (list, tuple)):
-		search = "WHERE " + " AND ".join(search)
-	else:
-		search = 'WHERE ' + search
-
-	if order_by is None:
-		order_by = ''
-	elif isinstance(order_by, (list, tuple)):
-		order_by = " ORDER BY " + ",".join(order_by)
-	elif isinstance(order_by, six.string_types):
-		order_by = " ORDER BY " + order_by
-
-	limit = '' if limit is None else " LIMIT %d" % limit
-
-	query = "SELECT {distinct:s}{select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority {search:s}{order_by:s}{limit:s};".format(
-		distinct='DISTINCT ' if distinct else '',
-		select=select,
-		search=search,
-		order_by=order_by,
-		limit=limit
-	)
-	logger.debug("Running query: %s", query)
-
-	# Ask the database: status=1
-	cursor.execute(query)
-	return [dict(row) for row in cursor.fetchall()]
-
-
-
-# =============================================================================
-#
-# =============================================================================
-
+#------------------------------------------------------------------------------
 class DataValidation(object):
 
 
 	def __init__(self, input_folders, output_folder=None, validate=True, method='all', colorbysector=False, ext='png', showplots=False, sysnoise=0):
 
+		# Store inputs:
 		self.input_folders = input_folders
 		self.method = method
 		self.extension = ext
 		self.show = showplots
-
 		self.outfolders = output_folder
 		self.sysnoise = sysnoise
 		self.doval = validate
@@ -307,7 +249,7 @@ class DataValidation(object):
 
 			if self.method == 'all':
 				# Create table for diagnostics:
-				if self.doval == True:
+				if self.doval:
 					self.cursor.execute('DROP TABLE IF EXISTS datavalidation_raw')
 				self.cursor.execute("""CREATE TABLE IF NOT EXISTS datavalidation_raw (
 					priority INT PRIMARY KEY NOT NULL,
@@ -329,6 +271,58 @@ class DataValidation(object):
 
 	def __enter__(self):
 		return self
+
+	def search_database(self, select=None, search=None, order_by=None, limit=None, distinct=False):
+		"""
+		Search list of lightcurves and return a list of tasks/stars matching the given criteria.
+
+		Parameters:
+			search (list of strings or None): Conditions to apply to the selection of stars from the database
+			order_by (list, string or None): Column to order the database output by.
+			limit (int or None): Maximum number of rows to retrieve from the database. If limit is None, all the rows are retrieved.
+			distinct (boolean): Boolean indicating if the query should return unique elements only.
+
+		Returns:
+			list of dicts: Returns all stars retrieved by the call to the database as dicts/tasks that can be consumed directly by load_lightcurve
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+
+		logger = logging.getLogger(__name__)
+
+		if select is None:
+			select = '*'
+		elif isinstance(select, (list, tuple)):
+			select = ",".join(select)
+
+		if search is None:
+			search = ''
+		elif isinstance(search, (list, tuple)):
+			search = "WHERE " + " AND ".join(search)
+		else:
+			search = 'WHERE ' + search
+
+		if order_by is None:
+			order_by = ''
+		elif isinstance(order_by, (list, tuple)):
+			order_by = " ORDER BY " + ",".join(order_by)
+		elif isinstance(order_by, six.string_types):
+			order_by = " ORDER BY " + order_by
+
+		limit = '' if limit is None else " LIMIT %d" % limit
+
+		query = "SELECT {distinct:s}{select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority {search:s}{order_by:s}{limit:s};".format(
+			distinct='DISTINCT ' if distinct else '',
+			select=select,
+			search=search,
+			order_by=order_by,
+			limit=limit
+		)
+		logger.debug("Running query: %s", query)
+
+		# Ask the database: status=1
+		self.cursor.execute(query)
+		return [dict(row) for row in self.cursor.fetchall()]
 
 	def Validations(self):
 
@@ -411,7 +405,7 @@ class DataValidation(object):
 		ax1 = fig.add_subplot(211)
 		ax2 = fig.add_subplot(212)
 
-		star_vals = search_database(self.cursor, search=['status in (1,3)'], select=['todolist.priority','todolist.sector','todolist.starid','method','todolist.datasource','todolist.tmag','contamination'])
+		star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.sector','todolist.starid','method','todolist.datasource','todolist.tmag','contamination'])
 
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
@@ -553,7 +547,7 @@ class DataValidation(object):
 
 		PARAM = {}
 
-		star_vals = search_database(self.cursor, search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','rms_hour','ptp','ccd'])
+		star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','rms_hour','ptp','ccd'])
 
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
@@ -734,9 +728,9 @@ class DataValidation(object):
 
 
 		if self.doval:
-			star_vals = search_database(self.cursor, search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera'])
+			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera'])
 		else:
-			star_vals = search_database(self.cursor, search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','datavalidation_raw.dataval'])
+			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','datavalidation_raw.dataval'])
 
 
 
@@ -1042,7 +1036,7 @@ class DataValidation(object):
 #		ax31 = fig3.add_subplot(121)
 #		ax32 = fig3.add_subplot(122)
 
-		star_vals = search_database(self.cursor, search=["status in (1,3)"], select=['todolist.priority','todolist.datasource','todolist.sector','todolist.starid','todolist.tmag','ccd','mean_flux', 'contamination'])
+		star_vals = self.search_database(search=["status in (1,3)"], select=['todolist.priority','todolist.datasource','todolist.sector','todolist.starid','todolist.tmag','ccd','mean_flux', 'contamination'])
 
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
@@ -1233,7 +1227,7 @@ class DataValidation(object):
 #		norm = colors.Normalize(vmin=0, vmax=len(self.cursors)+5)
 #		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 
-		star_vals = search_database(self.cursor, search=["status in (1,3)"], select=['todolist.datasource','todolist.sector','todolist.tmag','stamp_resizes','stamp_width','stamp_height','elaptime'])
+		star_vals = self.search_database(search=["status in (1,3)"], select=['todolist.datasource','todolist.sector','todolist.tmag','stamp_resizes','stamp_width','stamp_height','elaptime'])
 
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
@@ -1392,7 +1386,7 @@ class DataValidation(object):
 		ax = fig.add_subplot(111)
 		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
 
-		star_vals = search_database(self.cursor, search=["status in (1,3)"], select=['todolist.datasource','todolist.tmag'])
+		star_vals = self.search_database(search=["status in (1,3)"], select=['todolist.datasource','todolist.tmag'])
 
 		tmags = np.array([star['tmag'] for star in star_vals])
 
