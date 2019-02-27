@@ -370,6 +370,8 @@ class DataValidation(object):
 			self.plot_mag_dist()
 		elif self.method == 'contam':
 			self.plot_contam()
+		elif self.method == 'magdistoverlap':
+			self.plot_mag_dist_overlap()
 
 
 
@@ -433,10 +435,12 @@ class DataValidation(object):
 		# Plot individual contamination points
 		ax1.scatter(tmags[idx_low_ffi], cont[idx_low_ffi], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1)
 		ax2.scatter(tmags[idx_low_tpf], cont[idx_low_tpf], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1)
-		ax1.scatter(tmags[idx_high_ffi], cont[idx_high_ffi], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
-		ax1.scatter(tmags[(cont==1.2) & (source=='ffi')], cont[(cont==1.2) & (source=='ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
-		ax2.scatter(tmags[idx_high_tpf], cont[idx_high_tpf], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
-		ax2.scatter(tmags[(cont==1.2) & (source=='tpf')], cont[(cont==1.2) & (source=='tpf')], marker='o', facecolors='None', color='r', alpha=0.9)
+		
+		if self.doval:
+			ax1.scatter(tmags[idx_high_ffi], cont[idx_high_ffi], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
+			ax1.scatter(tmags[(cont==1.2) & (source=='ffi')], cont[(cont==1.2) & (source=='ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
+			ax2.scatter(tmags[idx_high_tpf], cont[idx_high_tpf], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
+			ax2.scatter(tmags[(cont==1.2) & (source=='tpf')], cont[(cont==1.2) & (source=='tpf')], marker='o', facecolors='None', color='r', alpha=0.9)
 
 		# Indices for finding validation limit
 #		idx_low = (cont<=1)
@@ -465,11 +469,17 @@ class DataValidation(object):
 		for axx in np.array([ax1, ax2]):
 #			axx.plot(mags, cont_vs_mag(mags))
 
-			axx.set_ylim([-0.05, 1.3])
+			if self.doval:
+				axx.set_ylim([-0.05, 1.3])
+			else:
+				axx.set_ylim([-0.05, 1.1])
+
 
 			axx.axhline(y=0, ls='--', color='k', zorder=-1)
-			axx.axhline(y=1.1, ls=':', color='k', zorder=-1)
-			axx.axhline(y=1.2, ls=':', color='r', zorder=-1)
+			
+			if self.doval:
+				axx.axhline(y=1.1, ls=':', color='k', zorder=-1)
+				axx.axhline(y=1.2, ls=':', color='r', zorder=-1)
 			axx.axhline(y=1, ls=':', color='k', zorder=-1)
 			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
 			axx.set_ylabel('Contamination', fontsize=16, labelpad=10)
@@ -1372,6 +1382,120 @@ class DataValidation(object):
 			plt.show()
 		else:
 			plt.close('all')
+			
+	# =============================================================================
+	#
+	# =============================================================================
+
+	def plot_mag_dist_overlap(self):
+
+		"""
+		Function to plot magnitude distribution overlap between sectors
+
+		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+		"""
+
+		logger=logging.getLogger(__name__)
+
+		logger.info('--------------------------------------')
+		logger.info('Plotting Magnitude distribution')
+
+		fig = plt.figure(figsize=(10,5))
+		ax = fig.add_subplot(111)
+		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
+		
+		
+		sets_lc = []
+		sets_sc = []
+		tmags_lc = []
+		tmags_sc = []
+		for i, f in enumerate(self.input_folders):
+			todo_file = os.path.join(f, 'todo.sqlite')
+			logger.debug("TODO file: %s", todo_file)
+			if not os.path.exists(todo_file):
+				raise ValueError("TODO file not found")
+
+			# Open the SQLite file:
+			conn = sqlite3.connect(todo_file)
+			conn.row_factory = sqlite3.Row
+			cursor = conn.cursor()
+
+			select=['todolist.starid','todolist.datasource','todolist.tmag']
+			select = ",".join(select)
+#			search=["status in (1,3)"]
+			search=["approved=1"]
+			search = "WHERE " + " AND ".join(search)
+			
+			query = "SELECT {select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority  {search:s};".format(
+			select=select,
+			search=search)
+
+			# Ask the database: status=1
+			cursor.execute(query)
+			star_vals = [dict(row) for row in cursor.fetchall()]
+
+			tmags = np.array([star['tmag'] for star in star_vals])
+			source = np.array([star['datasource'] for star in star_vals])
+			starid = np.array([star['starid'] for star in star_vals], dtype="int32")
+	
+			idx_lc = (source=='ffi')
+			idx_sc = (source=='tpf')
+			
+			ind_dict_lc = dict((k,i) for i,k in enumerate(starid[idx_lc]))
+			ind_dict_sc = dict((k,i) for i,k in enumerate(starid[idx_sc]))
+
+			print(len(tmags[idx_lc]), len(tmags[idx_sc]))
+
+			tmags_lc.append(tmags[idx_lc])
+			tmags_sc.append(tmags[idx_sc])
+			sets_lc.append(ind_dict_lc)
+			sets_sc.append(ind_dict_sc)
+			
+		inter_lc = set(sets_lc[0].keys()).intersection(sets_lc[1].keys())
+		inter_sc = set(sets_sc[0].keys()).intersection(sets_sc[1].keys())
+		indices_lc = [ sets_lc[1][x] for x in inter_lc ]
+		indices_lc2 = [ sets_lc[0][x] for x in inter_lc ]
+		indices_sc = [ sets_sc[1][x] for x in inter_sc ]
+		indices_sc2 = [ sets_sc[0][x] for x in inter_sc ]
+
+
+		print(tmags_lc[0][indices_lc2])
+		print(tmags_lc[1][indices_lc])
+		print(len(indices_lc), len(indices_sc))
+
+#		if sum(idx_lc) > 0:
+		kde_lc = KDE(tmags_lc[0][indices_lc2])
+		kde_lc.fit(gridsize=1000)
+		ax.fill_between(kde_lc.support, 0, kde_lc.density/np.max(kde_lc.density), color='r', alpha=0.3, label='30-min cadence')
+#
+#		if sum(idx_sc) > 0:
+		kde_sc = KDE(tmags_sc[0][indices_sc2])
+		kde_sc.fit(gridsize=1000)
+#			ax.fill_between(kde_sc.support, 0, kde_sc.density*sum(idx_sc), color='b', alpha=0.3, label='2-min cadence')
+		ax.fill_between(kde_sc.support, 0, kde_sc.density/np.max(kde_sc.density), color='b', alpha=0.3, label='2-min cadence')
+
+#		kde_all = KDE(tmags)
+#		kde_all.fit(gridsize=1000)
+#		ax.plot(kde_all.support, kde_all.density/, 'k-', lw=1.5, label='All')
+
+		ax.set_ylim(ymin=0)
+		ax.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+		ax.set_ylabel('Normalised Density', fontsize=16, labelpad=10)
+		ax.xaxis.set_major_locator(MultipleLocator(2))
+		ax.xaxis.set_minor_locator(MultipleLocator(1))
+		ax.tick_params(direction='out', which='both', pad=5, length=3)
+		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
+		ax.yaxis.set_ticks_position('both')
+		ax.xaxis.set_ticks_position('both')
+		ax.legend(frameon=False, prop={'size':12} ,loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
+
+#		filename = 'mag_dist.%s' %self.extension
+#		fig.savefig(os.path.join(self.outfolders, filename))
+
+		if self.show:
+			plt.show()
+		else:
+			plt.close('all')		
 
 
 	# =============================================================================
@@ -1403,11 +1527,13 @@ if __name__ == '__main__':
 
 	# TODO: Remove this before going into production... Baaaaaaddddd Mikkel!
 	args.show = True
-	args.method = 'pixvsmag'
+	args.method = 'contam'
 	args.validate = False
 	args.sysnoise = 5
-	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/'
-#	args.input_folders = '/media/mikkelnl/Elements/TESS/S02_tests/'
+#	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/'
+#	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/;/media/mikkelnl/Elements/TESS/S02_tests/'
+#	args.output_folder = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/'
+	args.input_folders = '/media/mikkelnl/Elements/TESS/S02_tests/'
 
 	if args.output_folder is None and len(args.input_folders.split(';'))>1:
 		parser.error("Please specify an output directory!")
