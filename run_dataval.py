@@ -8,7 +8,6 @@ Created on Sun Feb 26 20:51:06 2017
 # Packages
 #===============================================================================
 
-from __future__ import with_statement, print_function, division
 import os
 import argparse
 import logging
@@ -26,190 +25,24 @@ y_formatter = ScalarFormatter(useOffset=False)
 mpl.rcParams['font.family'] = 'serif'
 from matplotlib import rc
 rc('text', usetex=True)
-from astropy import units as u
-from astropy.coordinates import SkyCoord
 import scipy.interpolate as INT
 import scipy.optimize as OP
-from bottleneck import move_std
-from astropy.io import fits
 from statsmodels.nonparametric.kde import KDEUnivariate as KDE
 import sqlite3
 from scipy.stats import binned_statistic as binning
-import contextlib
-from scipy.ndimage import filters as filt
+
 from dataval.quality import DatavalQualityFlags
+#from dataval.utilities import rms_timescale #, sphere_distance
+from dataval.noise_model import phot_noise
 
 plt.ioff()
 
 
-#==============================================================================
-# Noise model as a function of magnitude and position
-#==============================================================================
+#def reduce_percentile1(x):
+#	return np.nanpercentile(x, 99.9, interpolation='lower')
+#def reduce_percentile2(x):
+#	return np.nanpercentile(x, 0.5, interpolation='lower')
 
-def sphere_distance(ra1, dec1, ra2, dec2):
-	# Convert angles to radians:
-	ra1 = np.deg2rad(ra1)
-	ra2 = np.deg2rad(ra2)
-	dec1 = np.deg2rad(dec1)
-	dec2 = np.deg2rad(dec2)
-
-	# Calculate distance using Vincenty formulae:
-	return np.rad2deg(np.arctan2(
-		np.sqrt( (np.cos(dec2)*np.sin(ra2-ra1))**2 + (np.cos(dec1)*np.sin(dec2) - np.sin(dec1)*np.cos(dec2)*np.cos(ra2-ra1))**2 ),
-		np.sin(dec1)*np.sin(dec2) + np.cos(dec1)*np.cos(dec2)*np.cos(ra2-ra1)
-	))
-
-def ZLnoise(gal_lat):
-    # RMS noise from Zodiacal background
-    rms = (16-10)*(gal_lat/90 -1)**2 + 10 # e-1 / pix in 2sec integration
-    return rms
-
-def Pixinaperture(Tmag, cad='1800'):
-
-	ffi_tmag = np.array([ 2.05920002,  2.95159999,  3.84399996,  4.73639993,  5.6287999 ,
-        6.52119987,  7.41359984,  8.30599982,  9.19839979, 10.09079976,
-       10.98319973, 11.8755997 , 12.76799967, 13.66039964, 14.55279961])
-	ffi_mask = np.array([1484.5,  715. ,  447. ,  282.5,  185. ,  126. ,   98. ,   76. ,
-         61. ,   49. ,   38. ,   28. ,   20. ,   14. ,    8. ])
-	tpf_tmag = np.array([ 2.48170001,  3.56310005,  4.6445001 ,  5.72590014,  6.80730019,
-        7.88870023,  8.97010028, 10.05150032, 11.13290037, 12.21430041,
-       13.29570045, 14.3771005 , 15.45850054, 16.53990059, 17.62130063])
-	tpf_mask = np.array([473., 188.,  82.,  61.,  55.,  49.,  43.,  38.,  31.,  23.,  18.,
-        13.,  10.,  12.,  11.])
-
-	ffi_pix = INT.InterpolatedUnivariateSpline(ffi_tmag, ffi_mask, k=1)
-	tpf_pix = INT.InterpolatedUnivariateSpline(tpf_tmag, tpf_mask, k=1)
-
-	if cad=='1800':
-		pixels = ffi_pix(Tmag)
-	elif cad=='120':
-		pixels = tpf_pix(Tmag)
-	else:
-		pixels = 0
-
-    # Approximate relation for pixels in aperture (based on plot in Sullivan et al.)
-#    pixels = (30 + (((3-30)/(14-7)) * (Tmag-7)))*(Tmag<14) + 3*(Tmag>=14)
-
-
-	return int(np.max([pixels, 3]))
-
-def mean_flux_level(Tmag):#, Teff):
-    # Magnitude system based on Sullivan et al.
-#    collecting_area = np.pi*(10.5/2)**2 # square cm
-#    Teff_list = np.array([2450, 3000, 3200, 3400, 3700, 4100, 4500, 5000, 5777, 6500, 7200, 9700]) # Based on Sullivan
-#    Flux_list = np.array([2.38, 1.43, 1.40, 1.38, 1.39, 1.41, 1.43, 1.45, 1.45, 1.48, 1.48, 1.56])*1e6 # photons per sec; Based on Sullivan
-#    Magn_list = np.array([306, -191, -202, -201, -174, -132, -101, -80, -69.5, -40, -34.1, 35])*1e-3 #Ic-Tmag (mmag)
-#
-#
-#    Flux_int = INT.UnivariateSpline(Teff_list, Flux_list, k=1, s=0)
-#    Magn_int = INT.UnivariateSpline(Teff_list, Magn_list, k=1, s=0)
-#
-#    Imag = Magn_int(Teff)+Tmag
-#    Flux = 10**(-0.4*Imag) * Flux_int(Teff) * collecting_area
-
-
-    Flux = 10**(-0.4*(Tmag - 20.54))
-
-
-    return Flux
-
-
-def phot_noise(Tmag, Teff, cad, PARAM, verbose=False, sysnoise=60, cadpix='1800'):
-
-	# Calculate galactic latitude for Zodiacal noise
-	gc= SkyCoord(PARAM['RA']*u.degree, PARAM['DEC']*u.degree, frame='icrs')
-#    gc = SkyCoord(lon=PARAM['ELON']*u.degree, lat=PARAM['ELAT']*u.degree, frame='barycentrictrueecliptic')
-	gc_gal = gc.transform_to('galactic')
-	gal_lat0 = gc_gal.b.deg
-
-	gal_lat = np.arcsin(np.abs(np.sin(gal_lat0*np.pi/180)))*180/np.pi
-
-	# Number of 2 sec integrations in cadence
-	integrations = cad/2
-
-	# Number of pixels in aperture given Tmag
-	pixels = int(Pixinaperture(Tmag, cadpix))
-
-	# noise values are in rms, so square-root should be used when factoring up
-	Flux_factor = np.sqrt(integrations * pixels)
-
-	# Mean flux level in electrons per cadence
-	mean_level_ppm = mean_flux_level(Tmag) * cad # electrons (based on measurement) #, Teff
-
-	# Shot noise
-	shot_noise = 1e6/np.sqrt(mean_level_ppm)
-
-	# Read noise
-	read_noise = 10 * Flux_factor *1e6/mean_level_ppm # ppm
-
-	# Zodiacal noise
-	zodiacal_noise = ZLnoise(gal_lat) * Flux_factor *1e6/mean_level_ppm # ppm
-
-	# Systematic noise in ppm
-	systematic_noise_ppm = sysnoise / np.sqrt(cad/(60*60)) # ppm / sqrt(hr)
-
-
-	if verbose:
-		print('Galactic latitude', gal_lat)
-		print('Systematic noise in ppm', systematic_noise_ppm)
-		print('Integrations', integrations)
-		print('Pixels', pixels)
-		print('Flux factor', Flux_factor)
-		print('Mean level ppm', mean_level_ppm)
-		print('Shot noise', shot_noise)
-		print('Read noise', read_noise)
-		print('Zodiacal noise', zodiacal_noise)
-
-
-	PARAM['Galactic_lat'] = gal_lat
-	PARAM['Pixels_in_aper'] = pixels
-
-	noise_vals = np.array([shot_noise, zodiacal_noise, read_noise, systematic_noise_ppm])
-	return noise_vals, PARAM # ppm per cadence
-
-def reduce_percentile1(x):
-	return np.nanpercentile(x, 99.9, interpolation='lower')
-def reduce_percentile2(x):
-	return np.nanpercentile(x, 0.5, interpolation='lower')
-def reduce_mode(x):
-	kde = KDE(x)
-	kde.fit(gridsize=2000)
-
-	pdf = kde.density
-	x = kde.support
-	return x[np.argmax(pdf)]
-# =============================================================================
-#
-# =============================================================================
-
-def compute_onehour_rms(flux, cad):
-
-	if cad==120:
-		N=30
-	elif cad==1800:
-		N=2
-	else:
-		N=1
-
-	bins = int(np.ceil(len(flux)/N)) + 1
-
-	idx_finite = np.isfinite(flux)
-	flux_finite = flux[idx_finite]
-	bin_means = np.array([])
-	ii = 0;
-
-	for ii in range(bins):
-		try:
-			m = np.nanmean(flux_finite[ii*N:(ii+1)*N])
-			bin_means = np.append(bin_means, m)
-		except:
-			continue
-
-	# Compute robust RMS value (MAD scaled to RMS)
-	RMS = 1.4826*np.nanmedian(np.abs((bin_means - np.nanmedian(bin_means))))
-	PTP = np.nanmedian(np.abs(np.diff(flux_finite)))
-
-	return RMS, PTP
 
 def combine_flag_dicts(a, b):
 	return {key: a.get(key, 0) | b.get(key, 0) for key in set().union(a.keys(), b.keys())}
@@ -250,7 +83,7 @@ class DataValidation(object):
 			self.cursor = self.conn.cursor()
 
 			if self.method == 'all':
-				# Create table for diagnostics:
+				# Create table for data-validation:
 				if self.doval:
 					self.cursor.execute('DROP TABLE IF EXISTS datavalidation_raw')
 				self.cursor.execute("""CREATE TABLE IF NOT EXISTS datavalidation_raw (
@@ -332,7 +165,7 @@ class DataValidation(object):
 		if self.method == 'all':
 			val1 = self.plot_magtoflux(return_val=True)
 			val2 = self.plot_pixinaperture(return_val=True)
-			val3 = self.plot_contam(return_val=True)		
+			val3 = self.plot_contam(return_val=True)
 			val4 = self.plot_onehour_noise(return_val=True)
 			self.plot_stamp()
 			self.plot_mag_dist()
@@ -343,7 +176,7 @@ class DataValidation(object):
 				val = combine_flag_dicts(val, val4)
 
 				dv = np.array(list(val.values()), dtype="int32")
-							
+
 				#Reject: Small/High apertures; Contamination>1;
 				app = np.ones_like(dv, dtype='bool')
 				qf = DatavalQualityFlags.filter(dv)
@@ -376,7 +209,7 @@ class DataValidation(object):
 
 
 	# =============================================================================
-	# 	
+	#
 	# =============================================================================
 
 	def plot_contam(self, return_val=False):
@@ -435,7 +268,7 @@ class DataValidation(object):
 		# Plot individual contamination points
 		ax1.scatter(tmags[idx_low_ffi], cont[idx_low_ffi], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1)
 		ax2.scatter(tmags[idx_low_tpf], cont[idx_low_tpf], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1)
-		
+
 		if self.doval:
 			ax1.scatter(tmags[idx_high_ffi], cont[idx_high_ffi], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
 			ax1.scatter(tmags[(cont==1.2) & (source=='ffi')], cont[(cont==1.2) & (source=='ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
@@ -476,7 +309,7 @@ class DataValidation(object):
 
 
 			axx.axhline(y=0, ls='--', color='k', zorder=-1)
-			
+
 			if self.doval:
 				axx.axhline(y=1.1, ls=':', color='k', zorder=-1)
 				axx.axhline(y=1.2, ls=':', color='r', zorder=-1)
@@ -500,10 +333,10 @@ class DataValidation(object):
 			val0['dv'] = np.zeros_like(pri, dtype="int32")
 			val0['dv'][cont>=1] |= DatavalQualityFlags.ContaminationOne
 			val0['dv'][(cont>cont_vs_mag(tmags)) & (cont<1)] |= DatavalQualityFlags.ContaminationHigh
-						
+
 			val = dict(zip(pri, val0['dv']))
-			
-			
+
+
 		###########
 		filename = 'contam.%s' %self.extension
 		fig.savefig(os.path.join(self.outfolders, filename))
@@ -572,7 +405,7 @@ class DataValidation(object):
 		PARAM['RA'] = 0
 		PARAM['DEC'] = 0
 
-		idx_lc = (source=='ffi') 
+		idx_lc = (source=='ffi')
 		idx_sc = (source=='tpf')
 
 		ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
@@ -667,24 +500,24 @@ class DataValidation(object):
 
 		# Assign validation bits, for both FFI and TPF
 		if return_val:
-		
+
 			dv = np.zeros_like(pri, dtype="int32")
-			
+
 			idx_tpf_ptp = (ptp < ptp_tpf_vs_mag(tmags)) & (ptp>0)
 			idx_ffi_ptp = (ptp < ptp_ffi_vs_mag(tmags)) & (ptp>0)
 			idx_tpf_rms = (rms < rms_tpf_vs_mag(tmags)) & (rms>0)
 			idx_ffi_rms = (rms < rms_ffi_vs_mag(tmags)) & (rms>0)
 			idx_invalid = (rms<=0) | ~np.isfinite(rms) | (ptp<=0) | ~np.isfinite(ptp)
-			
+
 			dv[idx_sc & idx_tpf_ptp] |= DatavalQualityFlags.LowPTP
 			dv[idx_lc & idx_ffi_ptp] |= DatavalQualityFlags.LowPTP
 			dv[idx_sc & idx_tpf_rms] |= DatavalQualityFlags.LowRMS
 			dv[idx_lc & idx_ffi_rms] |= DatavalQualityFlags.LowRMS
 			dv[idx_lc & idx_ffi_rms] |= DatavalQualityFlags.LowRMS
-			dv[idx_invalid] |= DatavalQualityFlags.InvalidNoise	
-			
+			dv[idx_invalid] |= DatavalQualityFlags.InvalidNoise
+
 			val = dict(zip(list(pri), list(dv)))
-			
+
 		if self.show:
 			plt.show()
 		else:
@@ -745,8 +578,8 @@ class DataValidation(object):
 		minimal_mask_used = np.array([False if star['errors'] is None else ('Using minimum aperture.' in star['errors']) for star in star_vals], dtype='bool')
 
 		dataval = np.zeros_like(pri, dtype='int32')
-		if not self.doval:
-			dataval = np.array([star['dataval'] for star in star_vals], dtype=int)
+		if self.doval:
+			dataval = np.array([star['dataval'] for star in star_vals], dtype='int32')
 
 
 #		cats = {}
@@ -795,7 +628,7 @@ class DataValidation(object):
 
 		idx_lc1 = (source=='ffi') & (dataval&(32+64) != 0)
 		idx_sc1 = (source=='tpf') & (dataval&(32+64) != 0)
-		
+
 		perm_lc = np.random.permutation(sum(idx_lc0))
 		perm_sc = np.random.permutation(sum(idx_sc0))
 
@@ -949,11 +782,11 @@ class DataValidation(object):
 		axc = fig.add_axes([pos.x0 + pos.width+0.01, pos.y0, 0.01, pos.height], zorder=-1)
 		cb = mpl.colorbar.ColorbarBase(axc, cmap=plt.get_cmap('PuOr'), norm=norm, orientation='vertical')
 		cb.set_label('Contamination', fontsize=12, labelpad=6)
-		cb.ax.tick_params(axis='y', direction='out') 
+		cb.ax.tick_params(axis='y', direction='out')
 
 		filename = 'pix_in_aper.%s' %self.extension
 		fig.savefig(os.path.join(self.outfolders, filename))
-		
+
 		# Assign validation bits, for both FFI and TPF
 		if return_val:
 			# Create validation dict:
@@ -969,7 +802,7 @@ class DataValidation(object):
 			val0['dv'][idx_sc & (masksizes<min_bound_sc(tmags)) & (masksizes>0)] |= DatavalQualityFlags.SmallMask
 
 			val = dict(zip(pri, val0['dv']))
-			
+
 
 		if self.show:
 			plt.show()
@@ -1032,11 +865,11 @@ class DataValidation(object):
 		pri = np.array([star['priority'] for star in star_vals], dtype=int)
 
 
-		idx_lc = (source=='ffi') 
-		idx_sc = (source=='tpf') 
+		idx_lc = (source=='ffi')
+		idx_sc = (source=='tpf')
 
 		norm = colors.Normalize(vmin=0, vmax=1)
-		
+
 		perm_lc = np.random.permutation(sum(idx_lc))
 		perm_sc = np.random.permutation(sum(idx_sc))
 
@@ -1119,13 +952,13 @@ class DataValidation(object):
 
 #		ax1.text(10, 1e7, r'$\rm Flux = 10^{-0.4\,(T_{mag} - %1.2f)}$' %cc.x, fontsize=14)
 		ax1.set_ylabel('Mean flux', fontsize=16, labelpad=10)
-		
+
 		pos = ax2.get_position()
 		axc = fig.add_axes([pos.x0 + pos.width+0.01, pos.y0, 0.01, pos.height], zorder=-1)
 		cb = mpl.colorbar.ColorbarBase(axc, cmap=plt.get_cmap('PuOr'), norm=norm, orientation='vertical')
 		cb.set_label('Contamination', fontsize=12, labelpad=6)
-		cb.ax.tick_params(axis='y', direction='out') 
-		
+		cb.ax.tick_params(axis='y', direction='out')
+
 
 		filename = 'mag_to_flux.%s' %self.extension
 		filename2 = 'mag_to_flux_optimize.%s' %self.extension
@@ -1382,7 +1215,7 @@ class DataValidation(object):
 			plt.show()
 		else:
 			plt.close('all')
-			
+
 	# =============================================================================
 	#
 	# =============================================================================
@@ -1403,8 +1236,8 @@ class DataValidation(object):
 		fig = plt.figure(figsize=(10,5))
 		ax = fig.add_subplot(111)
 		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
-		
-		
+
+
 		sets_lc = []
 		sets_sc = []
 		tmags_lc = []
@@ -1425,7 +1258,7 @@ class DataValidation(object):
 #			search=["status in (1,3)"]
 			search=["approved=1"]
 			search = "WHERE " + " AND ".join(search)
-			
+
 			query = "SELECT {select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority  {search:s};".format(
 			select=select,
 			search=search)
@@ -1437,10 +1270,10 @@ class DataValidation(object):
 			tmags = np.array([star['tmag'] for star in star_vals])
 			source = np.array([star['datasource'] for star in star_vals])
 			starid = np.array([star['starid'] for star in star_vals], dtype="int32")
-	
+
 			idx_lc = (source=='ffi')
 			idx_sc = (source=='tpf')
-			
+
 			ind_dict_lc = dict((k,i) for i,k in enumerate(starid[idx_lc]))
 			ind_dict_sc = dict((k,i) for i,k in enumerate(starid[idx_sc]))
 
@@ -1450,7 +1283,7 @@ class DataValidation(object):
 			tmags_sc.append(tmags[idx_sc])
 			sets_lc.append(ind_dict_lc)
 			sets_sc.append(ind_dict_sc)
-			
+
 		inter_lc = set(sets_lc[0].keys()).intersection(sets_lc[1].keys())
 		inter_sc = set(sets_sc[0].keys()).intersection(sets_sc[1].keys())
 		indices_lc = [ sets_lc[1][x] for x in inter_lc ]
@@ -1495,15 +1328,15 @@ class DataValidation(object):
 		if self.show:
 			plt.show()
 		else:
-			plt.close('all')		
+			plt.close('all')
 
 
 	# =============================================================================
-	# 
+	#
 	# =============================================================================
-	
+
 	def plot_dist_to_edge(self, return_val=False):
-		
+
 		pass
 
 
@@ -1520,22 +1353,12 @@ if __name__ == '__main__':
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-cbs', '--colorbysector', help='Color by sector', action='store_true')
-	parser.add_argument('-sn', '--sysnoise', type=float, help='systematic noise level for noise plot.', nargs='?', default=0)
-	parser.add_argument('input_folders', type=str, help='Directory to create catalog files in.', nargs='?', default=None)
+	parser.add_argument('-sn', '--sysnoise', type=float, help='systematic noise level for noise plot.', nargs='?', default=5.0)
+	parser.add_argument('input_folders', type=str, help='Directory to create catalog files in.', nargs='+')
 	parser.add_argument('output_folder', type=str, help='Directory in which to place output if several input folders are given.', nargs='?', default=None)
 	args = parser.parse_args()
 
-	# TODO: Remove this before going into production... Baaaaaaddddd Mikkel!
-	args.show = True
-	args.method = 'contam'
-	args.validate = False
-	args.sysnoise = 5
-#	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/'
-#	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/;/media/mikkelnl/Elements/TESS/S02_tests/'
-#	args.output_folder = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/'
-	args.input_folders = '/media/mikkelnl/Elements/TESS/S02_tests/'
-
-	if args.output_folder is None and len(args.input_folders.split(';'))>1:
+	if args.output_folder is None and len(args.input_folders) > 1:
 		parser.error("Please specify an output directory!")
 
 	# Set logging level:
@@ -1552,7 +1375,7 @@ if __name__ == '__main__':
 	logger = logging.getLogger(__name__)
 	logger.addHandler(console)
 	logger.setLevel(logging_level)
-	logger_parent = logging.getLogger('corrections')
+	logger_parent = logging.getLogger('dataval')
 	logger_parent.addHandler(console)
 	logger_parent.setLevel(logging_level)
 
@@ -1560,10 +1383,8 @@ if __name__ == '__main__':
 	logger.info("Loading input data from '%s'", args.input_folders)
 	logger.info("Putting output data in '%s'", args.output_folder)
 
-	input_folders = args.input_folders.split(';')
-
 	# Create DataValidation object:
-	with DataValidation(input_folders, output_folder=args.output_folder,
+	with DataValidation(args.input_folders, output_folder=args.output_folder,
 		validate=args.validate, method=args.method, colorbysector=args.colorbysector,
 		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise) as dataval:
 
