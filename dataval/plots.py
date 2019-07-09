@@ -12,8 +12,8 @@ import os
 import warnings
 import numpy as np
 from bottleneck import allnan
-import matplotlib
-matplotlib.use('agg', warn=False)
+import matplotlib as mpl
+mpl.use('agg', warn=False)
 from matplotlib.ticker import MaxNLocator
 import matplotlib.pyplot as plt
 from astropy.visualization import (PercentileInterval, ImageNormalize,
@@ -72,7 +72,7 @@ def plot_image(image, scale='log', origin='lower', xlabel='Pixel Column Number',
 		norm = ImageNormalize(vmin=vmin, vmax=vmax, stretch=LinearStretch())
 	elif scale == 'sqrt':
 		norm = ImageNormalize(vmin=vmin, vmax=vmax, stretch=SqrtStretch())
-	elif isinstance(scale, matplotlib.colors.Normalize) or isinstance(scale, ImageNormalize):
+	elif isinstance(scale, mpl.colors.Normalize) or isinstance(scale, ImageNormalize):
 		norm = scale
 	else:
 		raise ValueError("scale {} is not available.".format(scale))
