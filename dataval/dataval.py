@@ -339,7 +339,7 @@ class DataValidation(object):
 
 		###########
 		filename = 'contam.%s' %self.extension
-		fig.savefig(os.path.join(self.outfolders, filename))
+		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 
 		if self.show:
 			plt.show()
@@ -494,8 +494,8 @@ class DataValidation(object):
 		filename = 'rms.%s' %self.extension
 		filename2 = 'ptp.%s' %self.extension
 
-		fig1.savefig(os.path.join(self.outfolders, filename))
-		fig2.savefig(os.path.join(self.outfolders, filename2))
+		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
+		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
 
 
 		# Assign validation bits, for both FFI and TPF
@@ -785,7 +785,7 @@ class DataValidation(object):
 		cb.ax.tick_params(axis='y', direction='out')
 
 		filename = 'pix_in_aper.%s' %self.extension
-		fig.savefig(os.path.join(self.outfolders, filename))
+		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 
 		# Assign validation bits, for both FFI and TPF
 		if return_val:
@@ -964,9 +964,9 @@ class DataValidation(object):
 		filename2 = 'mag_to_flux_optimize.%s' %self.extension
 #		filename3 = 'mag_to_flux_dev.%s' %self.extension
 
-		fig.savefig(os.path.join(self.outfolders, filename))
-		fig2.savefig(os.path.join(self.outfolders, filename2))
-#		fig3.savefig(os.path.join(self.outfolders, filename3))
+		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
+		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
+#		fig3.savefig(os.path.join(self.outfolders, filename3), bbox_inches='tight')
 
 #		# Assign validation bits, for both FFI and TPF
 		if return_val:
@@ -1143,8 +1143,8 @@ class DataValidation(object):
 		filename = 'stamp_size.%s' %self.extension
 		filename2 = 'calc_time.%s' %self.extension
 
-		fig1.savefig(os.path.join(self.outfolders, filename))
-		fig2.savefig(os.path.join(self.outfolders, filename2))
+		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
+		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
 
 		if self.show:
 			plt.show()
@@ -1209,7 +1209,7 @@ class DataValidation(object):
 		ax.legend(frameon=False, prop={'size':12} ,loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
 
 		filename = 'mag_dist.%s' %self.extension
-		fig.savefig(os.path.join(self.outfolders, filename))
+		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 
 		if self.show:
 			plt.show()
@@ -1323,7 +1323,7 @@ class DataValidation(object):
 		ax.legend(frameon=False, prop={'size':12} ,loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
 
 #		filename = 'mag_dist.%s' %self.extension
-#		fig.savefig(os.path.join(self.outfolders, filename))
+#		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 
 		if self.show:
 			plt.show()
