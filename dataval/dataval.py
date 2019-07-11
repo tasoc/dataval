@@ -390,7 +390,11 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger=logging.getLogger(__name__)
+		logger = logging.getLogger(__name__)
+
+		if not self.corrections_done:
+			logger.info("Can not run plot_onehour_noise when corrections have not been run")
+			return {}
 
 		logger.info('------------------------------------------')
 		logger.info('Plotting Noise vs. Magnitude')
@@ -414,7 +418,7 @@ class DataValidation(object):
 		PARAM = {}
 
 #		if self.corr:
-		star_vals = self.search_database(search=['corr_status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
+		star_vals = self.search_database(search=['status in (1,3)', 'corr_status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
 		factor = 1
 #		else:
 		star_vals2 = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
