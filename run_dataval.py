@@ -17,6 +17,7 @@ def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
 	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'magdist'))
+	parser.add_argument('-c', '--corrected', help='Use corrected or raw values.', default=False, choices=('True or False'))
 	parser.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png', 'eps'))
 	parser.add_argument('-s', '--show', help='Show plots.', action='store_true')
 	parser.add_argument('-v', '--validate', help='Compute validation (only run is method is "all").', action='store_true')
@@ -28,7 +29,17 @@ def main():
 	parser.add_argument('output_folder', type=str, help='Directory in which to place output if several input folders are given.', nargs='?', default=None)
 	args = parser.parse_args()
 
-	if args.output_folder is None and len(args.input_folders) > 1:
+	# TODO: Remove this before going into production... Baaaaaaddddd Mikkel!
+	args.show = True
+	args.method = 'contam'
+	args.validate = False
+	args.sysnoise = 5
+#	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/'
+#	args.input_folders = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/;/media/mikkelnl/Elements/TESS/S02_tests/'
+#	args.output_folder = '/media/mikkelnl/Elements/TESS/S01_tests/lightcurves-combined/'
+	args.input_folders = '/media/mikkelnl/Elements/TESS/S02_tests/'
+
+	if args.output_folder is None and len(args.input_folders.split(';'))>1:
 		parser.error("Please specify an output directory!")
 
 	# Set logging level:
@@ -56,7 +67,7 @@ def main():
 	# Create DataValidation object:
 	with DataValidation(args.input_folders, output_folder=args.output_folder,
 		validate=args.validate, method=args.method, colorbysector=args.colorbysector,
-		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise) as dataval:
+		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise, corr=args.corrected) as dataval:
 
 		# Run validation
 		dataval.Validations()
