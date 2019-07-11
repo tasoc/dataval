@@ -63,7 +63,12 @@ class DataValidation(object):
 		self.doval = validate
 		self.color_by_sector = colorbysector
 		self.corr = corr
-		
+
+		if self.corr:
+			self.dataval_table = 'datavalidation_corr'
+		else:
+			self.dataval_table = 'datavalidation_raw'
+
 		#load sqlite to-do files
 		if len(self.input_folders)==1:
 			if self.outfolders is None:
@@ -86,27 +91,14 @@ class DataValidation(object):
 			if self.method == 'all':
 				# Create table for data-validation:
 				if self.doval:
-					if self.corr:
-						self.cursor.execute('DROP TABLE IF EXISTS datavalidation_corr')
-					else:	
-						self.cursor.execute('DROP TABLE IF EXISTS datavalidation_raw')
-						
-				if self.corr:
-					self.cursor.execute("""CREATE TABLE IF NOT EXISTS datavalidation_corr (
+					self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
+					self.cursor.execute("CREATE TABLE IF NOT EXISTS " + self.dataval_table + """ (
 						priority INT PRIMARY KEY NOT NULL,
 						dataval INT NOT NULL,
 						approved BOOLEAN NOT NULL,
 						FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 					);""")
-				else:		
-					self.cursor.execute("""CREATE TABLE IF NOT EXISTS datavalidation_raw (
-						priority INT PRIMARY KEY NOT NULL,
-						dataval INT NOT NULL,
-						approved BOOLEAN NOT NULL,
-						FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
-					);""")
-
-				self.conn.commit()
+					self.conn.commit()
 
 	def close(self):
 		"""Close DataValidation object and all associated objects."""
@@ -169,7 +161,7 @@ class DataValidation(object):
 				limit=limit
 			)
 			logger.debug("Running query: %s", query)
-	
+
 			# Ask the database: status=1
 			self.cursor.execute(query)
 		except:
@@ -181,7 +173,7 @@ class DataValidation(object):
 				limit=limit
 			)
 			logger.debug("Running query: %s", query)
-	
+
 			# Ask the database: status=1
 			self.cursor.execute(query)
 		return [dict(row) for row in self.cursor.fetchall()]
@@ -210,10 +202,10 @@ class DataValidation(object):
 				qf = DatavalQualityFlags.filter(dv)
 				app[~qf] = False
 
-				[self.cursor.execute("INSERT INTO datavalidation_raw (priority, dataval, approved) VALUES (?,?,?);", (int(v1), int(v2), bool(v3))) for v1,v2,v3 in
+				[self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) VALUES (?,?,?);", (int(v1), int(v2), bool(v3))) for v1,v2,v3 in
 						zip(np.array(list(val.keys()), dtype="int32"),dv,app)]
 
-				self.cursor.execute("INSERT INTO datavalidation_raw (priority, dataval, approved) select todolist.priority, 0, 0 FROM todolist WHERE todolist.status not in (1,3);")
+				self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) SELECT todolist.priority, 0, 0 FROM todolist WHERE todolist.status not in (1,3);")
 				self.conn.commit()
 
 
@@ -405,7 +397,7 @@ class DataValidation(object):
 		fig2.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
 		ax21 = fig2.add_subplot(121)
 		ax22 = fig2.add_subplot(122)
-		
+
 		fig3 = plt.figure(figsize=(15, 5))
 		fig3.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
 		ax31 = fig3.add_subplot(121)
@@ -440,7 +432,7 @@ class DataValidation(object):
 		ptp = np.array([star['ptp']*factor for star in star_vals], dtype=float)
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
 		contam = np.array([star['contamination'] for star in star_vals], dtype=float)
-		
+
 		pri2 = np.array([star['priority'] for star in star_vals2], dtype=int)
 		tmags2 = np.array([star['tmag'] for star in star_vals2], dtype=float)
 		rms2 = np.array([star['rms_hour']*factor2 for star in star_vals2], dtype=float)
@@ -449,13 +441,13 @@ class DataValidation(object):
 		contam2 = np.array([star['contamination'] for star in star_vals2], dtype=float)
 
 		def overlap(a, b):
-		    # return the indices in a that overlap with b, also returns 
-		    # the corresponding index in b only works if both a and b are unique! 
+		    # return the indices in a that overlap with b, also returns
+		    # the corresponding index in b only works if both a and b are unique!
 		    # This is not very efficient but it works
 		    bool_a = np.in1d(a,b)
 		    ind_a = np.arange(len(a))
 		    ind_a = ind_a[bool_a]
-		
+
 		    ind_b = np.array([np.argwhere(b == a[x]) for x in ind_a]).flatten()
 		    return ind_a,ind_b
 
@@ -470,66 +462,66 @@ class DataValidation(object):
 		print(tmags[(source=='ffi')][idx_o])
 		print(tmags2[(source2=='ffi')][idx2_o])
 		print(np.sum(tmags[(source=='ffi')][idx_o]-tmags2[(source2=='ffi')][idx2_o]))
-		
-		
+
+
 		#88518 956502
 #
 #		tcomp = np.array([tmags[(pri==i)] for i in pri_overlap[5000:10000]])
 #		rmscomp = np.array([rms[(pri==i)]/rms2[(pri2==i)] for i in pri_overlap[5000:10000]])
 #		ptpcomp = np.array([ptp[(pri==i)]/ptp2[(pri2==i)] for i in pri_overlap[5000:10000]])
-		
+
 		tcomp = tmags[(source=='ffi')][idx_o]
 		rmscomp = rms[(source=='ffi')][idx_o]/rms2[(source2=='ffi')][idx2_o]
 		ptpcomp = ptp[(source=='ffi')][idx_o]/ptp2[(source2=='ffi')][idx2_o]
-		
+
 		ccomp = contam[(source=='ffi')][idx_o]
-		
+
 #		nbins=300
 #		data1 = np.column_stack((tcomp, rmscomp))
 #		k = kde.gaussian_kde(data1.T)
 #		xi, yi = np.mgrid[tcomp.min():tcomp.max():nbins*1j, rmscomp.min():rmscomp.max():nbins*1j]
 #		zi = np.log10(k(np.vstack([xi.flatten(), yi.flatten()])))
 #		clevels = ax31.contour(xi, yi, zi.reshape(xi.shape),lw=.9,cmap='winter')#,zorder=90)
-#		
+#
 #		ax31.pcolormesh(xi, yi, zi.reshape(xi.shape), cmap=plt.cm.Greens, shading='gouraud')
-#		
+#
 #		p = clevels.collections[0].get_paths()
 #		inside = np.full_like(tcomp,False,dtype=bool)
 #		print(inside)
 #		for level in p:
 #			print(inside)
 #			inside |= level.contains_points(list(zip(*(rmscomp,tcomp))))
-#		
+#
 #		print(inside)
 #		print(inside.shape, tcomp.shape, rmscomp.shape)
 #		ax31.scatter(tcomp[~inside],rmscomp[~inside],marker='.', color='0.2')
-#		
+#
 #		data2 = np.column_stack((tcomp, ptpcomp))
 #		k = kde.gaussian_kde(data2.T)
 #		xi, yi = np.mgrid[tcomp.min():tcomp.max():nbins*1j, ptpcomp.min():ptpcomp.max():nbins*1j]
 #		zi = k(np.vstack([xi.flatten(), yi.flatten()]))
 #		ax32.pcolormesh(xi, yi, zi.reshape(xi.shape), cmap=plt.cm.Greens, shading='gouraud',norm=colors.LogNorm(vmin=zi.min(), vmax=zi.max()))
-		
+
 		ax31.scatter(tcomp, rmscomp, marker='o', c=contam, alpha=0.01, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 		ax32.scatter(tcomp, ptpcomp, marker='o', c=contam, alpha=0.01, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
-		
-		
+
+
 		bin_rms, bin_edge_rms, _ = binning(tcomp, rmscomp, statistic='median', bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
 		bin_ptp, bin_edge_ptp, _ = binning(tcomp, ptpcomp, statistic='median', bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
 		bin_width = (bin_edge_rms[1] - bin_edge_rms[0]);		bin_centers = bin_edge_rms[1:] - bin_width/2
-		
-		
+
+
 		bin_rmsmad, bin_edges_rmsmad, _ = binning(tcomp, rmscomp, statistic=mad, bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
 		bin_ptpmad, bin_edges_ptpmad, _ = binning(tcomp, ptpcomp, statistic=mad, bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
-		
-		
-		
+
+
+
 		ax31.errorbar(bin_centers, bin_rms, yerr=bin_rmsmad, ecolor='r', mec='r', mfc='w', capsize=0, marker='o', ls='')
 		ax32.errorbar(bin_centers, bin_ptp, yerr=bin_ptpmad, ecolor='r', mec='r', mfc='w', capsize=0, marker='o', ls='')
-		
+
 		ax31.axhline(y=1, ls='--', color='r')
 		ax32.axhline(y=1, ls='--', color='r')
-		
+
 
 		# TODO: Update elat+elon based on observing sector?
 		PARAM['RA'] = 0
@@ -540,16 +532,16 @@ class DataValidation(object):
 
 #		ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
 #		ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='2-min cadence')
-		
+
 		ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', c=contam[idx_lc], alpha=0.1, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 		ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', c=contam[idx_sc], alpha=0.1, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
 
 #		ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
 #		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='2-min cadence')
-		
+
 		ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', c=contam[idx_lc], alpha=0.1, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', c=contam[idx_sc], alpha=0.1, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
-		
+
 #		ax11.scatter(tmags2[(source2=='ffi')], rms2[(source2=='ffi')], marker='o', facecolors='r', edgecolor='r', alpha=0.1, label='30-min cadence')
 #		ax21.scatter(tmags2[(source2=='ffi')], ptp2[(source2=='ffi')], marker='o', facecolors='r', edgecolor='r', alpha=0.1, label='30-min cadence')
 
