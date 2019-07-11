@@ -88,17 +88,23 @@ class DataValidation(object):
 			self.conn.row_factory = sqlite3.Row
 			self.cursor = self.conn.cursor()
 
-			if self.method == 'all':
-				# Create table for data-validation:
-				if self.doval:
-					self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
-					self.cursor.execute("CREATE TABLE IF NOT EXISTS " + self.dataval_table + """ (
-						priority INT PRIMARY KEY NOT NULL,
-						dataval INT NOT NULL,
-						approved BOOLEAN NOT NULL,
-						FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
-					);""")
-					self.conn.commit()
+			# Check if corrections have been run:
+			self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
+			self.corrections_done = bool(self.cursor.fetchone()[0] == 1)
+
+			if self.corr and not self.corrections_done:
+				raise Exception("Can not run dataval on corr when corrections have not been run")
+
+			# Create table for data-validation:
+			if self.method == 'all' and self.doval:
+				self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
+				self.cursor.execute("CREATE TABLE IF NOT EXISTS " + self.dataval_table + """ (
+					priority INT PRIMARY KEY NOT NULL,
+					dataval INT NOT NULL,
+					approved BOOLEAN NOT NULL,
+					FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
+				);""")
+				self.conn.commit()
 
 	def close(self):
 		"""Close DataValidation object and all associated objects."""
@@ -111,7 +117,7 @@ class DataValidation(object):
 	def __enter__(self):
 		return self
 
-	def search_database(self, select=None, search=None, order_by=None, limit=None, distinct=False):
+	def search_database(self, select=None, search=None, order_by=None, limit=None, distinct=False, joins=None):
 		"""
 		Search list of lightcurves and return a list of tasks/stars matching the given criteria.
 
@@ -150,32 +156,30 @@ class DataValidation(object):
 
 		limit = '' if limit is None else " LIMIT %d" % limit
 
+		default_joins = [
+			'INNER JOIN diagnostics ON todolist.priority=diagnostics.priority',
+			'LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority'
+		]
 
+		if self.corrections_done:
+			default_joins.append('LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority')
 
-		try: #searcing for values that are corrected
-			query = "SELECT {distinct:s}{select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority {search:s}{order_by:s}{limit:s};".format(
-				distinct='DISTINCT ' if distinct else '',
-				select=select,
-				search=search,
-				order_by=order_by,
-				limit=limit
-			)
-			logger.debug("Running query: %s", query)
+		joins = default_joins if joins is None else default_joins + joins
 
-			# Ask the database: status=1
-			self.cursor.execute(query)
-		except:
-			query = "SELECT {distinct:s}{select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority {search:s}{order_by:s}{limit:s};".format(
-				distinct='DISTINCT ' if distinct else '',
-				select=select,
-				search=search,
-				order_by=order_by,
-				limit=limit
-			)
-			logger.debug("Running query: %s", query)
+		# Create query:
+		query = "SELECT {distinct:s}{select:s} FROM todolist {joins:s} {search:s}{order_by:s}{limit:s};".format(
+			distinct='DISTINCT ' if distinct else '',
+			select=select,
+			joins=' '.join(joins),
+			search=search,
+			order_by=order_by,
+			limit=limit
+		)
 
-			# Ask the database: status=1
-			self.cursor.execute(query)
+		# Ask the database:
+		logger.debug("Running query: %s", query)
+		self.cursor.execute(query)
+
 		return [dict(row) for row in self.cursor.fetchall()]
 
 
@@ -202,8 +206,12 @@ class DataValidation(object):
 				qf = DatavalQualityFlags.filter(dv)
 				app[~qf] = False
 
-				[self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) VALUES (?,?,?);", (int(v1), int(v2), bool(v3))) for v1,v2,v3 in
-						zip(np.array(list(val.keys()), dtype="int32"),dv,app)]
+				for v1,v2,v3 in zip(np.array(list(val.keys()), dtype="int32"), dv, app):
+					self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) VALUES (?,?,?);", (
+						int(v1),
+						int(v2),
+						bool(v3)
+					))
 
 				self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) SELECT todolist.priority, 0, 0 FROM todolist WHERE todolist.status not in (1,3);")
 				self.conn.commit()
