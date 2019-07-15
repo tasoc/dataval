@@ -16,6 +16,7 @@ import numpy as np
 from .plots import mpl, plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter,ScalarFormatter
 y_formatter = ScalarFormatter(useOffset=False)
 mpl.rcParams['font.family'] = 'serif'
@@ -32,6 +33,7 @@ from scipy.stats import binned_statistic as binning
 from .quality import DatavalQualityFlags
 #from dataval.utilities import rms_timescale #, sphere_distance
 from .noise_model import phot_noise
+import seaborn as sns
 
 plt.ioff()
 
@@ -41,6 +43,8 @@ plt.ioff()
 #def reduce_percentile2(x):
 #	return np.nanpercentile(x, 0.5, interpolation='lower')
 
+def mad(X):
+	return np.nanmedian(np.abs(X-np.nanmedian(X)))*1.4826
 
 def combine_flag_dicts(a, b):
 	return {key: a.get(key, 0) | b.get(key, 0) for key in set().union(a.keys(), b.keys())}
@@ -227,6 +231,8 @@ class DataValidation(object):
 			self.plot_mag_dist()
 		elif self.method == 'noise':
 			self.plot_onehour_noise()
+		elif self.method == 'noise_compare':
+			self.compare_noise()	
 		elif self.method == 'magdist':
 			self.plot_mag_dist()
 		elif self.method == 'contam':
@@ -381,12 +387,11 @@ class DataValidation(object):
 	# =============================================================================
 	#
 	# =============================================================================
-
-	def plot_onehour_noise(self, return_val=False):
-
+	
+	def compare_noise(self):
 		"""
-		Function to plot the light curve noise against the stellar TESS magnitudes
-
+		Compare noise metrics before and after correction
+		
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
@@ -397,9 +402,8 @@ class DataValidation(object):
 			return {}
 
 		logger.info('------------------------------------------')
-		logger.info('Plotting Noise vs. Magnitude')
-
-
+		logger.info('Plotting Noise Comparison')
+		
 		fig1 = plt.figure(figsize=(15, 5))
 		fig1.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
 		ax11 = fig1.add_subplot(121)
@@ -420,24 +424,9 @@ class DataValidation(object):
 #		if self.corr:
 		star_vals = self.search_database(search=['status in (1,3)', 'corr_status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
 		factor = 1
-#		else:
 		star_vals2 = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
 		factor2 = 1e6
-
-
-		if self.color_by_sector:
-			sec = np.array([star['sector'] for star in star_vals], dtype=int)
-			sectors = np.array(list(set(sec)))
-			if len(sectors)>1:
-				norm = colors.Normalize(vmin=1, vmax=len(sectors))
-				scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
-				rgba_color = np.array([scalarMap.to_rgba(s) for s in sec])
-			else:
-				rgba_color = 'k'
-		else:
-			rgba_color = 'k'
-
-
+		
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
 		pri = np.array([star['priority'] for star in star_vals], dtype=int)
 		rms = np.array([star['rms_hour']*factor for star in star_vals], dtype=float)
@@ -450,8 +439,7 @@ class DataValidation(object):
 		rms2 = np.array([star['rms_hour']*factor2 for star in star_vals2], dtype=float)
 		ptp2 = np.array([star['ptp']*factor2 for star in star_vals2], dtype=float)
 		source2 = np.array([star['datasource'] for star in star_vals2], dtype=str)
-		contam2 = np.array([star['contamination'] for star in star_vals2], dtype=float)
-
+		
 		def overlap(a, b):
 		    # return the indices in a that overlap with b, also returns
 		    # the corresponding index in b only works if both a and b are unique!
@@ -463,11 +451,7 @@ class DataValidation(object):
 		    ind_b = np.array([np.argwhere(b == a[x]) for x in ind_a]).flatten()
 		    return ind_a,ind_b
 
-#		pri_overlap = np.array(list(set(pri[(source=='ffi')]).intersection(pri2[(source2=='ffi')])))
 		idx_o, idx2_o = overlap(pri[(source=='ffi')], pri2[(source2=='ffi')])
-#		print(pri_overlap)
-#		[ax31.scatter(tmags[(pri==i)], rms[(pri==i)]/rms2[(pri2==i)], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence') for i in pri_overlap[5000:10000]]
-#		[ax32.scatter(tmags[(pri==i)], ptp[(pri==i)]/ptp2[(pri2==i)], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence') for i in pri_overlap[5000:10000]]
 
 		print(len(star_vals), len(star_vals2))
 		print(len(idx_o), len(idx2_o))
@@ -611,15 +595,6 @@ class DataValidation(object):
 		ax22.semilogy(mags, tot_noise_ptp_tpf, 'k-')
 		ax22.axhline(y=self.sysnoise, color='b', ls='--')
 
-		ptp_tpf_vs_mag = INT.UnivariateSpline(mags, tot_noise_ptp_tpf)
-		ptp_ffi_vs_mag = INT.UnivariateSpline(mags, tot_noise_ptp_ffi)
-		rms_tpf_vs_mag = INT.UnivariateSpline(mags, tot_noise_rms_tpf)
-		rms_ffi_vs_mag = INT.UnivariateSpline(mags, tot_noise_rms_ffi)
-
-#		print(tics[idx_sc][(ptp[idx_sc] < 0.5*ptp_tpf_vs_mag(tmags[idx_sc]))])
-#		print(ptp[idx_sc][(ptp[idx_sc] < 0.5*ptp_tpf_vs_mag(tmags[idx_sc]))])
-#		print(tmags[idx_sc][(ptp[idx_sc] < 0.5*ptp_tpf_vs_mag(tmags[idx_sc]))])
-
 		ax11.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$', fontsize=16, labelpad=10)
 		ax21.set_ylabel('PTP-MDV (ppm)', fontsize=16, labelpad=10)
 		ax31.set_ylabel(r'$\rm RMS_{corr} / RMS_{raw}$', fontsize=16, labelpad=10)
@@ -635,20 +610,178 @@ class DataValidation(object):
 			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
 			axx.yaxis.set_ticks_position('both')
 			axx.set_yscale("log", nonposy='clip')
-			axx.legend(loc='upper left', prop={'size': 12})
+#			axx.legend(loc='upper left', prop={'size': 12})
 
 
 		ax31.set_xlim([np.min(tcomp)-0.5, np.max(tcomp)+0.5])
 		ax32.set_xlim([np.min(tcomp)-0.5, np.max(tcomp)+0.5])
 		###########
 
-		filename = 'rms.%s' %self.extension
-		filename2 = 'ptp.%s' %self.extension
+		filename = 'rms_comp.%s' %self.extension
+		filename2 = 'ptp_comp.%s' %self.extension
 		filename3 = 'comp.%s' %self.extension
 
 		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
 		fig3.savefig(os.path.join(self.outfolders, filename3), bbox_inches='tight')
+
+
+		if self.show:
+			plt.show()
+		else:
+			plt.close('all')
+		
+		
+		
+	# =============================================================================
+	#
+	# =============================================================================
+
+	def plot_onehour_noise(self, return_val=False):
+
+		"""
+		Function to plot the light curve noise against the stellar TESS magnitudes
+
+		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+		"""
+
+		logger=logging.getLogger(__name__)
+
+		logger.info('------------------------------------------')
+		logger.info('Plotting Noise vs. Magnitude')
+
+
+		fig1 = plt.figure(figsize=(15, 5))
+		fig1.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
+		ax11 = fig1.add_subplot(121)
+		ax12 = fig1.add_subplot(122)
+
+		fig2 = plt.figure(figsize=(15, 5))
+		fig2.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
+		ax21 = fig2.add_subplot(121)
+		ax22 = fig2.add_subplot(122)
+		
+
+		PARAM = {}
+
+		if self.corr:
+			star_vals = self.search_database(search=['corr_status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
+			factor = 1
+		else:
+			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
+			factor = 1e6
+			
+		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
+		pri = np.array([star['priority'] for star in star_vals], dtype=int)
+		rms = np.array([star['rms_hour']*factor for star in star_vals], dtype=float)
+		ptp = np.array([star['ptp']*factor for star in star_vals], dtype=float)
+		source = np.array([star['datasource'] for star in star_vals], dtype=str)
+		contam = np.array([star['contamination'] for star in star_vals], dtype=float)
+		
+		# TODO: Update elat+elon based on observing sector?
+		PARAM['RA'] = 0
+		PARAM['DEC'] = 0
+
+		idx_lc = (source=='ffi') 
+		idx_sc = (source!='ffi')
+		
+		im1 = ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', c=contam[idx_lc], alpha=0.2, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
+		ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
+		
+		im3 = ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', c=contam[idx_lc], alpha=0.2, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
+		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
+
+		# Plot theoretical lines
+		mags = np.linspace(np.nanmin(tmags)-0.5, 15+0.5, 50)
+
+		vals_rms_tpf = np.zeros([len(mags), 4])
+		vals_rms_ffi = np.zeros([len(mags), 4])
+		vals_ptp_ffi = np.zeros([len(mags), 4])
+		vals_ptp_tpf = np.zeros([len(mags), 4])
+		
+		cols = sns.color_palette("colorblind", 4)
+
+		# Expected *1-hour* RMS noise fii
+		for i in range(len(mags)):
+			vals_rms_ffi[i,:], _ = phot_noise(mags[i], 5775, 3600, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
+		tot_noise_rms_ffi = np.sqrt(np.sum(vals_rms_ffi**2, axis=1))
+
+		ax11.semilogy(mags, vals_rms_ffi[:, 0], '-', color=cols[0])
+		ax11.semilogy(mags, vals_rms_ffi[:, 1], '--', color=cols[1])
+		ax11.semilogy(mags, vals_rms_ffi[:, 2], '-', color=cols[2])
+		ax11.semilogy(mags, tot_noise_rms_ffi, 'k-')
+		ax11.axhline(y=self.sysnoise, color=cols[3], ls='--')
+
+		# Expected *1-hour* RMS noise tpf
+		for i in range(len(mags)):
+			vals_rms_tpf[i,:], _ = phot_noise(mags[i], 5775, 3600, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
+		tot_noise_rms_tpf = np.sqrt(np.sum(vals_rms_tpf**2, axis=1))
+
+		ax12.semilogy(mags, vals_rms_tpf[:, 0], '-', color=cols[0])
+		ax12.semilogy(mags, vals_rms_tpf[:, 1], '--', color=cols[1])
+		ax12.semilogy(mags, vals_rms_tpf[:, 2], '-', color=cols[2])
+		ax12.semilogy(mags, tot_noise_rms_tpf, 'k-')
+		ax12.axhline(y=self.sysnoise, color=cols[3], ls='--')
+
+		# Expected ptp for 30-min
+		for i in range(len(mags)):
+			vals_ptp_ffi[i,:], _ = phot_noise(mags[i], 5775, 1800, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
+		tot_noise_ptp_ffi = np.sqrt(np.sum(vals_ptp_ffi**2, axis=1))
+
+		ax21.semilogy(mags, vals_ptp_ffi[:, 0], '-', color=cols[0])
+		ax21.semilogy(mags, vals_ptp_ffi[:, 1], '--', color=cols[1])
+		ax21.semilogy(mags, vals_ptp_ffi[:, 2], '-', color=cols[2])
+		ax21.semilogy(mags, tot_noise_ptp_ffi, 'k-')
+		ax21.axhline(y=self.sysnoise, color=cols[3], ls='--')
+
+		# Expected ptp for 2-min
+		for i in range(len(mags)):
+			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 5775, 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
+		tot_noise_ptp_tpf = np.sqrt(np.sum(vals_ptp_tpf**2, axis=1))
+
+
+		ax22.semilogy(mags, vals_ptp_tpf[:, 0], '-', color=cols[0])
+		ax22.semilogy(mags, vals_ptp_tpf[:, 1], '--', color=cols[1])
+		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-', color=cols[2])
+		ax22.semilogy(mags, tot_noise_ptp_tpf, 'k-')
+		ax22.axhline(y=self.sysnoise, color=cols[3], ls='--')
+
+		ptp_tpf_vs_mag = INT.UnivariateSpline(mags, tot_noise_ptp_tpf)
+		ptp_ffi_vs_mag = INT.UnivariateSpline(mags, tot_noise_ptp_ffi)
+		rms_tpf_vs_mag = INT.UnivariateSpline(mags, tot_noise_rms_tpf)
+		rms_ffi_vs_mag = INT.UnivariateSpline(mags, tot_noise_rms_ffi)
+
+		ax11.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$', fontsize=16, labelpad=10)
+		ax21.set_ylabel('PTP-MDV (ppm)', fontsize=16, labelpad=10)
+
+		for axx in np.array([ax11, ax12, ax21, ax22]):
+			axx.set_xlim([np.min(mags)-0.5, np.max(mags)+0.5])
+			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+			axx.xaxis.set_major_locator(MultipleLocator(2))
+			axx.xaxis.set_minor_locator(MultipleLocator(1))
+			axx.tick_params(direction='out', which='both', pad=5, length=3)
+			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
+			axx.yaxis.set_ticks_position('both')
+			axx.set_yscale("log", nonposy='clip')
+#			axx.legend(loc='upper left', prop={'size': 12})
+			
+		divider = make_axes_locatable(ax11)
+		cax = divider.append_axes('right', size='5%', pad=0.1)
+		cbar = fig1.colorbar(im1, cax=cax, orientation='vertical', label='Contamination')
+		cbar.set_alpha(1);		cbar.draw_all()
+		
+		divider = make_axes_locatable(ax21)
+		cax = divider.append_axes('right', size='5%', pad=0.1)
+		cbar = fig2.colorbar(im3, cax=cax, orientation='vertical', label='Contamination')
+		cbar.set_alpha(1);		cbar.draw_all()
+
+		###########
+
+		filename = 'rms.%s' %self.extension
+		filename2 = 'ptp.%s' %self.extension
+
+		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
+		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
 
 
 		# Assign validation bits, for both FFI and TPF
