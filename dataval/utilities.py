@@ -122,3 +122,16 @@ def rms_timescale(lc, timescale=3600/86400):
 
 	# Compute robust RMS value (MAD scaled to RMS)
 	return mad_to_sigma * nanmedian(np.abs(flux_bin - nanmedian(flux_bin)))
+
+#------------------------------------------------------------------------------
+def mad(x):
+	"""
+	Median absolute deviation scaled to standard deviation.
+
+	Parameters:
+		x (ndarray): Array to calculate robust standard deviation for.
+
+	Returns:
+		float: Median absolute deviation scaled to standard deviation.
+	"""
+	return mad_to_sigma * nanmedian(np.abs(x - nanmedian(x)))
