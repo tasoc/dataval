@@ -31,17 +31,12 @@ from scipy.stats import binned_statistic as binning
 
 # Local packages:
 from .quality import DatavalQualityFlags
-#from dataval.utilities import rms_timescale #, sphere_distance
+from dataval.utilities import mad #rms_timescale #, sphere_distance
 from .noise_model import phot_noise
 import seaborn as sns
 
 plt.ioff()
 
-
-#def reduce_percentile1(x):
-#	return np.nanpercentile(x, 99.9, interpolation='lower')
-#def reduce_percentile2(x):
-#	return np.nanpercentile(x, 0.5, interpolation='lower')
 
 def combine_flag_dicts(a, b):
 	return {key: a.get(key, 0) | b.get(key, 0) for key in set().union(a.keys(), b.keys())}
@@ -931,9 +926,12 @@ class DataValidation(object):
 		bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
 		ax1.scatter(bin_centers, bin_means, marker='o', color='r')
 
-		bin_means, bin_edges, binnumber = binning(tmags[idx_sc], masksizes[idx_sc], statistic='median', bins=15, range=(np.nanmin(tmags[idx_sc]),np.nanmax(tmags[idx_sc])))
-		bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
-		ax2.scatter(bin_centers, bin_means, marker='o', color='r')
+		try:
+			bin_means, bin_edges, binnumber = binning(tmags[idx_sc], masksizes[idx_sc], statistic='median', bins=15, range=(np.nanmin(tmags[idx_sc]),np.nanmax(tmags[idx_sc])))
+			bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
+			ax2.scatter(bin_centers, bin_means, marker='o', color='r')
+		except ValueError:
+			pass	
 
 #		normed0 = masksizes[idx_lc]/med_vs_mag(tmags[idx_lc])
 #		normed1 = masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc])
@@ -1047,7 +1045,11 @@ class DataValidation(object):
 #		ax2.plot(mags, pix, color='k', ls='-')
 
 		ax1.set_xlim([np.nanmin(tmags[idx_lc])-0.5, np.nanmax(tmags[idx_lc])+0.5])
-		ax2.set_xlim([np.nanmin(tmags[idx_sc])-0.5, np.nanmax(tmags[idx_sc])+0.5])
+		try:
+			ax2.set_xlim([np.nanmin(tmags[idx_sc])-0.5, np.nanmax(tmags[idx_sc])+0.5])
+		except ValueError:
+			pass
+		
 		ax1.set_ylim([0.99, np.nanmax(masksizes)+500])
 		ax2.set_ylim([0.99, np.nanmax(masksizes)+500])
 
@@ -1221,7 +1223,11 @@ class DataValidation(object):
 		ax2.plot(mag, 10**(-0.4*(mag - cc2.x)), color='k', ls='--')
 
 		ax1.set_xlim([np.nanmin(tmags[source == 'ffi'])-1, np.nanmax(tmags[source == 'ffi'])+1])
-		ax2.set_xlim([np.nanmin(tmags[source != 'ffi'])-1, np.nanmax(tmags[source != 'ffi'])+1])
+		
+		try:
+			ax2.set_xlim([np.nanmin(tmags[source != 'ffi'])-1, np.nanmax(tmags[source != 'ffi'])+1])
+		except ValueError:
+			pass
 
 		for axx in np.array([ax1, ax2]):
 			axx.set_yscale("log", nonposy='clip')
