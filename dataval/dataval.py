@@ -1373,12 +1373,16 @@ class DataValidation(object):
 				pass
 
 		kde1 = KDE(et[(ds==True) & (et<50)])
-		kde2 = KDE(et[(ds==False) & (et<50)])
 		kde1.fit(gridsize=1000)
-		kde2.fit(gridsize=1000)
 		ax21.plot(kde1.support, kde1.density, color='k', lw=2, label='30-min cadence')
-		ax22.plot(kde2.support, kde2.density, color='k', lw=2, label='2-min candence')
 		ax21.set_xlim([0, 50])
+		
+		try:
+			kde2 = KDE(et[(ds==False) & (et<50)])		
+			kde2.fit(gridsize=1000)		
+			ax22.plot(kde2.support, kde2.density, color='k', lw=2, label='2-min candence')
+		except ValueError:
+			pass
 
 
 		# Decide how many pixels to use based on lookup tables as a function of Tmag:
