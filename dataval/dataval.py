@@ -327,7 +327,11 @@ class DataValidation(object):
 #		mags = np.linspace(np.nanmin(tmags),np.nanmax(tmags),100)
 
 		ax1.set_xlim([np.min(tmags[(source == 'ffi')])-0.5, np.max(tmags[(source == 'ffi')])+0.5])
-		ax2.set_xlim([np.min(tmags[(source != 'ffi')])-0.5, np.max(tmags[(source != 'ffi')])+0.5])
+		
+		try:
+			ax2.set_xlim([np.min(tmags[(source != 'ffi')])-0.5, np.max(tmags[(source != 'ffi')])+0.5])
+		except ValueError:
+			pass
 
 		# Plotting stuff
 		for axx in np.array([ax1, ax2]):
