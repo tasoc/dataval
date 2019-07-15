@@ -1312,7 +1312,7 @@ class DataValidation(object):
 		ax21 = fig2.add_subplot(121)
 		ax22 = fig2.add_subplot(122)
 
-		star_vals = self.search_database(select=['todolist.datasource','todolist.sector','todolist.tmag','stamp_resizes','stamp_width','stamp_height','elaptime'])
+		star_vals = self.search_database(select=['todolist.datasource','todolist.sector','todolist.tmag','stamp_resizes','stamp_width','stamp_height', 'diagnostics.elaptime'])
 
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
