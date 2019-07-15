@@ -16,7 +16,7 @@ def main():
 
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
-	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'magdist'))
+	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'magdist', 'all'))
 	parser.add_argument('-c', '--corrected', help='Use corrected or raw values.', action='store_true')
 	parser.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png', 'eps'))
 	parser.add_argument('-s', '--show', help='Show plots.', action='store_true')

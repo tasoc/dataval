@@ -270,7 +270,7 @@ class DataValidation(object):
 		ax1 = fig.add_subplot(211)
 		ax2 = fig.add_subplot(212)
 
-		star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.sector','todolist.starid','method','todolist.datasource','todolist.tmag','contamination'])
+		star_vals = self.search_database(select=['todolist.priority','todolist.sector','todolist.starid','method','todolist.datasource','todolist.tmag','contamination'])
 
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
@@ -424,9 +424,9 @@ class DataValidation(object):
 		PARAM = {}
 
 #		if self.corr:
-		star_vals = self.search_database(search=['status in (1,3)', 'corr_status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
+		star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
 		factor = 1
-		star_vals2 = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
+		star_vals2 = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
 		factor2 = 1e6
 
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
@@ -667,10 +667,10 @@ class DataValidation(object):
 		PARAM = {}
 
 		if self.corr:
-			star_vals = self.search_database(search=['corr_status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
+			star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
 			factor = 1
 		else:
-			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
+			star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
 			factor = 1e6
 
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
@@ -837,10 +837,10 @@ class DataValidation(object):
 		fig.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
 
 
-		if self.doval:
-			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors'])
+		if not self.doval:
+			star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors'])
 		else:
-			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors','datavalidation_raw.dataval'])
+			star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors','datavalidation_raw.dataval'])
 
 
 
@@ -1131,7 +1131,7 @@ class DataValidation(object):
 #		ax31 = fig3.add_subplot(121)
 #		ax32 = fig3.add_subplot(122)
 
-		star_vals = self.search_database(search=["status in (1,3)"], select=['todolist.priority','todolist.datasource','todolist.sector','todolist.starid','todolist.tmag','ccd','mean_flux', 'contamination'])
+		star_vals = self.search_database(select=['todolist.priority','todolist.datasource','todolist.sector','todolist.starid','todolist.tmag','ccd','mean_flux', 'contamination'])
 
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
@@ -1302,7 +1302,7 @@ class DataValidation(object):
 		ax21 = fig2.add_subplot(121)
 		ax22 = fig2.add_subplot(122)
 
-		star_vals = self.search_database(search=["status in (1,3)"], select=['todolist.datasource','todolist.sector','todolist.tmag','stamp_resizes','stamp_width','stamp_height','elaptime'])
+		star_vals = self.search_database(select=['todolist.datasource','todolist.sector','todolist.tmag','stamp_resizes','stamp_width','stamp_height','elaptime'])
 
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
@@ -1461,7 +1461,7 @@ class DataValidation(object):
 		ax = fig.add_subplot(111)
 		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
 
-		star_vals = self.search_database(search=["status in (1,3)"], select=['todolist.datasource','todolist.tmag'])
+		star_vals = self.search_database(select=['todolist.datasource','todolist.tmag'])
 
 		tmags = np.array([star['tmag'] for star in star_vals])
 		source = np.array([star['datasource'] for star in star_vals])
