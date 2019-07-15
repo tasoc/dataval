@@ -16,6 +16,8 @@ def main():
 
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
+	
+	
 	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'magdist'))
 	parser.add_argument('-c', '--corrected', help='Use corrected or raw values.', action='store_true')
 	parser.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png', 'eps'))
@@ -25,10 +27,22 @@ def main():
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-cbs', '--colorbysector', help='Color by sector', action='store_true')
 	parser.add_argument('-sn', '--sysnoise', type=float, help='systematic noise level for noise plot.', nargs='?', default=5.0)
-	parser.add_argument('input_folders', type=str, help='Directory to create catalog files in.', nargs='+')
-	parser.add_argument('output_folder', type=str, help='Directory in which to place output if several input folders are given.', nargs='?', default=None)
+	
+#	parser.add_argument('input_folders', type=str, help='Directory to create catalog files in.', nargs='+')
+#	parser.add_argument('output_folder', type=str, help='Directory in which to place output if several input folders are given.', nargs='?', default=None)
+	
 	args = parser.parse_args()
-
+	
+	# TODO: Remove this before going into production... Baaaaaaddddd Mikkel!
+	args.show = True
+#	args.method = 'noise'
+	args.method = 'all'
+	args.validate = True
+	args.sysnoise = 5
+	args.corrected = True
+	args.input_folders = ['/media/mikkelnl/Elements/TESS/TASOC_DR04/S02/']
+	args.output_folder = '/media/mikkelnl/Elements/TESS/TASOC_DR04/S02/'
+	
 	if args.output_folder is None and len(args.input_folders) > 1:
 		parser.error("Please specify an output directory!")
 
