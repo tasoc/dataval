@@ -217,7 +217,9 @@ class DataValidation(object):
 						bool(v3)
 					))
 
-				self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) SELECT todolist.priority, 0, 0 FROM todolist WHERE todolist.status not in (1,3);")
+				# Fill out the table, setting everything not already covered by the above to disapproved:
+				self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) SELECT todolist.priority, 0, 0 FROM todolist LEFT JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE " + self.dataval_table + ".priority IS NULL;")
+
 				self.conn.commit()
 
 
@@ -232,7 +234,7 @@ class DataValidation(object):
 		elif self.method == 'noise':
 			self.plot_onehour_noise()
 		elif self.method == 'noise_compare':
-			self.compare_noise()	
+			self.compare_noise()
 		elif self.method == 'magdist':
 			self.plot_mag_dist()
 		elif self.method == 'contam':
@@ -387,11 +389,11 @@ class DataValidation(object):
 	# =============================================================================
 	#
 	# =============================================================================
-	
+
 	def compare_noise(self):
 		"""
 		Compare noise metrics before and after correction
-		
+
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
@@ -403,7 +405,7 @@ class DataValidation(object):
 
 		logger.info('------------------------------------------')
 		logger.info('Plotting Noise Comparison')
-		
+
 		fig1 = plt.figure(figsize=(15, 5))
 		fig1.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
 		ax11 = fig1.add_subplot(121)
@@ -426,7 +428,7 @@ class DataValidation(object):
 		factor = 1
 		star_vals2 = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
 		factor2 = 1e6
-		
+
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
 		pri = np.array([star['priority'] for star in star_vals], dtype=int)
 		rms = np.array([star['rms_hour']*factor for star in star_vals], dtype=float)
@@ -439,7 +441,7 @@ class DataValidation(object):
 		rms2 = np.array([star['rms_hour']*factor2 for star in star_vals2], dtype=float)
 		ptp2 = np.array([star['ptp']*factor2 for star in star_vals2], dtype=float)
 		source2 = np.array([star['datasource'] for star in star_vals2], dtype=str)
-		
+
 		def overlap(a, b):
 		    # return the indices in a that overlap with b, also returns
 		    # the corresponding index in b only works if both a and b are unique!
@@ -630,9 +632,9 @@ class DataValidation(object):
 			plt.show()
 		else:
 			plt.close('all')
-		
-		
-		
+
+
+
 	# =============================================================================
 	#
 	# =============================================================================
@@ -660,7 +662,7 @@ class DataValidation(object):
 		fig2.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
 		ax21 = fig2.add_subplot(121)
 		ax22 = fig2.add_subplot(122)
-		
+
 
 		PARAM = {}
 
@@ -670,24 +672,24 @@ class DataValidation(object):
 		else:
 			star_vals = self.search_database(search=['status in (1,3)'], select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
 			factor = 1e6
-			
+
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
 		pri = np.array([star['priority'] for star in star_vals], dtype=int)
 		rms = np.array([star['rms_hour']*factor for star in star_vals], dtype=float)
 		ptp = np.array([star['ptp']*factor for star in star_vals], dtype=float)
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
 		contam = np.array([star['contamination'] for star in star_vals], dtype=float)
-		
+
 		# TODO: Update elat+elon based on observing sector?
 		PARAM['RA'] = 0
 		PARAM['DEC'] = 0
 
-		idx_lc = (source=='ffi') 
+		idx_lc = (source=='ffi')
 		idx_sc = (source!='ffi')
-		
+
 		im1 = ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', c=contam[idx_lc], alpha=0.2, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 		ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
-		
+
 		im3 = ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', c=contam[idx_lc], alpha=0.2, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
 
@@ -698,7 +700,7 @@ class DataValidation(object):
 		vals_rms_ffi = np.zeros([len(mags), 4])
 		vals_ptp_ffi = np.zeros([len(mags), 4])
 		vals_ptp_tpf = np.zeros([len(mags), 4])
-		
+
 		cols = sns.color_palette("colorblind", 4)
 
 		# Expected *1-hour* RMS noise fii
@@ -764,12 +766,12 @@ class DataValidation(object):
 			axx.yaxis.set_ticks_position('both')
 			axx.set_yscale("log", nonposy='clip')
 #			axx.legend(loc='upper left', prop={'size': 12})
-			
+
 		divider = make_axes_locatable(ax11)
 		cax = divider.append_axes('right', size='5%', pad=0.1)
 		cbar = fig1.colorbar(im1, cax=cax, orientation='vertical', label='Contamination')
 		cbar.set_alpha(1);		cbar.draw_all()
-		
+
 		divider = make_axes_locatable(ax21)
 		cax = divider.append_axes('right', size='5%', pad=0.1)
 		cbar = fig2.colorbar(im3, cax=cax, orientation='vertical', label='Contamination')
