@@ -43,9 +43,6 @@ plt.ioff()
 #def reduce_percentile2(x):
 #	return np.nanpercentile(x, 0.5, interpolation='lower')
 
-def mad(X):
-	return np.nanmedian(np.abs(X-np.nanmedian(X)))*1.4826
-
 def combine_flag_dicts(a, b):
 	return {key: a.get(key, 0) | b.get(key, 0) for key in set().union(a.keys(), b.keys())}
 
