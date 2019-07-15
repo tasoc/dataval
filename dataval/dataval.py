@@ -141,12 +141,15 @@ class DataValidation(object):
 		elif isinstance(select, (list, tuple)):
 			select = ",".join(select)
 
-		if search is None:
-			search = ''
-		elif isinstance(search, (list, tuple)):
-			search = "WHERE " + " AND ".join(search)
-		else:
-			search = 'WHERE ' + search
+
+		default_search = [
+			'status in (1,3)']
+		
+		if self.corr:
+			default_search.append('corr_status in (1,3)')
+		
+		search = default_search if search is None else default_search + search
+		search = "WHERE " + " AND ".join(search)
 
 		if order_by is None:
 			order_by = ''
