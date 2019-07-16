@@ -768,12 +768,14 @@ class DataValidation(object):
 
 		divider = make_axes_locatable(ax11)
 		cax = divider.append_axes('right', size='5%', pad=0.1)
+		im1.set_clim(0, 1)
 		cbar = fig1.colorbar(im1, cax=cax, orientation='vertical', label='Contamination')
 		cbar.set_alpha(1)
 		cbar.draw_all()
 
 		divider = make_axes_locatable(ax21)
 		cax = divider.append_axes('right', size='5%', pad=0.1)
+		im3.set_clim(0, 1)
 		cbar = fig2.colorbar(im3, cax=cax, orientation='vertical', label='Contamination')
 		cbar.set_alpha(1)
 		cbar.draw_all()
