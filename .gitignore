@@ -1,7 +1,5 @@
 # Specific files for this repo:
-tests/input/only_raw/todo.sqlite
 tests/input/only_raw/data_validation/*
-tests/input/with_corr/todo.sqlite
 tests/input/with_corr/data_validation/*
 
 # Byte-compiled / optimized / DLL files

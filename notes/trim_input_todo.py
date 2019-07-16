@@ -22,18 +22,22 @@ if __name__ == '__main__':
 		cursor = conn.cursor()
 		cursor.execute("PRAGMA foreign_keys=ON;")
 
-		print("Finding samples from file...")
+		# List of priorities to include
 		pri_total = set()
-		for b in np.arange(0, 18, 1):
-			print(b)
 
-			cursor.execute("SELECT priority FROM todolist WHERE tmag BETWEEN %s AND %s ORDER BY RANDOM() LIMIT 1000;" % (
-				b,
-				b+1
-			))
+		print("Finding random samples from file...")
+		for datasource in ("datasource='ffi'", "datasource!='ffi'"):
+			for b in np.arange(0, 18, 1):
+				print(b)
 
-			pri = {str(row[0]) for row in cursor.fetchall()}
-			pri_total |= pri
+				cursor.execute("SELECT priority FROM todolist WHERE %s AND tmag BETWEEN %s AND %s ORDER BY RANDOM() LIMIT 5000;" % (
+					datasource,
+					b,
+					b+1
+				))
+
+				pri = {str(row[0]) for row in cursor.fetchall()}
+				pri_total |= pri
 
 		print("Cleaning file...")
 
