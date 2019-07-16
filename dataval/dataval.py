@@ -66,18 +66,11 @@ class DataValidation(object):
 			self.dataval_table = 'datavalidation_raw'
 
 		#load sqlite to-do files
-		if len(self.input_folders)==1:
-			if self.outfolders is None:
-				path = os.path.join(self.input_folders[0], 'data_validation')
-				self.outfolders = path
-				if not os.path.exists(self.outfolders):
-					os.makedirs(self.outfolders)
-
 		for i, f in enumerate(self.input_folders):
 			todo_file = os.path.join(f, 'todo.sqlite')
 			logger.debug("TODO file: %s", todo_file)
 			if not os.path.exists(todo_file):
-				raise ValueError("TODO file not found")
+				raise FileNotFoundError("TODO file not found: '%s'" % todo_file)
 
 			# Open the SQLite file:
 			self.conn = sqlite3.connect(todo_file)
@@ -101,6 +94,14 @@ class DataValidation(object):
 					FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 				);""")
 				self.conn.commit()
+
+		# Create output directory:
+		if len(self.input_folders)==1:
+			if self.outfolders is None:
+				path = os.path.join(self.input_folders[0], 'data_validation')
+				self.outfolders = path
+				if not os.path.exists(self.outfolders):
+					os.makedirs(self.outfolders)
 
 		# Get the range of Tmags in the tables:
 		tmag_limits = self.search_database(select=['MIN(tmag) AS tmag_min', 'MAX(tmag) AS tmag_max'])[0]
