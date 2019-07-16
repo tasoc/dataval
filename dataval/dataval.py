@@ -17,11 +17,10 @@ from .plots import mpl, plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.ticker import MultipleLocator, FormatStrFormatter,ScalarFormatter
+from matplotlib.ticker import MultipleLocator, ScalarFormatter
 y_formatter = ScalarFormatter(useOffset=False)
 mpl.rcParams['font.family'] = 'serif'
-from matplotlib import rc
-rc('text', usetex=True)
+#plt.rc('text', usetex=True)
 import seaborn as sns
 
 import scipy.interpolate as INT
