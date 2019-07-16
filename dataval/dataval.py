@@ -102,6 +102,12 @@ class DataValidation(object):
 				);""")
 				self.conn.commit()
 
+		# Get the range of Tmags in the tables:
+		tmag_limits = self.search_database(select=['MIN(tmag) AS tmag_min', 'MAX(tmag) AS tmag_max'])[0]
+		self.tmag_limits = (tmag_limits['tmag_min']-0.5, np.nanmax(tmag_limits['tmag_max'])+0.5)
+
+
+
 	def close(self):
 		"""Close DataValidation object and all associated objects."""
 		self.cursor.close()
@@ -139,10 +145,10 @@ class DataValidation(object):
 
 		default_search = [
 			'status in (1,3)']
-		
+
 		if self.corr:
 			default_search.append('corr_status in (1,3)')
-		
+
 		search = default_search if search is None else default_search + search
 		search = "WHERE " + " AND ".join(search)
 
@@ -326,12 +332,8 @@ class DataValidation(object):
 		cont_vs_mag = INT.InterpolatedUnivariateSpline(xmax, ymax)
 #		mags = np.linspace(np.nanmin(tmags),np.nanmax(tmags),100)
 
-		ax1.set_xlim([np.min(tmags[(source == 'ffi')])-0.5, np.max(tmags[(source == 'ffi')])+0.5])
-		
-		try:
-			ax2.set_xlim([np.min(tmags[(source != 'ffi')])-0.5, np.max(tmags[(source != 'ffi')])+0.5])
-		except ValueError:
-			pass
+		ax1.set_xlim(self.tmag_limits)
+		ax2.set_xlim(self.tmag_limits)
 
 		# Plotting stuff
 		for axx in np.array([ax1, ax2]):
@@ -543,9 +545,7 @@ class DataValidation(object):
 #		ax21.scatter(tmags2[(source2=='ffi')], ptp2[(source2=='ffi')], marker='o', facecolors='r', edgecolor='r', alpha=0.1, label='30-min cadence')
 
 		# Plot theoretical lines
-		mags = np.linspace(np.nanmin([np.nanmin(tmags), np.nanmin(tmags2)])-0.5, 15+0.5, 50)
-		print(np.nanmax(tmags), np.nanmax(tmags2))
-		print(np.nanmin(tmags), np.nanmin(tmags2))
+		mags = np.linspace(self.tmag_limits[0], self.tmag_limits[1], 100)
 		vals_rms_tpf = np.zeros([len(mags), 4])
 		vals_rms_ffi = np.zeros([len(mags), 4])
 		vals_ptp_ffi = np.zeros([len(mags), 4])
@@ -603,7 +603,7 @@ class DataValidation(object):
 
 
 		for axx in np.array([ax11, ax12, ax21, ax22, ax31, ax32]):
-			axx.set_xlim([np.min(mags)-0.5, np.max(mags)+0.5])
+			axx.set_xlim(self.tmag_limits)
 			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
@@ -614,8 +614,8 @@ class DataValidation(object):
 #			axx.legend(loc='upper left', prop={'size': 12})
 
 
-		ax31.set_xlim([np.min(tcomp)-0.5, np.max(tcomp)+0.5])
-		ax32.set_xlim([np.min(tcomp)-0.5, np.max(tcomp)+0.5])
+		ax31.set_xlim(self.tmag_limits)
+		ax32.set_xlim(self.tmag_limits)
 		###########
 
 		filename = 'rms_comp.%s' %self.extension
@@ -693,7 +693,7 @@ class DataValidation(object):
 		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
 
 		# Plot theoretical lines
-		mags = np.linspace(np.nanmin(tmags)-0.5, 15+0.5, 50)
+		mags = np.linspace(self.tmag_limits[0], self.tmag_limits[1], 100)
 
 		vals_rms_tpf = np.zeros([len(mags), 4])
 		vals_rms_ffi = np.zeros([len(mags), 4])
@@ -756,7 +756,7 @@ class DataValidation(object):
 		ax21.set_ylabel('PTP-MDV (ppm)', fontsize=16, labelpad=10)
 
 		for axx in np.array([ax11, ax12, ax21, ax22]):
-			axx.set_xlim([np.min(mags)-0.5, np.max(mags)+0.5])
+			axx.set_xlim(self.tmag_limits)
 			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
@@ -769,12 +769,14 @@ class DataValidation(object):
 		divider = make_axes_locatable(ax11)
 		cax = divider.append_axes('right', size='5%', pad=0.1)
 		cbar = fig1.colorbar(im1, cax=cax, orientation='vertical', label='Contamination')
-		cbar.set_alpha(1);		cbar.draw_all()
+		cbar.set_alpha(1)
+		cbar.draw_all()
 
 		divider = make_axes_locatable(ax21)
 		cax = divider.append_axes('right', size='5%', pad=0.1)
 		cbar = fig2.colorbar(im3, cax=cax, orientation='vertical', label='Contamination')
-		cbar.set_alpha(1);		cbar.draw_all()
+		cbar.set_alpha(1)
+		cbar.draw_all()
 
 		###########
 
@@ -930,12 +932,11 @@ class DataValidation(object):
 		bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
 		ax1.scatter(bin_centers, bin_means, marker='o', color='r')
 
-		try:
+		if np.any(idx_sc):
 			bin_means, bin_edges, binnumber = binning(tmags[idx_sc], masksizes[idx_sc], statistic='median', bins=15, range=(np.nanmin(tmags[idx_sc]),np.nanmax(tmags[idx_sc])))
-			bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
+			bin_width = (bin_edges[1] - bin_edges[0])
+			bin_centers = bin_edges[1:] - bin_width/2
 			ax2.scatter(bin_centers, bin_means, marker='o', color='r')
-		except ValueError:
-			pass	
 
 #		normed0 = masksizes[idx_lc]/med_vs_mag(tmags[idx_lc])
 #		normed1 = masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc])
@@ -1048,12 +1049,9 @@ class DataValidation(object):
 #		ax1.plot(mags, pix, color='k', ls='-')
 #		ax2.plot(mags, pix, color='k', ls='-')
 
-		ax1.set_xlim([np.nanmin(tmags[idx_lc])-0.5, np.nanmax(tmags[idx_lc])+0.5])
-		try:
-			ax2.set_xlim([np.nanmin(tmags[idx_sc])-0.5, np.nanmax(tmags[idx_sc])+0.5])
-		except ValueError:
-			pass
-		
+		ax1.set_xlim(self.tmag_limits)
+		ax2.set_xlim(self.tmag_limits)
+
 		ax1.set_ylim([0.99, np.nanmax(masksizes)+500])
 		ax2.set_ylim([0.99, np.nanmax(masksizes)+500])
 
@@ -1226,12 +1224,8 @@ class DataValidation(object):
 		ax1.plot(mag, 10**(-0.4*(mag - cc.x)), color='k', ls='--')
 		ax2.plot(mag, 10**(-0.4*(mag - cc2.x)), color='k', ls='--')
 
-		ax1.set_xlim([np.nanmin(tmags[source == 'ffi'])-1, np.nanmax(tmags[source == 'ffi'])+1])
-		
-		try:
-			ax2.set_xlim([np.nanmin(tmags[source != 'ffi'])-1, np.nanmax(tmags[source != 'ffi'])+1])
-		except ValueError:
-			pass
+		ax1.set_xlim(self.tmag_limits)
+		ax2.set_xlim(self.tmag_limits)
 
 		for axx in np.array([ax1, ax2]):
 			axx.set_yscale("log", nonposy='clip')
@@ -1376,10 +1370,10 @@ class DataValidation(object):
 		kde1.fit(gridsize=1000)
 		ax21.plot(kde1.support, kde1.density, color='k', lw=2, label='30-min cadence')
 		ax21.set_xlim([0, 50])
-		
+
 		try:
-			kde2 = KDE(et[(ds==False) & (et<50)])		
-			kde2.fit(gridsize=1000)		
+			kde2 = KDE(et[(ds==False) & (et<50)])
+			kde2.fit(gridsize=1000)
 			ax22.plot(kde2.support, kde2.density, color='k', lw=2, label='2-min candence')
 		except ValueError:
 			pass
