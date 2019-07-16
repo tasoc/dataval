@@ -22,6 +22,7 @@ y_formatter = ScalarFormatter(useOffset=False)
 mpl.rcParams['font.family'] = 'serif'
 from matplotlib import rc
 rc('text', usetex=True)
+import seaborn as sns
 
 import scipy.interpolate as INT
 import scipy.optimize as OP
@@ -31,9 +32,8 @@ from scipy.stats import binned_statistic as binning
 
 # Local packages:
 from .quality import DatavalQualityFlags
-from dataval.utilities import mad #rms_timescale #, sphere_distance
+from .utilities import mad #rms_timescale #, sphere_distance
 from .noise_model import phot_noise
-import seaborn as sns
 
 plt.ioff()
 
