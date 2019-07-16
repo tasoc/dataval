@@ -76,6 +76,7 @@ class DataValidation(object):
 			self.conn = sqlite3.connect(todo_file)
 			self.conn.row_factory = sqlite3.Row
 			self.cursor = self.conn.cursor()
+			self.cursor.execute("PRAGMA foreign_keys=ON;")
 
 			# Check if corrections have been run:
 			self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
