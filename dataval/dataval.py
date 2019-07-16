@@ -836,10 +836,10 @@ class DataValidation(object):
 		fig.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
 
 
-		if not self.doval:
-			star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors'])
-		else:
-			star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors','datavalidation_raw.dataval'])
+#		if not self.doval:
+		star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors'])
+#		else:
+#			star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors','datavalidation_raw.dataval'])
 
 
 
@@ -864,9 +864,9 @@ class DataValidation(object):
 		pri = np.array([star['priority'] for star in star_vals], dtype=int)
 		minimal_mask_used = np.array([False if star['errors'] is None else ('Using minimum aperture.' in star['errors']) for star in star_vals], dtype='bool')
 
-		dataval = np.zeros_like(pri, dtype='int32')
-		if self.doval:
-			dataval = np.array([star['dataval'] for star in star_vals], dtype='int32')
+#		dataval = np.zeros_like(pri, dtype='int32')
+#		if self.doval:
+#			dataval = np.array([star['dataval'] for star in star_vals], dtype='int32')
 
 
 #		cats = {}
@@ -910,20 +910,20 @@ class DataValidation(object):
 		idx_lc = (source == 'ffi')
 		idx_sc = (source != 'ffi')
 
-		idx_lc0 = idx_lc & (dataval&(32+64) == 0)
-		idx_sc0 = idx_sc & (dataval&(32+64) == 0)
+		idx_lc0 = idx_lc #& (dataval&(32+64) == 0)
+		idx_sc0 = idx_sc #& (dataval&(32+64) == 0)
 
-		idx_lc1 = idx_lc & (dataval&(32+64) != 0)
-		idx_sc1 = idx_sc & (dataval&(32+64) != 0)
+#		idx_lc1 = idx_lc & (dataval&(32+64) != 0)
+#		idx_sc1 = idx_sc & (dataval&(32+64) != 0)
 
 		perm_lc = np.random.permutation(sum(idx_lc0))
 		perm_sc = np.random.permutation(sum(idx_sc0))
 
 		ax1.scatter(tmags[idx_lc0][perm_lc], masksizes[idx_lc0][perm_lc], marker='o', c=contam[idx_lc0][perm_lc], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'))
-		ax1.scatter(tmags[idx_lc1], masksizes[idx_lc1], marker='.', c=contam[idx_lc1], alpha=0.2, norm=norm, cmap=plt.get_cmap('PuOr'))
+#		ax1.scatter(tmags[idx_lc1], masksizes[idx_lc1], marker='.', c=contam[idx_lc1], alpha=0.2, norm=norm, cmap=plt.get_cmap('PuOr'))
 
 		ax2.scatter(tmags[idx_sc0][perm_sc], masksizes[idx_sc0][perm_sc], marker='o', c=contam[idx_sc0][perm_sc], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'))
-		ax2.scatter(tmags[idx_sc1], masksizes[idx_sc1], marker='.', c=contam[idx_sc1], alpha=0.2, norm=norm, cmap=plt.get_cmap('PuOr'))
+#		ax2.scatter(tmags[idx_sc1], masksizes[idx_sc1], marker='.', c=contam[idx_sc1], alpha=0.2, norm=norm, cmap=plt.get_cmap('PuOr'))
 
 		# Compute median-bin curve
 		bin_means, bin_edges, binnumber = binning(tmags[idx_lc], masksizes[idx_lc], statistic='median', bins=15, range=(np.nanmin(tmags[idx_lc]),np.nanmax(tmags[idx_lc])))
@@ -1381,7 +1381,7 @@ class DataValidation(object):
 			kde2 = KDE(et[(ds==False) & (et<50)])		
 			kde2.fit(gridsize=1000)		
 			ax22.plot(kde2.support, kde2.density, color='k', lw=2, label='2-min candence')
-		except ValueError:
+		except ZeroDivisionError:
 			pass
 
 
