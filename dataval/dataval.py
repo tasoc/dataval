@@ -104,7 +104,7 @@ class DataValidation(object):
 
 		# Get the range of Tmags in the tables:
 		tmag_limits = self.search_database(select=['MIN(tmag) AS tmag_min', 'MAX(tmag) AS tmag_max'])[0]
-		self.tmag_limits = (tmag_limits['tmag_min']-0.5, np.nanmax(tmag_limits['tmag_max'])+0.5)
+		self.tmag_limits = (tmag_limits['tmag_min']-0.5, tmag_limits['tmag_max']+0.5)
 
 
 
@@ -137,17 +137,17 @@ class DataValidation(object):
 
 		logger = logging.getLogger(__name__)
 
+		# Which columns to select from the tables:
 		if select is None:
 			select = '*'
 		elif isinstance(select, (list, tuple)):
 			select = ",".join(select)
 
-
-		default_search = [
-			'status in (1,3)']
-
+		# Search constraints:
+		# Default is to only pass through targets that made the last step successfully
+		default_search = ['status IN (1,3)']
 		if self.corr:
-			default_search.append('corr_status in (1,3)')
+			default_search.append('corr_status IN (1,3)')
 
 		search = default_search if search is None else default_search + search
 		search = "WHERE " + " AND ".join(search)
@@ -161,11 +161,11 @@ class DataValidation(object):
 
 		limit = '' if limit is None else " LIMIT %d" % limit
 
+		# Which tables to join together:
 		default_joins = [
 			'INNER JOIN diagnostics ON todolist.priority=diagnostics.priority',
 			'LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority'
 		]
-
 		if self.corrections_done:
 			default_joins.append('LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority')
 
@@ -401,7 +401,7 @@ class DataValidation(object):
 		logger = logging.getLogger(__name__)
 
 		if not self.corrections_done:
-			logger.info("Can not run plot_onehour_noise when corrections have not been run")
+			logger.info("Can not run compare_noise when corrections have not been run")
 			return {}
 
 		logger.info('------------------------------------------')
