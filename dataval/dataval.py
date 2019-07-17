@@ -93,6 +93,7 @@ class DataValidation(object):
 					approved BOOLEAN NOT NULL,
 					FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 				);""")
+				self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_approved_idx ON " + self.dataval_table + " (approved);")
 				self.conn.commit()
 
 		# Create output directory:
