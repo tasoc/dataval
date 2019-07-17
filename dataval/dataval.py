@@ -88,7 +88,7 @@ class DataValidation(object):
 			if self.method == 'all' and self.doval:
 				self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
 				self.cursor.execute("CREATE TABLE IF NOT EXISTS " + self.dataval_table + """ (
-					priority INT PRIMARY KEY NOT NULL,
+					priority INTEGER PRIMARY KEY ASC NOT NULL,
 					dataval INT NOT NULL,
 					approved BOOLEAN NOT NULL,
 					FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
