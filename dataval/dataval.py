@@ -164,10 +164,12 @@ class DataValidation(object):
 		limit = '' if limit is None else " LIMIT %d" % limit
 
 		# Which tables to join together:
-		default_joins = [
-			'INNER JOIN diagnostics ON todolist.priority=diagnostics.priority',
-			'LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority'
-		]
+		default_joins = ['INNER JOIN diagnostics ON todolist.priority=diagnostics.priority']
+		
+		if self.method == 'all' and self.doval:
+			default_joins.append('LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority')
+			
+			
 		if self.corrections_done:
 			default_joins.append('LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority')
 
@@ -863,6 +865,7 @@ class DataValidation(object):
 
 
 
+		tic = np.array([star['starid'] for star in star_vals], dtype=int)
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
 		masksizes = np.array([star['mask_size'] for star in star_vals], dtype=float)
 		contam = np.array([star['contamination'] for star in star_vals], dtype=float)
