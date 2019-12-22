@@ -9,7 +9,6 @@
 
 import os
 import logging
-import six
 import numpy as np
 
 # Plotting:
@@ -158,7 +157,7 @@ class DataValidation(object):
 			order_by = ''
 		elif isinstance(order_by, (list, tuple)):
 			order_by = " ORDER BY " + ",".join(order_by)
-		elif isinstance(order_by, six.string_types):
+		elif isinstance(order_by, str):
 			order_by = " ORDER BY " + order_by
 
 		limit = '' if limit is None else " LIMIT %d" % limit
