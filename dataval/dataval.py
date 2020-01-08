@@ -153,6 +153,7 @@ class DataValidation(object):
 		if self.corr:
 			default_search.append('corr_status IN (1,3)')
 
+		if isinstance(search, str): search = [search,]
 		search = default_search if search is None else default_search + search
 		search = "WHERE " + " AND ".join(search)
 
@@ -203,6 +204,7 @@ class DataValidation(object):
 			val4 = self.plot_onehour_noise(return_val=True)
 			self.plot_stamp()
 			self.plot_mag_dist()
+			self.plot_corrections_waittime()
 
 			if self.doval:
 				val = combine_flag_dicts(val1, val2)
@@ -285,10 +287,10 @@ class DataValidation(object):
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
 
 		# Indices for plotting
-		idx_high_ffi = (cont>1) & (source == 'ffi')
-		idx_high_tpf = (cont>1) & (source != 'ffi')
-		idx_low_ffi = (cont<=1) & (source == 'ffi')
-		idx_low_tpf = (cont<=1) & (source != 'ffi')
+		idx_high_ffi = (cont > 1) & (source == 'ffi')
+		idx_high_tpf = (cont > 1) & (source != 'ffi')
+		idx_low_ffi = (cont <= 1) & (source == 'ffi')
+		idx_low_tpf = (cont <= 1) & (source != 'ffi')
 		cont[idx_high_ffi] = 1.1
 		cont[idx_high_tpf] = 1.1
 
@@ -648,12 +650,12 @@ class DataValidation(object):
 			star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
 			factor = 1e6
 
-		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
-		pri = np.array([star['priority'] for star in star_vals], dtype=int)
-		rms = np.array([star['rms_hour']*factor for star in star_vals], dtype=float)
-		ptp = np.array([star['ptp']*factor for star in star_vals], dtype=float)
+		tmags = np.array([star['tmag'] for star in star_vals], dtype='float64')
+		pri = np.array([star['priority'] for star in star_vals], dtype='int64')
+		rms = np.array([star['rms_hour']*factor for star in star_vals], dtype='float64')
+		ptp = np.array([star['ptp']*factor for star in star_vals], dtype='float64')
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
-		contam = np.array([star['contamination'] for star in star_vals], dtype=float)
+		contam = np.array([star['contamination'] for star in star_vals], dtype='float64')
 
 		# TODO: Update elat+elon based on observing sector?
 		PARAM['RA'] = 0
@@ -829,11 +831,11 @@ class DataValidation(object):
 		#	rgba_color = 'k'
 
 		#tic = np.array([star['starid'] for star in star_vals], dtype=int)
-		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
-		masksizes = np.array([star['mask_size'] for star in star_vals], dtype=float)
-		contam = np.array([star['contamination'] for star in star_vals], dtype=float)
+		tmags = np.array([star['tmag'] for star in star_vals], dtype='float64')
+		masksizes = np.array([star['mask_size'] for star in star_vals], dtype='float64')
+		contam = np.array([star['contamination'] for star in star_vals], dtype='float64')
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
-		pri = np.array([star['priority'] for star in star_vals], dtype=int)
+		pri = np.array([star['priority'] for star in star_vals], dtype='int64')
 		minimal_mask_used = np.array([False if star['errors'] is None else ('Using minimum aperture.' in star['errors']) for star in star_vals], dtype='bool')
 
 #		dataval = np.zeros_like(pri, dtype='int32')
@@ -1559,13 +1561,40 @@ class DataValidation(object):
 		else:
 			plt.close(fig)
 
+	#--------------------------------------------------------------------------
+	def plot_corrections_waittime(self):
+		"""
+		Visiualize the worker wait-time during the processing.
 
-	# =============================================================================
-	#
-	# =============================================================================
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
-	def plot_dist_to_edge(self, return_val=False):
+		logger = logging.getLogger(__name__)
 
-		pass
+		if not self.corrections_done:
+			logger.debug('plot_corrections_waittime only works for corrected data.')
+			return
 
+		self.cursor.execute("PRAGMA table_info(diagnostics_corr)")
+		if 'worker_waittime' not in [r['name'] for r in self.cursor.fetchall()]:
+			logger.info("WORKER_WAITTIME is not stored in database.")
+			return
 
+		# Get the data from the database:
+		star_vals = self.search_database(select=['todolist.priority','diagnostics_corr.worker_waittime'])
+		tab = Table(rows=star_vals)
+
+		# Create figure figure:
+		fig = plt.figure()
+		ax = fig.add_subplot(111)
+		ax.scatter(tab['priority'], tab['worker_waittime'], alpha=0.3)
+		ax.set_xlabel('Priority')
+		ax.set_ylabel('Worker wait-time (s)')
+
+		# Save figure to file and close:
+		filename = 'corrections_worker_waittime.{0:s}'.format(self.extension)
+		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
+		if self.show:
+			plt.show()
+		else:
+			plt.close(fig)
