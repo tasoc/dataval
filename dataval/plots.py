@@ -166,24 +166,3 @@ def plot_image_fit_residuals(fig, image, fit, residuals):
 		ax.set_title(title)
 
 	return ax_list
-
-#--------------------------------------------------------------------------------------------------
-def save_figure(path, format='png', **kwargs):
-	"""
-	Write current figure to file. Creates directory to place it in if needed.
-
-	Parameters:
-		path (string): Path where to save figure. If no file extension is provided, the extension of
-			the format is automatically appended.
-		format (string): Figure file type. Default is ``'png'``.
-		kwargs (dict, optional): Keyword arguments to be passed to `matplotlib.pyplot.savefig`.
-	"""
-
-	logger = logging.getLogger(__name__)
-	logger.debug("Saving figure '%s' to '%s'.", os.path.basename(path), os.path.dirname(path))
-
-	if not path.endswith('.' + format):
-		path += '.' + format
-
-	# Write current figure to file if it doesn't exist:
-	plt.savefig(path, format=format, bbox_inches='tight', **kwargs)

@@ -13,7 +13,7 @@ xtick.minor.visible : True
 xtick.labelsize  : 15
 xtick.major.size : 5
 xtick.major.pad  : 6
-ytick.minor.size : 3
+xtick.minor.size : 3
 xtick.minor.pad  : 5
 
 ytick.direction  : out

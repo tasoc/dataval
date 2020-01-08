@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-
+Data Validation module for TASOC Pipeline.
 
 .. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
