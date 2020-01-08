@@ -42,7 +42,7 @@ def combine_flag_dicts(a, b):
 #------------------------------------------------------------------------------
 class DataValidation(object):
 
-
+	#----------------------------------------------------------------------------------------------
 	def __init__(self, input_folders, output_folder=None, validate=True, method='all', colorbysector=False, ext='png', showplots=False, sysnoise=0, corr=False):
 
 		logger = logging.getLogger(__name__)
@@ -108,18 +108,21 @@ class DataValidation(object):
 		self.tmag_limits = (tmag_limits['tmag_min']-0.5, tmag_limits['tmag_max']+0.5)
 
 
-
+	#----------------------------------------------------------------------------------------------
 	def close(self):
 		"""Close DataValidation object and all associated objects."""
 		self.cursor.close()
 		self.conn.close()
 
+	#----------------------------------------------------------------------------------------------
 	def __exit__(self, *args):
 		self.close()
 
+	#----------------------------------------------------------------------------------------------
 	def __enter__(self):
 		return self
 
+	#----------------------------------------------------------------------------------------------
 	def search_database(self, select=None, search=None, order_by=None, limit=None, distinct=False, joins=None):
 		"""
 		Search list of lightcurves and return a list of tasks/stars matching the given criteria.
@@ -164,11 +167,11 @@ class DataValidation(object):
 
 		# Which tables to join together:
 		default_joins = ['INNER JOIN diagnostics ON todolist.priority=diagnostics.priority']
-		
+
 		if self.method == 'all' and self.doval:
 			default_joins.append('LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority')
-			
-			
+
+
 		if self.corrections_done:
 			default_joins.append('LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority')
 
@@ -190,8 +193,7 @@ class DataValidation(object):
 
 		return [dict(row) for row in self.cursor.fetchall()]
 
-
-
+	#----------------------------------------------------------------------------------------------
 	def Validations(self):
 
 		if self.method == 'all':
@@ -226,7 +228,6 @@ class DataValidation(object):
 
 				self.conn.commit()
 
-
 		elif self.method == 'mag2flux':
 			self.plot_magtoflux()
 		elif self.method == 'pixvsmag':
@@ -246,52 +247,41 @@ class DataValidation(object):
 		elif self.method == 'magdistoverlap':
 			self.plot_mag_dist_overlap()
 
-
-
-	# =============================================================================
-	#
-	# =============================================================================
-
+	#----------------------------------------------------------------------------------------------
 	def plot_contam(self, return_val=False):
-
-
 		"""
 		Function to plot the contamination against the stellar TESS magnitudes
 
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger=logging.getLogger(__name__)
+		logger = logging.getLogger(__name__)
 
 		logger.info('------------------------------------------')
 		logger.info('Plotting Contamination vs. Magnitude')
-
-
-
 
 		fig = plt.figure(figsize=(10, 5))
 		fig.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
 		ax1 = fig.add_subplot(211)
 		ax2 = fig.add_subplot(212)
 
-		star_vals = self.search_database(select=['todolist.priority','todolist.sector','todolist.starid','method','todolist.datasource','todolist.tmag','contamination'])
+		# Search database for all targets processed with aperture photometry:
+		star_vals = self.search_database(
+			select=['todolist.priority','todolist.sector','todolist.datasource','todolist.tmag','contamination'],
+			search="(method IS NULL or method='aperture')")
 
+		rgba_color = 'k'
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
 			sectors = np.array(list(set(sec)))
-			if len(sectors)>1:
+			if len(sectors) > 1:
 				norm = colors.Normalize(vmin=1, vmax=len(sectors))
 				scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 				rgba_color = np.array([scalarMap.to_rgba(s) for s in sec])
-			else:
-				rgba_color = 'k'
-		else:
-			rgba_color = 'k'
 
-
-		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
-		cont = np.array([star['contamination'] for star in star_vals], dtype=float)
-		pri = np.array([star['priority'] for star in star_vals], dtype=int)
+		tmags = np.array([star['tmag'] for star in star_vals], dtype='float64')
+		cont = np.array([star['contamination'] for star in star_vals], dtype='float64')
+		pri = np.array([star['priority'] for star in star_vals], dtype='int64')
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
 
 		# Indices for plotting
@@ -347,7 +337,6 @@ class DataValidation(object):
 			else:
 				axx.set_ylim([-0.05, 1.1])
 
-
 			axx.axhline(y=0, ls='--', color='k', zorder=-1)
 
 			if self.doval:
@@ -366,6 +355,13 @@ class DataValidation(object):
 			axx.yaxis.set_ticks_position('both')
 #			axx.legend(loc='upper left', prop={'size': 12})
 
+		###########
+		filename = 'contam.%s' %self.extension
+		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
+		if self.show:
+			plt.show()
+		else:
+			plt.close(fig)
 
 		# Assign validation bits
 		if return_val:
@@ -376,24 +372,9 @@ class DataValidation(object):
 
 			val = dict(zip(pri, val0['dv']))
 
-
-		###########
-		filename = 'contam.%s' %self.extension
-		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
-
-		if self.show:
-			plt.show()
-		else:
-			plt.close('all')
-
-		if return_val:
 			return val
 
-
-	# =============================================================================
-	#
-	# =============================================================================
-
+	#----------------------------------------------------------------------------------------------
 	def compare_noise(self):
 		"""
 		Compare noise metrics before and after correction
@@ -635,25 +616,18 @@ class DataValidation(object):
 		else:
 			plt.close('all')
 
-
-
-	# =============================================================================
-	#
-	# =============================================================================
-
+	#----------------------------------------------------------------------------------------------
 	def plot_onehour_noise(self, return_val=False):
-
 		"""
 		Function to plot the light curve noise against the stellar TESS magnitudes
 
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger=logging.getLogger(__name__)
+		logger = logging.getLogger(__name__)
 
 		logger.info('------------------------------------------')
 		logger.info('Plotting Noise vs. Magnitude')
-
 
 		fig1 = plt.figure(figsize=(15, 5))
 		fig1.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
@@ -664,7 +638,6 @@ class DataValidation(object):
 		fig2.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
 		ax21 = fig2.add_subplot(121)
 		ax22 = fig2.add_subplot(122)
-
 
 		PARAM = {}
 
@@ -791,7 +764,6 @@ class DataValidation(object):
 		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
 
-
 		# Assign validation bits, for both FFI and TPF
 		if return_val:
 
@@ -820,10 +792,7 @@ class DataValidation(object):
 		if return_val:
 			return val
 
-	# =============================================================================
-	#
-	# =============================================================================
-
+	#----------------------------------------------------------------------------------------------
 	def plot_pixinaperture(self, return_val=False):
 
 		"""
@@ -842,29 +811,24 @@ class DataValidation(object):
 		ax2 = fig.add_subplot(122)
 		fig.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
 
-
 #		if not self.doval:
 		star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors'])
 #		else:
 #			star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors','datavalidation_raw.dataval'])
 
+		#if self.color_by_sector:
+		#	sec = np.array([star['sector'] for star in star_vals], dtype=int)
+		#	sectors = np.array(list(set(sec)))
+		#	if len(sectors)>1:
+		#		norm = colors.Normalize(vmin=1, vmax=len(sectors))
+		#		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
+		#		rgba_color = np.array([scalarMap.to_rgba(s) for s in sec])
+		#	else:
+		#		rgba_color = 'k'
+		#else:
+		#	rgba_color = 'k'
 
-
-		if self.color_by_sector:
-			sec = np.array([star['sector'] for star in star_vals], dtype=int)
-			sectors = np.array(list(set(sec)))
-			if len(sectors)>1:
-				norm = colors.Normalize(vmin=1, vmax=len(sectors))
-				scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
-				rgba_color = np.array([scalarMap.to_rgba(s) for s in sec])
-			else:
-				rgba_color = 'k'
-		else:
-			rgba_color = 'k'
-
-
-
-		tic = np.array([star['starid'] for star in star_vals], dtype=int)
+		#tic = np.array([star['starid'] for star in star_vals], dtype=int)
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
 		masksizes = np.array([star['mask_size'] for star in star_vals], dtype=float)
 		contam = np.array([star['contamination'] for star in star_vals], dtype=float)
@@ -1110,10 +1074,7 @@ class DataValidation(object):
 		if return_val:
 			return val
 
-	# =============================================================================
-	#
-	# =============================================================================
-
+	#----------------------------------------------------------------------------------------------
 	def plot_magtoflux(self, return_val=False):
 		"""
 		Function to plot flux values from apertures against the stellar TESS magnitudes,
@@ -1122,7 +1083,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger=logging.getLogger(__name__)
+		logger = logging.getLogger(__name__)
 
 		logger.info('--------------------------------------')
 		logger.info('Plotting Magnitude to Flux conversion')
@@ -1141,27 +1102,13 @@ class DataValidation(object):
 #		ax31 = fig3.add_subplot(121)
 #		ax32 = fig3.add_subplot(122)
 
-		star_vals = self.search_database(select=['todolist.priority','todolist.datasource','todolist.sector','todolist.starid','todolist.tmag','ccd','mean_flux', 'contamination'])
+		star_vals = self.search_database(select=['todolist.priority','todolist.datasource','todolist.sector','todolist.tmag','mean_flux','contamination'])
 
-		if self.color_by_sector:
-			sec = np.array([star['sector'] for star in star_vals], dtype=int)
-			sectors = np.array(list(set(sec)))
-			if len(sectors)>1:
-				norm = colors.Normalize(vmin=1, vmax=len(sectors))
-				scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
-				rgba_color = np.array([scalarMap.to_rgba(s) for s in sec])
-			else:
-				rgba_color = 'k'
-		else:
-			rgba_color = 'k'
-
-
-		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
-		meanfluxes = np.array([star['mean_flux'] for star in star_vals], dtype=float)
-		contam = np.array([star['contamination'] for star in star_vals], dtype=float)
+		tmags = np.array([star['tmag'] for star in star_vals], dtype='float64')
+		meanfluxes = np.array([star['mean_flux'] for star in star_vals], dtype='float64')
+		contam = np.array([star['contamination'] for star in star_vals], dtype='float64')
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
-		pri = np.array([star['priority'] for star in star_vals], dtype=int)
-
+		pri = np.array([star['priority'] for star in star_vals], dtype='int64')
 
 		idx_lc = (source == 'ffi')
 		idx_sc = (source != 'ffi')
@@ -1230,13 +1177,9 @@ class DataValidation(object):
 		ax1.plot(mag, 10**(-0.4*(mag - cc.x)), color='k', ls='--')
 		ax2.plot(mag, 10**(-0.4*(mag - cc2.x)), color='k', ls='--')
 
-		ax1.set_xlim(self.tmag_limits)
-		ax2.set_xlim(self.tmag_limits)
-
 		for axx in np.array([ax1, ax2]):
 			axx.set_yscale("log", nonposy='clip')
-
-		for axx in np.array([ax1, ax2]):
+			axx.set_xlim(self.tmag_limits)
 			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
 
 			axx.xaxis.set_major_locator(MultipleLocator(2))
@@ -1257,7 +1200,6 @@ class DataValidation(object):
 		cb.set_label('Contamination', fontsize=12, labelpad=6)
 		cb.ax.tick_params(axis='y', direction='out')
 
-
 		filename = 'mag_to_flux.%s' %self.extension
 		filename2 = 'mag_to_flux_optimize.%s' %self.extension
 #		filename3 = 'mag_to_flux_dev.%s' %self.extension
@@ -1265,6 +1207,11 @@ class DataValidation(object):
 		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
 #		fig3.savefig(os.path.join(self.outfolders, filename3), bbox_inches='tight')
+
+		if self.show:
+			plt.show(block=True)
+		else:
+			plt.close('all')
 
 #		# Assign validation bits, for both FFI and TPF
 		if return_val:
@@ -1274,20 +1221,9 @@ class DataValidation(object):
 			val0['dv'][(~np.isfinite(meanfluxes)) | (meanfluxes<=0)] |= DatavalQualityFlags.InvalidFlux
 
 			val = dict(zip(pri, val0['dv']))
-
-		if self.show:
-			plt.show(block=True)
-		else:
-			plt.close('all')
-
-		if return_val:
 			return val
 
-
-	# =========================================================================
-	#
-	# =========================================================================
-
+	#----------------------------------------------------------------------------------------------
 	def plot_stamp(self, return_val=False):
 
 		"""
@@ -1453,13 +1389,8 @@ class DataValidation(object):
 		else:
 			plt.close('all')
 
-
-	# =============================================================================
-	#
-	# =============================================================================
-
+	#----------------------------------------------------------------------------------------------
 	def plot_mag_dist(self):
-
 		"""
 		Function to plot magnitude distribution for targets
 
@@ -1518,19 +1449,15 @@ class DataValidation(object):
 		else:
 			plt.close(fig)
 
-	# =============================================================================
-	#
-	# =============================================================================
-
+	#----------------------------------------------------------------------------------------------
 	def plot_mag_dist_overlap(self):
-
 		"""
 		Function to plot magnitude distribution overlap between sectors
 
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger=logging.getLogger(__name__)
+		logger = logging.getLogger(__name__)
 
 		logger.info('--------------------------------------')
 		logger.info('Plotting Magnitude distribution')
