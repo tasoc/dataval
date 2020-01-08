@@ -8,30 +8,30 @@ Plotting utilities.
 
 import logging
 import os
-import warnings
 import numpy as np
 from bottleneck import allnan
-import matplotlib as mpl
-mpl.use('agg', warn=False)
+import matplotlib
 from matplotlib.ticker import MaxNLocator
 import matplotlib.pyplot as plt
-from astropy.visualization import (PercentileInterval, ImageNormalize,
-								   SqrtStretch, LogStretch, LinearStretch)
+from astropy.visualization import (PercentileInterval, ImageNormalize, SqrtStretch,
+	LogStretch, LinearStretch)
 
-# Disable some warnings that are annoying (see below):
-warnings.filterwarnings("ignore", category=RuntimeWarning, module="astropy.visualization", message="invalid value encountered in log")
-warnings.filterwarnings("ignore", category=RuntimeWarning, module="astropy.visualization", message="invalid value encountered in sqrt")
-warnings.filterwarnings("ignore", category=RuntimeWarning, module="matplotlib.colors", message="invalid value encountered in less")
+# Change to a non-GUI backend since this
+# should be able to run on a cluster:
+plt.switch_backend('Agg')
 
+#--------------------------------------------------------------------------------------------------
 def plot_image(image, scale='log', origin='lower', xlabel='Pixel Column Number',
-			   ylabel='Pixel Row Number', make_cbar=False, clabel='Flux ($e^{-}s^{-1}$)',
-			   title=None, percentile=95.0, ax=None, cmap=plt.cm.Blues, offset_axes=None, **kwargs):
+	ylabel='Pixel Row Number', make_cbar=False, clabel='Flux ($e^{-}s^{-1}$)', cbar_ticks=None, cbar_ticklabels=None,
+	title=None, percentile=95.0, vmin=None, vmax=None, ax=None, cmap=plt.cm.Blues, offset_axes=None, **kwargs):
 	"""
 	Utility function to plot a 2D image.
 
 	Parameters:
 		image (2d array): Image data.
-		scale (str or astropy.visualization.ImageNormalize object, optional): Normalization used to stretch the colormap. Options: ``'linear'``, ``'sqrt'``, or ``'log'``. Can also be a `astropy.visualization.ImageNormalize` object. Default is ``'log'``.
+		scale (str or astropy.visualization.ImageNormalize object, optional): Normalization used to stretch the colormap.
+			Options: ``'linear'``, ``'sqrt'``, or ``'log'``. Can also be a `astropy.visualization.ImageNormalize` object.
+			Default is ``'log'``.
 		origin (str, optional): The origin of the coordinate system.
 		xlabel (str, optional): Label for the x-axis.
 		ylabel (str, optional): Label for the y-axis.
@@ -44,25 +44,16 @@ def plot_image(image, scale='log', origin='lower', xlabel='Pixel Column Number',
 		kwargs (dict, optional): Keyword arguments to be passed to `matplotlib.pyplot.imshow`.
 	"""
 
-	# Negative values will throw warnings, so add offset so we are above zero:
-	# TODO: Something weird is going on, and this doesn't work, so for now we ignore warnings?! (see above)
-	if scale == 'log' or scale == 'sqrt':
-		img_min = np.nanmin(image)
-		if img_min <= 0:
-			image = image.copy()
-			image += np.abs(img_min) + 1.0
-
-	#print(scale, np.all(np.isfinite(image)), np.all(image > 0), np.min(image), np.max(image))
-
 	if allnan(image):
 		logger = logging.getLogger(__name__)
 		logger.error("Image is all NaN")
 		return None
 
-	# Calcualte limits of color scaling:
-	vmin, vmax = PercentileInterval(percentile).get_limits(image)
-	vmax = kwargs.get('vmin', vmax)
-	vmax = kwargs.get('vmax', vmax)
+	# Calculate limits of color scaling:
+	if vmin is None or vmax is None:
+		vmin1, vmax1 = PercentileInterval(percentile).get_limits(image)
+		if vmin is None: vmin = vmin1
+		if vmax is None: vmax = vmax1
 
 	# Create ImageNormalize object with extracted limits:
 	if scale == 'log':
@@ -71,7 +62,7 @@ def plot_image(image, scale='log', origin='lower', xlabel='Pixel Column Number',
 		norm = ImageNormalize(vmin=vmin, vmax=vmax, stretch=LinearStretch())
 	elif scale == 'sqrt':
 		norm = ImageNormalize(vmin=vmin, vmax=vmax, stretch=SqrtStretch())
-	elif isinstance(scale, mpl.colors.Normalize) or isinstance(scale, ImageNormalize):
+	elif isinstance(scale, matplotlib.colors.Normalize) or isinstance(scale, ImageNormalize):
 		norm = scale
 	else:
 		raise ValueError("scale {} is not available.".format(scale))
@@ -88,16 +79,17 @@ def plot_image(image, scale='log', origin='lower', xlabel='Pixel Column Number',
 		cmap = plt.get_cmap(cmap)
 
 	im = ax.imshow(image, origin=origin, norm=norm, extent=extent, cmap=cmap, interpolation='nearest', **kwargs)
-	if not xlabel is None: ax.set_xlabel(xlabel)
-	if not ylabel is None: ax.set_ylabel(ylabel)
-	if not title is None: ax.set_title(title)
+	if xlabel is not None: ax.set_xlabel(xlabel)
+	if ylabel is not None: ax.set_ylabel(ylabel)
+	if title is not None: ax.set_title(title)
 	ax.set_xlim([extent[0], extent[1]])
 	ax.set_ylim([extent[2], extent[3]])
 
 	if make_cbar:
-		# TODO: In cases where image was rescaled, should we change something here?
-		cbar = plt.colorbar(im, norm=norm)
+		cbar = plt.colorbar(im, norm=norm, ax=ax)
 		cbar.set_label(clabel)
+		if cbar_ticks is not None: cbar.set_ticks(cbar_ticks)
+		if cbar_ticklabels is not None: cbar.set_ticklabels(cbar_ticklabels)
 
 	# Settings for ticks (to make Mikkel happy):
 	ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -110,7 +102,7 @@ def plot_image(image, scale='log', origin='lower', xlabel='Pixel Column Number',
 
 	return im
 
-
+#--------------------------------------------------------------------------------------------------
 def plot_image_fit_residuals(fig, image, fit, residuals):
 	"""
 	Make a figure with three subplots showing the image, the fit and the
@@ -175,14 +167,14 @@ def plot_image_fit_residuals(fig, image, fit, residuals):
 
 	return ax_list
 
-
+#--------------------------------------------------------------------------------------------------
 def save_figure(path, format='png', **kwargs):
 	"""
 	Write current figure to file. Creates directory to place it in if needed.
 
 	Parameters:
 		path (string): Path where to save figure. If no file extension is provided, the extension of
-		               the format is automatically appended.
+			the format is automatically appended.
 		format (string): Figure file type. Default is ``'png'``.
 		kwargs (dict, optional): Keyword arguments to be passed to `matplotlib.pyplot.savefig`.
 	"""

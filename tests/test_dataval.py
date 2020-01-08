@@ -27,7 +27,6 @@ def test_dataval_notodo():
 		with DataValidation([INPUT_DIR_NOTODO]):
 			pass
 
-
 #----------------------------------------------------------------------
 def test_dataval_raw():
 	"""
@@ -45,7 +44,6 @@ def test_dataval_raw():
 	# Create DataValidation object:
 	with DataValidation([INPUT], corr=False) as dataval:
 		dataval.Validations()
-
 
 #----------------------------------------------------------------------
 @pytest.mark.parametrize("corr", [False, True])

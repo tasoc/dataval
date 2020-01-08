@@ -7,34 +7,31 @@
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-import os
+import os.path
 import logging
 import numpy as np
+import sqlite3
+import scipy.interpolate as INT
+import scipy.optimize as OP
+from scipy.stats import binned_statistic as binning
+from statsmodels.nonparametric.kde import KDEUnivariate as KDE
+from astropy.table import Table
 
 # Plotting:
-from .plots import mpl, plt
+from .plots import plt, matplotlib as mpl
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import MultipleLocator, ScalarFormatter
-y_formatter = ScalarFormatter(useOffset=False)
-mpl.rcParams['font.family'] = 'serif'
-#plt.rc('text', usetex=True)
 import seaborn as sns
-
-import scipy.interpolate as INT
-import scipy.optimize as OP
-from statsmodels.nonparametric.kde import KDEUnivariate as KDE
-import sqlite3
-from scipy.stats import binned_statistic as binning
 
 # Local packages:
 from .quality import DatavalQualityFlags
-from .utilities import mad #rms_timescale #, sphere_distance
+from .utilities import mad # rms_timescale, sphere_distance
 from .noise_model import phot_noise
 
-plt.ioff()
-
+mpl.rcParams['font.family'] = 'serif'
+#plt.rc('text', usetex=True)
 
 def combine_flag_dicts(a, b):
 	return {key: a.get(key, 0) | b.get(key, 0) for key in set().union(a.keys(), b.keys())}
@@ -302,16 +299,16 @@ class DataValidation(object):
 
 		if self.doval:
 			ax1.scatter(tmags[idx_high_ffi], cont[idx_high_ffi], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
-			ax1.scatter(tmags[(cont == 1.2) & (source == 'ffi')], cont[(cont==1.2) & (source == 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
+			ax1.scatter(tmags[(cont == 1.2) & (source == 'ffi')], cont[(cont == 1.2) & (source == 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
 			ax2.scatter(tmags[idx_high_tpf], cont[idx_high_tpf], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
-			ax2.scatter(tmags[(cont == 1.2) & (source != 'ffi')], cont[(cont==1.2) & (source != 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
+			ax2.scatter(tmags[(cont == 1.2) & (source != 'ffi')], cont[(cont == 1.2) & (source != 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
 
 		# Indices for finding validation limit
-#		idx_low = (cont<=1)
+		#idx_low = (cont<=1)
 		# Compute median-bin curve
-#		bin_means, bin_edges, binnumber = binning(tmags[idx_low], cont[idx_low], statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
-#		bin_width = (bin_edges[1] - bin_edges[0])
-#		bin_centers = bin_edges[1:] - bin_width/2
+		#bin_means, bin_edges, binnumber = binning(tmags[idx_low], cont[idx_low], statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
+		#bin_width = (bin_edges[1] - bin_edges[0])
+		#bin_centers = bin_edges[1:] - bin_width/2
 
 		xmax = np.arange(0, 20, 1)
 		ymax = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.12, 0.2, 0.3, 0.45, 0.6, 0.7, 0.8, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])
@@ -323,14 +320,14 @@ class DataValidation(object):
 		ax2.plot(xmax, ymax, marker='.', color='r', ls='-')
 
 		cont_vs_mag = INT.InterpolatedUnivariateSpline(xmax, ymax)
-#		mags = np.linspace(np.nanmin(tmags),np.nanmax(tmags),100)
+		#mags = np.linspace(np.nanmin(tmags),np.nanmax(tmags),100)
 
 		ax1.set_xlim(self.tmag_limits)
 		ax2.set_xlim(self.tmag_limits)
 
 		# Plotting stuff
 		for axx in np.array([ax1, ax2]):
-#			axx.plot(mags, cont_vs_mag(mags))
+			#axx.plot(mags, cont_vs_mag(mags))
 
 			if self.doval:
 				axx.set_ylim([-0.05, 1.3])
