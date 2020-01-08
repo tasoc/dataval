@@ -6,7 +6,6 @@ Handling of TESS data quality flags.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
 import numpy as np
 
 #------------------------------------------------------------------------------
@@ -25,8 +24,8 @@ class QualityFlagsBase(object):
 
 		Returns:
 			list of str: List of human-readable strings giving a short
-			             description of the quality flags raised.
-						 Returns an empty list if no flags raised.
+				description of the quality flags raised.
+				Returns an empty list if no flags raised.
 		"""
 		result = []
 		for flag in cls.STRINGS.keys():
