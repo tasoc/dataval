@@ -11,9 +11,8 @@ import argparse
 import logging
 from dataval import DataValidation
 
-#------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 def main():
-
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
 	parser.add_argument('-m', '--method', help='Corrector method to use.', default='all', choices=('pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'magdist', 'all'))
@@ -61,6 +60,6 @@ def main():
 		# Run validation
 		dataval.Validations()
 
-#------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	main()

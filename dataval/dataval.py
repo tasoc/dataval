@@ -96,7 +96,7 @@ class DataValidation(object):
 				self.conn.commit()
 
 		# Create output directory:
-		if len(self.input_folders)==1:
+		if len(self.input_folders) == 1:
 			if self.outfolders is None:
 				path = os.path.join(self.input_folders[0], 'data_validation')
 				self.outfolders = path
@@ -171,7 +171,6 @@ class DataValidation(object):
 
 		if self.method == 'all' and self.doval:
 			default_joins.append('LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority')
-
 
 		if self.corrections_done:
 			default_joins.append('LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority')
@@ -303,9 +302,9 @@ class DataValidation(object):
 
 		if self.doval:
 			ax1.scatter(tmags[idx_high_ffi], cont[idx_high_ffi], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
-			ax1.scatter(tmags[(cont==1.2) & (source == 'ffi')], cont[(cont==1.2) & (source == 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
+			ax1.scatter(tmags[(cont == 1.2) & (source == 'ffi')], cont[(cont==1.2) & (source == 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
 			ax2.scatter(tmags[idx_high_tpf], cont[idx_high_tpf], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
-			ax2.scatter(tmags[(cont==1.2) & (source != 'ffi')], cont[(cont==1.2) & (source != 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
+			ax2.scatter(tmags[(cont == 1.2) & (source != 'ffi')], cont[(cont==1.2) & (source != 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
 
 		# Indices for finding validation limit
 #		idx_low = (cont<=1)
@@ -317,10 +316,9 @@ class DataValidation(object):
 		xmax = np.arange(0, 20, 1)
 		ymax = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.12, 0.2, 0.3, 0.45, 0.6, 0.7, 0.8, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])
 
-
 		# Plot median-bin curve (1 and 5 times standadised MAD)
-#		ax1.scatter(bin_centers, 1.4826*bin_means, marker='o', color='r')
-#		ax1.scatter(bin_centers, 1.4826*5*bin_means, marker='.', color='r')
+		#ax1.scatter(bin_centers, 1.4826*bin_means, marker='o', color='r')
+		#ax1.scatter(bin_centers, 1.4826*5*bin_means, marker='.', color='r')
 		ax1.plot(xmax, ymax, marker='.', color='r', ls='-')
 		ax2.plot(xmax, ymax, marker='.', color='r', ls='-')
 
@@ -355,7 +353,7 @@ class DataValidation(object):
 			axx.tick_params(direction='out', which='both', pad=5, length=3)
 			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
 			axx.yaxis.set_ticks_position('both')
-#			axx.legend(loc='upper left', prop={'size': 12})
+			#axx.legend(loc='upper left', prop={'size': 12})
 
 		###########
 		filename = 'contam.%s' %self.extension
@@ -369,11 +367,10 @@ class DataValidation(object):
 		if return_val:
 			val0 = {}
 			val0['dv'] = np.zeros_like(pri, dtype="int32")
-			val0['dv'][cont>=1] |= DatavalQualityFlags.ContaminationOne
-			val0['dv'][(cont>cont_vs_mag(tmags)) & (cont<1)] |= DatavalQualityFlags.ContaminationHigh
+			val0['dv'][cont >= 1] |= DatavalQualityFlags.ContaminationOne
+			val0['dv'][(cont > cont_vs_mag(tmags)) & (cont < 1)] |= DatavalQualityFlags.ContaminationHigh
 
 			val = dict(zip(pri, val0['dv']))
-
 			return val
 
 	#----------------------------------------------------------------------------------------------
@@ -430,15 +427,16 @@ class DataValidation(object):
 		source2 = np.array([star['datasource'] for star in star_vals2], dtype=str)
 
 		def overlap(a, b):
-		    # return the indices in a that overlap with b, also returns
-		    # the corresponding index in b only works if both a and b are unique!
-		    # This is not very efficient but it works
-		    bool_a = np.in1d(a,b)
-		    ind_a = np.arange(len(a))
-		    ind_a = ind_a[bool_a]
-
-		    ind_b = np.array([np.argwhere(b == a[x]) for x in ind_a]).flatten()
-		    return ind_a,ind_b
+			"""
+			return the indices in a that overlap with b, also returns
+			the corresponding index in b only works if both a and b are unique!
+			This is not very efficient but it works
+			"""
+			bool_a = np.in1d(a,b)
+			ind_a = np.arange(len(a))
+			ind_a = ind_a[bool_a]
+			ind_b = np.array([np.argwhere(b == a[x]) for x in ind_a]).flatten()
+			return ind_a,ind_b
 
 		idx_o, idx2_o = overlap(pri[(source=='ffi')], pri2[(source2=='ffi')])
 
@@ -490,23 +488,18 @@ class DataValidation(object):
 		ax31.scatter(tcomp, rmscomp, marker='o', c=contam, alpha=0.01, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 		ax32.scatter(tcomp, ptpcomp, marker='o', c=contam, alpha=0.01, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 
-
 		bin_rms, bin_edge_rms, _ = binning(tcomp, rmscomp, statistic='median', bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
 		bin_ptp, bin_edge_ptp, _ = binning(tcomp, ptpcomp, statistic='median', bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
 		bin_width = (bin_edge_rms[1] - bin_edge_rms[0]);		bin_centers = bin_edge_rms[1:] - bin_width/2
 
-
 		bin_rmsmad, bin_edges_rmsmad, _ = binning(tcomp, rmscomp, statistic=mad, bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
 		bin_ptpmad, bin_edges_ptpmad, _ = binning(tcomp, ptpcomp, statistic=mad, bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
-
-
 
 		ax31.errorbar(bin_centers, bin_rms, yerr=bin_rmsmad, ecolor='r', mec='r', mfc='w', capsize=0, marker='o', ls='')
 		ax32.errorbar(bin_centers, bin_ptp, yerr=bin_ptpmad, ecolor='r', mec='r', mfc='w', capsize=0, marker='o', ls='')
 
 		ax31.axhline(y=1, ls='--', color='r')
 		ax32.axhline(y=1, ls='--', color='r')
-
 
 		# TODO: Update elat+elon based on observing sector?
 		PARAM['RA'] = 0
@@ -575,7 +568,6 @@ class DataValidation(object):
 			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 5775, 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_ptp_tpf = np.sqrt(np.sum(vals_ptp_tpf**2, axis=1))
 
-
 		ax22.semilogy(mags, vals_ptp_tpf[:, 0], 'r-')
 		ax22.semilogy(mags, vals_ptp_tpf[:, 1], 'g--')
 		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-')
@@ -586,7 +578,6 @@ class DataValidation(object):
 		ax21.set_ylabel('PTP-MDV (ppm)', fontsize=16, labelpad=10)
 		ax31.set_ylabel(r'$\rm RMS_{corr} / RMS_{raw}$', fontsize=16, labelpad=10)
 		ax32.set_ylabel(r'$\rm PTP-MDV_{corr} / PTP-MDV_{raw}$', fontsize=16, labelpad=10)
-
 
 		for axx in np.array([ax11, ax12, ax21, ax22, ax31, ax32]):
 			axx.set_xlim(self.tmag_limits)
@@ -599,7 +590,6 @@ class DataValidation(object):
 			axx.set_yscale("log", nonposy='clip')
 #			axx.legend(loc='upper left', prop={'size': 12})
 
-
 		ax31.set_xlim(self.tmag_limits)
 		ax32.set_xlim(self.tmag_limits)
 		###########
@@ -611,7 +601,6 @@ class DataValidation(object):
 		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
 		fig3.savefig(os.path.join(self.outfolders, filename3), bbox_inches='tight')
-
 
 		if self.show:
 			plt.show()
@@ -718,7 +707,6 @@ class DataValidation(object):
 			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 5775, 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_ptp_tpf = np.sqrt(np.sum(vals_ptp_tpf**2, axis=1))
 
-
 		ax22.semilogy(mags, vals_ptp_tpf[:, 0], '-', color=cols[0])
 		ax22.semilogy(mags, vals_ptp_tpf[:, 1], '--', color=cols[1])
 		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-', color=cols[2])
@@ -766,9 +754,13 @@ class DataValidation(object):
 		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
 
+		if self.show:
+			plt.show()
+		else:
+			plt.close('all')
+
 		# Assign validation bits, for both FFI and TPF
 		if return_val:
-
 			dv = np.zeros_like(pri, dtype="int32")
 
 			idx_tpf_ptp = (ptp < ptp_tpf_vs_mag(tmags)) & (ptp>0)
@@ -785,13 +777,6 @@ class DataValidation(object):
 			dv[idx_invalid] |= DatavalQualityFlags.InvalidNoise
 
 			val = dict(zip(list(pri), list(dv)))
-
-		if self.show:
-			plt.show()
-		else:
-			plt.close('all')
-
-		if return_val:
 			return val
 
 	#----------------------------------------------------------------------------------------------
@@ -803,7 +788,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger=logging.getLogger(__name__)
+		logger = logging.getLogger(__name__)
 
 		logger.info('------------------------------------------')
 		logger.info('Plotting Pixels in aperture vs. Magnitude')
@@ -842,7 +827,6 @@ class DataValidation(object):
 #		if self.doval:
 #			dataval = np.array([star['dataval'] for star in star_vals], dtype='int32')
 
-
 #		cats = {}
 #		for cams in list(set(camera)):
 #			cats[cams] = {}
@@ -873,7 +857,6 @@ class DataValidation(object):
 #			cc.execute(query)
 #			star_vals = cc.fetchone()
 #			dists[ii] = sphere_distance(star_vals['ra'], star_vals['decl'], cams_cen[camera[ii],'ra'], cams_cen[camera[ii],'decl'])
-
 
 		contam[np.isnan(contam)] = 0
 		norm = colors.Normalize(vmin=0, vmax=1)
@@ -946,7 +929,6 @@ class DataValidation(object):
 #		ax00.axvline(x=np.percentile(d, 99.9), c='k')
 #		ax00.axvline(x=np.percentile(d, 0.1), c='k')
 
-
 		# Minimum bound on FFI data
 		xmin = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 11.6, 16])
 		ymin = np.array([2600, 846, 526, 319, 238, 159, 118, 62, 44, 32, 23, 15.7, 11.15, 8, 5, 4, 4])
@@ -980,8 +962,6 @@ class DataValidation(object):
 #		perh_vs_mag = INT.interp1d(tmags[idx_lc2][idx_sort], perfilt95)
 #		perl_vs_mag = INT.interp1d(tmags[idx_lc2][idx_sort], perfilt05)
 
-
-
 #		ticsh = tics[idx_lc][(masksizes[idx_lc]>max_bound(tmags[idx_lc]))]
 #		ticsh_m = tmags[idx_lc][(masksizes[idx_lc]>max_bound(tmags[idx_lc]))]
 #		ticsh_mm = masksizes[idx_lc][(masksizes[idx_lc]>max_bound(tmags[idx_lc]))]
@@ -1004,7 +984,6 @@ class DataValidation(object):
 #
 ##		print(len(ticsh))
 #		print(len(ticsl))
-
 
 #		bin_means1, bin_edges1, binnumber1 = binning(tmags[idx_lc], masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc]), statistic=reduce_percentile1, bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
 #		bin_means2, bin_edges2, binnumber2 = binning(tmags[idx_lc], masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc]), statistic=reduce_percentile2, bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
@@ -1051,6 +1030,11 @@ class DataValidation(object):
 		filename = 'pix_in_aper.%s' %self.extension
 		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 
+		if self.show:
+			plt.show()
+		else:
+			plt.close(fig)
+
 		# Assign validation bits, for both FFI and TPF
 		if return_val:
 			# Create validation dict:
@@ -1066,14 +1050,6 @@ class DataValidation(object):
 			val0['dv'][idx_sc & (masksizes<min_bound_sc(tmags)) & (masksizes>0)] |= DatavalQualityFlags.SmallMask
 
 			val = dict(zip(pri, val0['dv']))
-
-
-		if self.show:
-			plt.show()
-		else:
-			plt.close(fig)
-
-		if return_val:
 			return val
 
 	#----------------------------------------------------------------------------------------------
@@ -1234,7 +1210,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger=logging.getLogger(__name__)
+		logger = logging.getLogger(__name__)
 
 		logger.info('--------------------------------------')
 		logger.info('Plotting Stamp sizes')
