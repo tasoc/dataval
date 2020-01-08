@@ -10,6 +10,7 @@
 import os.path
 import logging
 import numpy as np
+from bottleneck import nansum
 import sqlite3
 import scipy.interpolate as INT
 import scipy.optimize as OP
@@ -29,9 +30,6 @@ import seaborn as sns
 from .quality import DatavalQualityFlags
 from .utilities import mad # rms_timescale, sphere_distance
 from .noise_model import phot_noise
-
-mpl.rcParams['font.family'] = 'serif'
-#plt.rc('text', usetex=True)
 
 def combine_flag_dicts(a, b):
 	return {key: a.get(key, 0) | b.get(key, 0) for key in set().union(a.keys(), b.keys())}
@@ -102,11 +100,16 @@ class DataValidation(object):
 		self.tmag_limits = (tmag_limits['tmag_min']-0.5, tmag_limits['tmag_max']+0.5)
 
 
+		# Plot settings:
+		mpl.style.use(os.path.join(os.path.dirname(__file__), 'dataval.mplstyle'))
+		mpl.rcParams['savefig.format'] = self.extension
+
 	#----------------------------------------------------------------------------------------------
 	def close(self):
 		"""Close DataValidation object and all associated objects."""
 		self.cursor.close()
 		self.conn.close()
+		mpl.style.use('default')
 
 	#----------------------------------------------------------------------------------------------
 	def __exit__(self, *args):
@@ -248,6 +251,7 @@ class DataValidation(object):
 		Function to plot the contamination against the stellar TESS magnitudes
 
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
 		logger = logging.getLogger(__name__)
@@ -301,7 +305,7 @@ class DataValidation(object):
 			ax2.scatter(tmags[(cont == 1.2) & (source != 'ffi')], cont[(cont == 1.2) & (source != 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
 
 		# Indices for finding validation limit
-		#idx_low = (cont<=1)
+		#idx_low = (cont <= 1)
 		# Compute median-bin curve
 		#bin_means, bin_edges, binnumber = binning(tmags[idx_low], cont[idx_low], statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
 		#bin_width = (bin_edges[1] - bin_edges[0])
@@ -337,21 +341,17 @@ class DataValidation(object):
 				axx.axhline(y=1.1, ls=':', color='k', zorder=-1)
 				axx.axhline(y=1.2, ls=':', color='r', zorder=-1)
 			axx.axhline(y=1, ls=':', color='k', zorder=-1)
-			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-			axx.set_ylabel('Contamination', fontsize=16, labelpad=10)
+			axx.set_xlabel('TESS magnitude')
+			axx.set_ylabel('Contamination')
 
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
 			axx.yaxis.set_major_locator(MultipleLocator(0.2))
 			axx.yaxis.set_minor_locator(MultipleLocator(0.1))
-			axx.tick_params(direction='out', which='both', pad=5, length=3)
-			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
-			axx.yaxis.set_ticks_position('both')
-			#axx.legend(loc='upper left', prop={'size': 12})
+			#axx.legend(loc='upper left')
 
 		###########
-		filename = 'contam.%s' % self.extension
-		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
+		fig.savefig(os.path.join(self.outfolders, 'contam'))
 		if self.show:
 			plt.show()
 		else:
@@ -441,7 +441,7 @@ class DataValidation(object):
 		print(np.sum(tmags[(source == 'ffi')][idx_o]-tmags2[(source2 == 'ffi')][idx2_o]))
 
 		#88518 956502
-#
+
 #		tcomp = np.array([tmags[(pri==i)] for i in pri_overlap[5000:10000]])
 #		rmscomp = np.array([rms[(pri==i)]/rms2[(pri2==i)] for i in pri_overlap[5000:10000]])
 #		ptpcomp = np.array([ptp[(pri==i)]/ptp2[(pri2==i)] for i in pri_overlap[5000:10000]])
@@ -450,7 +450,7 @@ class DataValidation(object):
 		rmscomp = rms[(source == 'ffi')][idx_o]/rms2[(source2 == 'ffi')][idx2_o]
 		ptpcomp = ptp[(source == 'ffi')][idx_o]/ptp2[(source2 == 'ffi')][idx2_o]
 
-		ccomp = contam[(source == 'ffi')][idx_o]
+		#ccomp = contam[(source == 'ffi')][idx_o]
 
 #		nbins=300
 #		data1 = np.column_stack((tcomp, rmscomp))
@@ -568,34 +568,26 @@ class DataValidation(object):
 		ax22.semilogy(mags, tot_noise_ptp_tpf, 'k-')
 		ax22.axhline(y=self.sysnoise, color='b', ls='--')
 
-		ax11.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$', fontsize=16, labelpad=10)
-		ax21.set_ylabel('PTP-MDV (ppm)', fontsize=16, labelpad=10)
-		ax31.set_ylabel(r'$\rm RMS_{corr} / RMS_{raw}$', fontsize=16, labelpad=10)
-		ax32.set_ylabel(r'$\rm PTP-MDV_{corr} / PTP-MDV_{raw}$', fontsize=16, labelpad=10)
+		ax11.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$')
+		ax21.set_ylabel('PTP-MDV (ppm)')
+		ax31.set_ylabel(r'$\rm RMS_{corr} / RMS_{raw}$')
+		ax32.set_ylabel(r'$\rm PTP-MDV_{corr} / PTP-MDV_{raw}$')
 
 		for axx in np.array([ax11, ax12, ax21, ax22, ax31, ax32]):
 			axx.set_xlim(self.tmag_limits)
-			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+			axx.set_xlabel('TESS magnitude')
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
-			axx.tick_params(direction='out', which='both', pad=5, length=3)
-			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
-			axx.yaxis.set_ticks_position('both')
 			axx.set_yscale("log", nonposy='clip')
-#			axx.legend(loc='upper left', prop={'size': 12})
+#			axx.legend(loc='upper left')
 
 		ax31.set_xlim(self.tmag_limits)
 		ax32.set_xlim(self.tmag_limits)
 		###########
 
-		filename = 'rms_comp.%s' % self.extension
-		filename2 = 'ptp_comp.%s' % self.extension
-		filename3 = 'comp.%s' % self.extension
-
-		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
-		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
-		fig3.savefig(os.path.join(self.outfolders, filename3), bbox_inches='tight')
-
+		fig1.savefig(os.path.join(self.outfolders, 'rms_comp'))
+		fig2.savefig(os.path.join(self.outfolders, 'ptp_comp'))
+		fig3.savefig(os.path.join(self.outfolders, 'comp'))
 		if self.show:
 			plt.show()
 		else:
@@ -712,19 +704,16 @@ class DataValidation(object):
 		rms_tpf_vs_mag = INT.UnivariateSpline(mags, tot_noise_rms_tpf)
 		rms_ffi_vs_mag = INT.UnivariateSpline(mags, tot_noise_rms_ffi)
 
-		ax11.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$', fontsize=16, labelpad=10)
-		ax21.set_ylabel('PTP-MDV (ppm)', fontsize=16, labelpad=10)
+		ax11.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$')
+		ax21.set_ylabel('PTP-MDV (ppm)')
 
 		for axx in np.array([ax11, ax12, ax21, ax22]):
 			axx.set_xlim(self.tmag_limits)
-			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+			axx.set_xlabel('TESS magnitude')
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
-			axx.tick_params(direction='out', which='both', pad=5, length=3)
-			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
-			axx.yaxis.set_ticks_position('both')
 			axx.set_yscale("log", nonposy='clip')
-#			axx.legend(loc='upper left', prop={'size': 12})
+#			axx.legend(loc='upper left')
 
 		divider = make_axes_locatable(ax11)
 		cax = divider.append_axes('right', size='5%', pad=0.1)
@@ -742,12 +731,8 @@ class DataValidation(object):
 
 		###########
 
-		filename = 'rms.%s' % self.extension
-		filename2 = 'ptp.%s' % self.extension
-
-		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
-		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
-
+		fig1.savefig(os.path.join(self.outfolders, 'rms'))
+		fig2.savefig(os.path.join(self.outfolders, 'ptp'))
 		if self.show:
 			plt.show()
 		else:
@@ -1002,19 +987,15 @@ class DataValidation(object):
 		ax2.set_ylim([0.99, np.nanmax(masksizes)+500])
 
 		for axx in np.array([ax1, ax2]):
-			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-			axx.set_ylabel('Pixels in aperture', fontsize=16, labelpad=10)
+			axx.set_xlabel('TESS magnitude')
+			axx.set_ylabel('Pixels in aperture')
 			xtick_major = np.median(np.diff(axx.get_xticks()))
 			axx.xaxis.set_minor_locator(MultipleLocator(xtick_major/2))
 			ytick_major = np.median(np.diff(axx.get_yticks()))
 			axx.yaxis.set_minor_locator(MultipleLocator(ytick_major/2))
-			axx.tick_params(direction='out', which='both', pad=5, length=3)
-			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
-			axx.yaxis.set_ticks_position('both')
-			axx.xaxis.set_ticks_position('both')
 			axx.set_yscale("log", nonposy='clip')
 			axx.yaxis.set_major_formatter(ScalarFormatter())
-#			axx.legend(loc='upper right', prop={'size': 12})
+#			axx.legend(loc='upper right')
 
 		pos = ax2.get_position()
 		axc = fig.add_axes([pos.x0 + pos.width+0.01, pos.y0, 0.01, pos.height], zorder=-1)
@@ -1022,9 +1003,7 @@ class DataValidation(object):
 		cb.set_label('Contamination', fontsize=12, labelpad=6)
 		cb.ax.tick_params(axis='y', direction='out')
 
-		filename = 'pix_in_aper.%s' % self.extension
-		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
-
+		fig.savefig(os.path.join(self.outfolders, 'pix_in_aper'))
 		if self.show:
 			plt.show()
 		else:
@@ -1107,9 +1086,12 @@ class DataValidation(object):
 			idx2 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source != 'ffi') & (contam < 0.15)
 
 		logger.info('Optimising coefficient of relation')
-		z = lambda c: np.log10(np.nansum(( (meanfluxes[idx1] - 10**(-0.4*(tmags[idx1] - c))) / (contam[idx1]+1) )**2))
-		z2 = lambda c: np.log10(np.nansum(( (meanfluxes[idx2] - 10**(-0.4*(tmags[idx2] - c))) / (contam[idx2]+1) )**2))
+		def z(c):
+			return np.log10(nansum(( (meanfluxes[idx1] - 10**(-0.4*(tmags[idx1] - c))) / (contam[idx1]+1) )**2))
 		cc = OP.minimize(z, 20.5, method='Nelder-Mead', options={'disp':False})
+
+		def z2(c):
+			return np.log10(nansum(( (meanfluxes[idx2] - 10**(-0.4*(tmags[idx2] - c))) / (contam[idx2]+1) )**2))
 		cc2 = OP.minimize(z2, 20.5, method='Nelder-Mead', options={'disp':False})
 
 		logger.info('Optimisation terminated successfully? %s', cc.success)
@@ -1124,7 +1106,7 @@ class DataValidation(object):
 		ax21.axvline(x=cc2.x, color='b', ls='--', label='2-min')
 		ax21.set_xlabel('Coefficient')
 		ax21.set_ylabel(r'$\chi^2$')
-		ax21.legend(loc='upper left', prop={'size': 12})
+		ax21.legend(loc='upper left')
 
 #		d1 = meanfluxes[idx1]/(10**(-0.4*(tmags[idx1] - cc.x))) - 1
 #		d2 = meanfluxes[idx2]/(10**(-0.4*(tmags[idx2] - cc2.x))) - 1
@@ -1155,19 +1137,15 @@ class DataValidation(object):
 		for axx in np.array([ax1, ax2]):
 			axx.set_yscale("log", nonposy='clip')
 			axx.set_xlim(self.tmag_limits)
-			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
+			axx.set_xlabel('TESS magnitude')
 
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
 
 			axx.set_xlim(axx.get_xlim()[::-1])
-			axx.tick_params(direction='out', which='both', pad=5, length=3)
-			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
-			axx.yaxis.set_ticks_position('both')
-			axx.xaxis.set_ticks_position('both')
 
 #		ax1.text(10, 1e7, r'$\rm Flux = 10^{-0.4\,(T_{mag} - %1.2f)}$' %cc.x, fontsize=14)
-		ax1.set_ylabel('Mean flux', fontsize=16, labelpad=10)
+		ax1.set_ylabel('Mean flux')
 
 		pos = ax2.get_position()
 		axc = fig.add_axes([pos.x0 + pos.width+0.01, pos.y0, 0.01, pos.height], zorder=-1)
@@ -1175,20 +1153,16 @@ class DataValidation(object):
 		cb.set_label('Contamination', fontsize=12, labelpad=6)
 		cb.ax.tick_params(axis='y', direction='out')
 
-		filename = 'mag_to_flux.%s' % self.extension
-		filename2 = 'mag_to_flux_optimize.%s' % self.extension
-#		filename3 = 'mag_to_flux_dev.%s' %self.extension
-
-		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
-		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
-#		fig3.savefig(os.path.join(self.outfolders, filename3), bbox_inches='tight')
-
+		fig.savefig(os.path.join(self.outfolders, 'mag_to_flux'))
+		fig2.savefig(os.path.join(self.outfolders, 'mag_to_flux_optimize'))
+		#fig3.savefig(os.path.join(self.outfolders, 'mag_to_flux_dev'))
 		if self.show:
-			plt.show(block=True)
+			plt.show()
 		else:
 			plt.close('all')
 
 #		# Assign validation bits, for both FFI and TPF
+		#self.flags[] |= DatavalQualityFlags.MagVsFluxLow
 		if return_val:
 			val0 = {}
 			val0['dv'] = np.zeros_like(pri, dtype="int32")
@@ -1257,15 +1231,15 @@ class DataValidation(object):
 		ax13.scatter(tmags[idx4], height[idx4], marker='o', facecolors='None', color='k', label='2-min cadence, resized', alpha=0.5)
 
 		bin_means, bin_edges, binnumber = binning(tmags[ds], height[ds], statistic='median', bins=20, range=(1.5,10))
-		bin_width = (bin_edges[1] - bin_edges[0])
-		bin_centers = bin_edges[1:] - bin_width/2
+		#bin_width = (bin_edges[1] - bin_edges[0])
+		#bin_centers = bin_edges[1:] - bin_width/2
 
 		bin_means2, bin_edges2, binnumber2 = binning(tmags[ds], width[ds], statistic='median', bins=20, range=(1.5,10))
-		bin_width2 = (bin_edges2[1] - bin_edges2[0])
-		bin_centers2 = bin_edges2[1:] - bin_width2/2
+		#bin_width2 = (bin_edges2[1] - bin_edges2[0])
+		#bin_centers2 = bin_edges2[1:] - bin_width2/2
 
-#		ax12.scatter(bin_centers2, bin_means2, marker='o', color='b', zorder=3)
-#		ax11.scatter(bin_centers, bin_means, marker='o', color='b', zorder=3)
+		#ax12.scatter(bin_centers2, bin_means2, marker='o', color='b', zorder=3)
+		#ax11.scatter(bin_centers, bin_means, marker='o', color='b', zorder=3)
 
 		normalize2 = colors.Normalize(vmin=0, vmax=np.max(resize))
 		scalarMap = cmx.ScalarMappable(norm=normalize2, cmap=plt.get_cmap('Set1'))
@@ -1316,10 +1290,10 @@ class DataValidation(object):
 		#ax12.plot(mags2,nwid2, 'b--')
 		#ax11.plot(mags2,nhei2, 'b--')
 
-		ax12.set_ylabel('Stamp width (pixels)', fontsize=16, labelpad=10)
-		ax14.set_ylabel('Stamp width (pixels)', fontsize=16, labelpad=10)
-		ax11.set_ylabel('Stamp height (pixels)', fontsize=16, labelpad=10)
-		ax13.set_ylabel('Stamp height (pixels)', fontsize=16, labelpad=10)
+		ax12.set_ylabel('Stamp width (pixels)')
+		ax14.set_ylabel('Stamp width (pixels)')
+		ax11.set_ylabel('Stamp height (pixels)')
+		ax13.set_ylabel('Stamp height (pixels)')
 
 		ax12.yaxis.set_major_locator(MultipleLocator(20))
 		ax12.yaxis.set_minor_locator(MultipleLocator(10))
@@ -1330,28 +1304,17 @@ class DataValidation(object):
 		for axx in np.array([ax11, ax12, ax13, ax14]):
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
-			axx.tick_params(direction='out', which='both', pad=5, length=3)
-			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
-			axx.yaxis.set_ticks_position('both')
-			axx.xaxis.set_ticks_position('both')
-			axx.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-			axx.legend(loc='upper right', prop={'size': 12})
+			axx.set_xlabel('TESS magnitude')
+			axx.legend(loc='upper right')
 
 		for axx in np.array([ax21, ax22]):
 			axx.xaxis.set_major_locator(MultipleLocator(5))
 			axx.xaxis.set_minor_locator(MultipleLocator(2.5))
-			axx.tick_params(direction='out', which='both', pad=5, length=3)
-			axx.tick_params(which='major', pad=6, length=5,labelsize='15')
-			axx.yaxis.set_ticks_position('both')
-			axx.set_xlabel('Calculation time (sec)', fontsize=16, labelpad=10)
-			axx.legend(loc='upper right', prop={'size': 12})
+			axx.set_xlabel('Calculation time (sec)')
+			axx.legend(loc='upper right')
 
-		filename = 'stamp_size.%s' % self.extension
-		filename2 = 'calc_time.%s' % self.extension
-
-		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
-		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
-
+		fig1.savefig(os.path.join(self.outfolders, 'stamp_size'))
+		fig2.savefig(os.path.join(self.outfolders, 'calc_time'))
 		if self.show:
 			plt.show()
 		else:
@@ -1398,20 +1361,14 @@ class DataValidation(object):
 #		kde_all.fit(gridsize=1000)
 #		ax.plot(kde_all.support, kde_all.density/, 'k-', lw=1.5, label='All')
 
-		ax.set_ylim(ymin=0)
-		ax.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-		ax.set_ylabel('Normalised Density', fontsize=16, labelpad=10)
+		ax.set_ylim(bottom=0)
+		ax.set_xlabel('TESS magnitude')
+		ax.set_ylabel('Normalised Density')
 		ax.xaxis.set_major_locator(MultipleLocator(2))
 		ax.xaxis.set_minor_locator(MultipleLocator(1))
-		ax.tick_params(direction='out', which='both', pad=5, length=3)
-		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
-		ax.yaxis.set_ticks_position('both')
-		ax.xaxis.set_ticks_position('both')
-		ax.legend(frameon=False, prop={'size':12}, loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
+		ax.legend(frameon=False, loc='upper left', borderaxespad=0, handlelength=2.5, handletextpad=0.4)
 
-		filename = 'mag_dist.%s' % self.extension
-		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
-
+		fig.savefig(os.path.join(self.outfolders, 'mag_dist'))
 		if self.show:
 			plt.show()
 		else:
@@ -1507,19 +1464,14 @@ class DataValidation(object):
 #		ax.plot(kde_all.support, kde_all.density/, 'k-', lw=1.5, label='All')
 
 		ax.set_ylim(ymin=0)
-		ax.set_xlabel('TESS magnitude', fontsize=16, labelpad=10)
-		ax.set_ylabel('Normalised Density', fontsize=16, labelpad=10)
+		ax.set_xlabel('TESS magnitude')
+		ax.set_ylabel('Normalised Density')
 		ax.xaxis.set_major_locator(MultipleLocator(2))
 		ax.xaxis.set_minor_locator(MultipleLocator(1))
-		ax.tick_params(direction='out', which='both', pad=5, length=3)
-		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
-		ax.yaxis.set_ticks_position('both')
-		ax.xaxis.set_ticks_position('both')
-		ax.legend(frameon=False, prop={'size':12}, loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
+		ax.legend(frameon=False, loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
 
 #		filename = 'mag_dist.%s' % self.extension
-#		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
-
+#		fig.savefig(os.path.join(self.outfolders, filename))
 		if self.show:
 			plt.show()
 		else:
@@ -1556,8 +1508,7 @@ class DataValidation(object):
 		ax.set_ylabel('Worker wait-time (s)')
 
 		# Save figure to file and close:
-		filename = 'corrections_worker_waittime.{0:s}'.format(self.extension)
-		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
+		fig.savefig(os.path.join(self.outfolders, 'corrections_worker_waittime'))
 		if self.show:
 			plt.show()
 		else:
