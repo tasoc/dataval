@@ -93,12 +93,9 @@ class DataValidation(object):
 				self.conn.commit()
 
 		# Create output directory:
-		if len(self.input_folders) == 1:
-			if self.outfolders is None:
-				path = os.path.join(self.input_folders[0], 'data_validation')
-				self.outfolders = path
-				if not os.path.exists(self.outfolders):
-					os.makedirs(self.outfolders)
+		if len(self.input_folders) == 1 and self.outfolders is None:
+			self.outfolders = os.path.join(self.input_folders[0], 'data_validation')
+		os.makedirs(self.outfolders, exist_ok=True)
 
 		# Get the range of Tmags in the tables:
 		tmag_limits = self.search_database(select=['MIN(tmag) AS tmag_min', 'MAX(tmag) AS tmag_max'])[0]
@@ -1104,8 +1101,9 @@ class DataValidation(object):
 		ax1.plot(xmin, ymin, ls='-', color='r')
 		ax2.plot(xmin, ymin, ls='-', color='r')
 
-		idx1 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source == 'ffi') & (contam < 0.15)
-		idx2 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source != 'ffi') & (contam < 0.15)
+		with np.errstate(invalid='ignore'):
+			idx1 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source == 'ffi') & (contam < 0.15)
+			idx2 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source != 'ffi') & (contam < 0.15)
 
 		logger.info('Optimising coefficient of relation')
 		z = lambda c: np.log10(np.nansum(( (meanfluxes[idx1] -  10**(-0.4*(tmags[idx1] - c))) / (contam[idx1]+1) )**2))
