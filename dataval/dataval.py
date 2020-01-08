@@ -350,7 +350,7 @@ class DataValidation(object):
 			#axx.legend(loc='upper left', prop={'size': 12})
 
 		###########
-		filename = 'contam.%s' %self.extension
+		filename = 'contam.%s' % self.extension
 		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 		if self.show:
 			plt.show()
@@ -432,14 +432,13 @@ class DataValidation(object):
 			ind_b = np.array([np.argwhere(b == a[x]) for x in ind_a]).flatten()
 			return ind_a,ind_b
 
-		idx_o, idx2_o = overlap(pri[(source=='ffi')], pri2[(source2=='ffi')])
+		idx_o, idx2_o = overlap(pri[(source == 'ffi')], pri2[(source2 == 'ffi')])
 
 		print(len(star_vals), len(star_vals2))
 		print(len(idx_o), len(idx2_o))
-		print(tmags[(source=='ffi')][idx_o])
-		print(tmags2[(source2=='ffi')][idx2_o])
-		print(np.sum(tmags[(source=='ffi')][idx_o]-tmags2[(source2=='ffi')][idx2_o]))
-
+		print(tmags[(source == 'ffi')][idx_o])
+		print(tmags2[(source2 == 'ffi')][idx2_o])
+		print(np.sum(tmags[(source == 'ffi')][idx_o]-tmags2[(source2 == 'ffi')][idx2_o]))
 
 		#88518 956502
 #
@@ -447,11 +446,11 @@ class DataValidation(object):
 #		rmscomp = np.array([rms[(pri==i)]/rms2[(pri2==i)] for i in pri_overlap[5000:10000]])
 #		ptpcomp = np.array([ptp[(pri==i)]/ptp2[(pri2==i)] for i in pri_overlap[5000:10000]])
 
-		tcomp = tmags[(source=='ffi')][idx_o]
-		rmscomp = rms[(source=='ffi')][idx_o]/rms2[(source2=='ffi')][idx2_o]
-		ptpcomp = ptp[(source=='ffi')][idx_o]/ptp2[(source2=='ffi')][idx2_o]
+		tcomp = tmags[(source == 'ffi')][idx_o]
+		rmscomp = rms[(source == 'ffi')][idx_o]/rms2[(source2 == 'ffi')][idx2_o]
+		ptpcomp = ptp[(source == 'ffi')][idx_o]/ptp2[(source2 == 'ffi')][idx2_o]
 
-		ccomp = contam[(source=='ffi')][idx_o]
+		ccomp = contam[(source == 'ffi')][idx_o]
 
 #		nbins=300
 #		data1 = np.column_stack((tcomp, rmscomp))
@@ -484,7 +483,8 @@ class DataValidation(object):
 
 		bin_rms, bin_edge_rms, _ = binning(tcomp, rmscomp, statistic='median', bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
 		bin_ptp, bin_edge_ptp, _ = binning(tcomp, ptpcomp, statistic='median', bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
-		bin_width = (bin_edge_rms[1] - bin_edge_rms[0]);		bin_centers = bin_edge_rms[1:] - bin_width/2
+		bin_width = (bin_edge_rms[1] - bin_edge_rms[0])
+		bin_centers = bin_edge_rms[1:] - bin_width/2
 
 		bin_rmsmad, bin_edges_rmsmad, _ = binning(tcomp, rmscomp, statistic=mad, bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
 		bin_ptpmad, bin_edges_ptpmad, _ = binning(tcomp, ptpcomp, statistic=mad, bins=15, range=(np.nanmin(tcomp),np.nanmax(tcomp)))
@@ -588,9 +588,9 @@ class DataValidation(object):
 		ax32.set_xlim(self.tmag_limits)
 		###########
 
-		filename = 'rms_comp.%s' %self.extension
-		filename2 = 'ptp_comp.%s' %self.extension
-		filename3 = 'comp.%s' %self.extension
+		filename = 'rms_comp.%s' % self.extension
+		filename2 = 'ptp_comp.%s' % self.extension
+		filename3 = 'comp.%s' % self.extension
 
 		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
@@ -644,8 +644,8 @@ class DataValidation(object):
 		PARAM['RA'] = 0
 		PARAM['DEC'] = 0
 
-		idx_lc = (source=='ffi')
-		idx_sc = (source!='ffi')
+		idx_lc = (source == 'ffi')
+		idx_sc = (source != 'ffi')
 
 		im1 = ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', c=contam[idx_lc], alpha=0.2, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 		ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
@@ -742,8 +742,8 @@ class DataValidation(object):
 
 		###########
 
-		filename = 'rms.%s' %self.extension
-		filename2 = 'ptp.%s' %self.extension
+		filename = 'rms.%s' % self.extension
+		filename2 = 'ptp.%s' % self.extension
 
 		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
@@ -757,11 +757,11 @@ class DataValidation(object):
 		if return_val:
 			dv = np.zeros_like(pri, dtype="int32")
 
-			idx_tpf_ptp = (ptp < ptp_tpf_vs_mag(tmags)) & (ptp>0)
-			idx_ffi_ptp = (ptp < ptp_ffi_vs_mag(tmags)) & (ptp>0)
-			idx_tpf_rms = (rms < rms_tpf_vs_mag(tmags)) & (rms>0)
-			idx_ffi_rms = (rms < rms_ffi_vs_mag(tmags)) & (rms>0)
-			idx_invalid = (rms<=0) | ~np.isfinite(rms) | (ptp<=0) | ~np.isfinite(ptp)
+			idx_tpf_ptp = (ptp < ptp_tpf_vs_mag(tmags)) & (ptp > 0)
+			idx_ffi_ptp = (ptp < ptp_ffi_vs_mag(tmags)) & (ptp > 0)
+			idx_tpf_rms = (rms < rms_tpf_vs_mag(tmags)) & (rms > 0)
+			idx_ffi_rms = (rms < rms_ffi_vs_mag(tmags)) & (rms > 0)
+			idx_invalid = (rms <= 0) | ~np.isfinite(rms) | (ptp <= 0) | ~np.isfinite(ptp)
 
 			dv[idx_sc & idx_tpf_ptp] |= DatavalQualityFlags.LowPTP
 			dv[idx_lc & idx_ffi_ptp] |= DatavalQualityFlags.LowPTP
@@ -861,11 +861,11 @@ class DataValidation(object):
 		idx_lc = (source == 'ffi')
 		idx_sc = (source != 'ffi')
 
-		idx_lc0 = idx_lc #& (dataval&(32+64) == 0)
-		idx_sc0 = idx_sc #& (dataval&(32+64) == 0)
+		idx_lc0 = idx_lc # & (dataval&(32+64) == 0)
+		idx_sc0 = idx_sc # & (dataval&(32+64) == 0)
 
-#		idx_lc1 = idx_lc & (dataval&(32+64) != 0)
-#		idx_sc1 = idx_sc & (dataval&(32+64) != 0)
+		#idx_lc1 = idx_lc & (dataval&(32+64) != 0)
+		#idx_sc1 = idx_sc & (dataval&(32+64) != 0)
 
 		perm_lc = np.random.permutation(sum(idx_lc0))
 		perm_sc = np.random.permutation(sum(idx_sc0))
@@ -878,7 +878,8 @@ class DataValidation(object):
 
 		# Compute median-bin curve
 		bin_means, bin_edges, binnumber = binning(tmags[idx_lc], masksizes[idx_lc], statistic='median', bins=15, range=(np.nanmin(tmags[idx_lc]),np.nanmax(tmags[idx_lc])))
-		bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
+		bin_width = (bin_edges[1] - bin_edges[0])
+		bin_centers = bin_edges[1:] - bin_width/2
 		ax1.scatter(bin_centers, bin_means, marker='o', color='r')
 
 		if np.any(idx_sc):
@@ -1021,7 +1022,7 @@ class DataValidation(object):
 		cb.set_label('Contamination', fontsize=12, labelpad=6)
 		cb.ax.tick_params(axis='y', direction='out')
 
-		filename = 'pix_in_aper.%s' %self.extension
+		filename = 'pix_in_aper.%s' % self.extension
 		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 
 		if self.show:
@@ -1039,9 +1040,9 @@ class DataValidation(object):
 			val0['dv'][minimal_mask_used] |= DatavalQualityFlags.MinimalMask
 
 			# Small and Large masks:
-			val0['dv'][idx_lc & (masksizes<min_bound(tmags)) & (masksizes>0)] |= DatavalQualityFlags.SmallMask
-			val0['dv'][idx_lc & (masksizes>max_bound(tmags))] |= DatavalQualityFlags.LargeMask
-			val0['dv'][idx_sc & (masksizes<min_bound_sc(tmags)) & (masksizes>0)] |= DatavalQualityFlags.SmallMask
+			val0['dv'][idx_lc & (masksizes < min_bound(tmags)) & (masksizes > 0)] |= DatavalQualityFlags.SmallMask
+			val0['dv'][idx_lc & (masksizes > max_bound(tmags))] |= DatavalQualityFlags.LargeMask
+			val0['dv'][idx_sc & (masksizes < min_bound_sc(tmags)) & (masksizes > 0)] |= DatavalQualityFlags.SmallMask
 
 			val = dict(zip(pri, val0['dv']))
 			return val
@@ -1090,8 +1091,8 @@ class DataValidation(object):
 		perm_lc = np.random.permutation(sum(idx_lc))
 		perm_sc = np.random.permutation(sum(idx_sc))
 
-		ax1.scatter(tmags[idx_lc][perm_lc], meanfluxes[idx_lc][perm_lc], marker='o', c=contam[idx_lc][perm_lc], norm = norm, cmap=plt.get_cmap('PuOr'), alpha=0.1)#, label='30-min cadence')
-		ax2.scatter(tmags[idx_sc][perm_sc], meanfluxes[idx_sc][perm_sc], marker='o', c=contam[idx_sc][perm_sc], norm = norm, cmap=plt.get_cmap('PuOr'), alpha=0.1)#, label='2-min cadence')
+		ax1.scatter(tmags[idx_lc][perm_lc], meanfluxes[idx_lc][perm_lc], marker='o', c=contam[idx_lc][perm_lc], norm=norm, cmap=plt.get_cmap('PuOr'), alpha=0.1) # , label='30-min cadence')
+		ax2.scatter(tmags[idx_sc][perm_sc], meanfluxes[idx_sc][perm_sc], marker='o', c=contam[idx_sc][perm_sc], norm=norm, cmap=plt.get_cmap('PuOr'), alpha=0.1) # , label='2-min cadence')
 
 		xmin = np.array([0, 1.5, 9, 12.6, 13, 14, 15, 16, 17, 18, 19])
 		ymin = np.array([8e7, 1.8e7, 12500, 250, 59, 5, 1, 1, 1, 1, 1])
@@ -1106,18 +1107,19 @@ class DataValidation(object):
 			idx2 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source != 'ffi') & (contam < 0.15)
 
 		logger.info('Optimising coefficient of relation')
-		z = lambda c: np.log10(np.nansum(( (meanfluxes[idx1] -  10**(-0.4*(tmags[idx1] - c))) / (contam[idx1]+1) )**2))
-		z2 = lambda c: np.log10(np.nansum(( (meanfluxes[idx2] -  10**(-0.4*(tmags[idx2] - c))) / (contam[idx2]+1) )**2))
+		z = lambda c: np.log10(np.nansum(( (meanfluxes[idx1] - 10**(-0.4*(tmags[idx1] - c))) / (contam[idx1]+1) )**2))
+		z2 = lambda c: np.log10(np.nansum(( (meanfluxes[idx2] - 10**(-0.4*(tmags[idx2] - c))) / (contam[idx2]+1) )**2))
 		cc = OP.minimize(z, 20.5, method='Nelder-Mead', options={'disp':False})
 		cc2 = OP.minimize(z2, 20.5, method='Nelder-Mead', options={'disp':False})
 
-		logger.info('Optimisation terminated successfully? %s' %cc.success)
-		logger.info('Coefficient is found to be %1.4f' %cc.x)
-		logger.info('Coefficient is found to be %1.4f' %cc2.x)
+		logger.info('Optimisation terminated successfully? %s', cc.success)
+		logger.info('Coefficient is found to be %1.4f', cc.x)
+		logger.info('Coefficient is found to be %1.4f', cc2.x)
 
-		C=np.linspace(19, 22, 100)
-		[ax21.scatter(c, z(c), marker='o', color='k') for c in C]
-		[ax21.scatter(c, z2(c), marker='o', color='b') for c in C]
+		C = np.linspace(19, 22, 100)
+		for c in C:
+			ax21.scatter(c, z(c), marker='o', color='k')
+			ax21.scatter(c, z2(c), marker='o', color='b')
 		ax21.axvline(x=cc.x, color='k', label='30-min')
 		ax21.axvline(x=cc2.x, color='b', ls='--', label='2-min')
 		ax21.set_xlabel('Coefficient')
@@ -1173,8 +1175,8 @@ class DataValidation(object):
 		cb.set_label('Contamination', fontsize=12, labelpad=6)
 		cb.ax.tick_params(axis='y', direction='out')
 
-		filename = 'mag_to_flux.%s' %self.extension
-		filename2 = 'mag_to_flux_optimize.%s' %self.extension
+		filename = 'mag_to_flux.%s' % self.extension
+		filename2 = 'mag_to_flux_optimize.%s' % self.extension
 #		filename3 = 'mag_to_flux_dev.%s' %self.extension
 
 		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
@@ -1190,15 +1192,14 @@ class DataValidation(object):
 		if return_val:
 			val0 = {}
 			val0['dv'] = np.zeros_like(pri, dtype="int32")
-			val0['dv'][meanfluxes<min_bound(tmags)] |= DatavalQualityFlags.MagVsFluxLow
-			val0['dv'][(~np.isfinite(meanfluxes)) | (meanfluxes<=0)] |= DatavalQualityFlags.InvalidFlux
+			val0['dv'][meanfluxes < min_bound(tmags)] |= DatavalQualityFlags.MagVsFluxLow
+			val0['dv'][(~np.isfinite(meanfluxes)) | (meanfluxes <= 0)] |= DatavalQualityFlags.InvalidFlux
 
 			val = dict(zip(pri, val0['dv']))
 			return val
 
 	#----------------------------------------------------------------------------------------------
 	def plot_stamp(self, return_val=False):
-
 		"""
 		Function to plot width and height of pixel stamps against the stellar TESS magnitudes
 
@@ -1209,7 +1210,6 @@ class DataValidation(object):
 
 		logger.info('--------------------------------------')
 		logger.info('Plotting Stamp sizes')
-
 
 		fig1 = plt.figure(figsize=(15, 10))
 		ax11 = fig1.add_subplot(221)
@@ -1223,29 +1223,26 @@ class DataValidation(object):
 
 		star_vals = self.search_database(select=['todolist.datasource','todolist.sector','todolist.tmag','stamp_resizes','stamp_width','stamp_height', 'diagnostics.elaptime'])
 
+		rgba_color = 'r'
 		if self.color_by_sector:
 			sec = np.array([star['sector'] for star in star_vals], dtype=int)
 			sectors = np.array(list(set(sec)))
-			if len(sectors)>1:
+			if len(sectors) > 1:
 				norm = colors.Normalize(vmin=1, vmax=len(sectors))
 				scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
 				rgba_color = np.array([scalarMap.to_rgba(s) for s in sec])
-			else:
-				rgba_color = 'r'
-		else:
-			rgba_color = 'r'
 
-		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
-		et = np.array([star['elaptime'] for star in star_vals], dtype=float)
-		width = np.array([star['stamp_width'] for star in star_vals], dtype=float)
-		height = np.array([star['stamp_height'] for star in star_vals], dtype=float)
-		resize = np.array([star['stamp_resizes'] for star in star_vals], dtype=float)
-		ds = np.array([star['datasource']=='ffi' for star in star_vals], dtype=bool)
+		tmags = np.array([star['tmag'] for star in star_vals], dtype='float64')
+		et = np.array([star['elaptime'] for star in star_vals], dtype='float64')
+		width = np.array([star['stamp_width'] for star in star_vals], dtype='float64')
+		height = np.array([star['stamp_height'] for star in star_vals], dtype='float64')
+		resize = np.array([star['stamp_resizes'] for star in star_vals], dtype='float64')
+		ds = np.array([star['datasource'] == 'ffi' for star in star_vals], dtype='bool')
 
-		idx1 = (resize<1) & (ds==True)
-		idx2 = (resize<1) & (ds==False)
-		idx3 = (resize>0) & (ds==True)
-		idx4 = (resize>0) & (ds==False)
+		idx1 = (resize < 1) & (ds)
+		idx2 = (resize < 1) & (~ds)
+		idx3 = (resize > 0) & (ds)
+		idx4 = (resize > 0) & (~ds)
 
 		ax12.scatter(tmags[idx1], width[idx1], marker='o', facecolors='None', color=rgba_color, label='30-min cadence, no resize', alpha=0.5, zorder=2)
 		ax14.scatter(tmags[idx2], width[idx2], marker='o', facecolors='None', color=rgba_color, label='2-min cadence, no resize', alpha=0.5, zorder=2)
@@ -1259,11 +1256,11 @@ class DataValidation(object):
 		ax11.scatter(tmags[idx3], height[idx3], marker='o', facecolors='None', color='k', label='30-min cadence, resized', alpha=0.5)
 		ax13.scatter(tmags[idx4], height[idx4], marker='o', facecolors='None', color='k', label='2-min cadence, resized', alpha=0.5)
 
-		bin_means, bin_edges, binnumber = binning(tmags[(ds==True)], height[(ds==True)], statistic='median', bins=20, range=(1.5,10))
+		bin_means, bin_edges, binnumber = binning(tmags[ds], height[ds], statistic='median', bins=20, range=(1.5,10))
 		bin_width = (bin_edges[1] - bin_edges[0])
 		bin_centers = bin_edges[1:] - bin_width/2
 
-		bin_means2, bin_edges2, binnumber2 = binning(tmags[(ds==True)], width[(ds==True)], statistic='median', bins=20, range=(1.5,10))
+		bin_means2, bin_edges2, binnumber2 = binning(tmags[ds], width[ds], statistic='median', bins=20, range=(1.5,10))
 		bin_width2 = (bin_edges2[1] - bin_edges2[0])
 		bin_centers2 = bin_edges2[1:] - bin_width2/2
 
@@ -1271,54 +1268,53 @@ class DataValidation(object):
 #		ax11.scatter(bin_centers, bin_means, marker='o', color='b', zorder=3)
 
 		normalize2 = colors.Normalize(vmin=0, vmax=np.max(resize))
-		scalarMap = cmx.ScalarMappable(norm=normalize2, cmap=plt.get_cmap('Set1') )
+		scalarMap = cmx.ScalarMappable(norm=normalize2, cmap=plt.get_cmap('Set1'))
 		for jj in range(0, int(np.max(resize))):
 			rgba_color = scalarMap.to_rgba(jj)
 			try:
-				kde1 = KDE(et[(ds==True)][(resize[(ds==True)]==jj) & (et[(ds==True)]<50)])
+				kde1 = KDE(et[ds][(resize[ds] == jj) & (et[ds] < 50)])
 				kde1.fit(gridsize=1000)
 				ax21.plot(kde1.support, kde1.density, color=rgba_color)
 			except:
 				pass
 
-		kde1 = KDE(et[(ds==True) & (et<50)])
+		kde1 = KDE(et[ds & (et < 50)])
 		kde1.fit(gridsize=1000)
 		ax21.plot(kde1.support, kde1.density, color='k', lw=2, label='30-min cadence')
 		ax21.set_xlim([0, 50])
 
 		try:
-			kde2 = KDE(et[(ds==False) & (et<50)])
+			kde2 = KDE(et[(~ds) & (et < 50)])
 			kde2.fit(gridsize=1000)
 			ax22.plot(kde2.support, kde2.density, color='k', lw=2, label='2-min candence')
 		except ZeroDivisionError:
 			pass
 
-
 		# Decide how many pixels to use based on lookup tables as a function of Tmag:
-		mags = np.array([ 0.        ,  0.52631579,  1.05263158,  1.57894737,  2.10526316,
-       2.63157895,  3.15789474,  3.68421053,  4.21052632,  4.73684211,
-       5.26315789,  5.78947368,  6.31578947,  6.84210526,  7.36842105,
-       7.89473684,  8.42105263,  8.94736842,  9.47368421, 10.        ])
-		nhei = np.array([831.98319063, 533.58494422, 344.0840884 , 223.73963332,
-      147.31365728,  98.77856016,  67.95585074,  48.38157414,
-       35.95072974,  28.05639497,  23.043017  ,  19.85922009,
-       17.83731732,  16.5532873 ,  15.73785092,  15.21999971,
-       14.89113301,  14.68228285,  14.54965042,  14.46542084])
-		nwid = np.array([157.71602062, 125.1238281 ,  99.99440209,  80.61896267,
-       65.6799962 ,  54.16166547,  45.28073365,  38.4333048 ,
-       33.15375951,  29.08309311,  25.94450371,  23.52456986,
-       21.65873807,  20.22013336,  19.1109318 ,  18.25570862,
-       17.59630936,  17.08789543,  16.69589509,  16.39365266])
+		mags = np.array([0., 0.52631579, 1.05263158, 1.57894737, 2.10526316,
+			2.63157895, 3.15789474, 3.68421053, 4.21052632, 4.73684211,
+			5.26315789, 5.78947368, 6.31578947, 6.84210526, 7.36842105,
+			7.89473684, 8.42105263, 8.94736842, 9.47368421, 10.])
+		nhei = np.array([831.98319063, 533.58494422, 344.0840884, 223.73963332,
+			147.31365728, 98.77856016, 67.95585074, 48.38157414,
+			35.95072974, 28.05639497, 23.043017, 19.85922009,
+			17.83731732, 16.5532873, 15.73785092, 15.21999971,
+			14.89113301, 14.68228285, 14.54965042, 14.46542084])
+		nwid = np.array([157.71602062, 125.1238281, 99.99440209, 80.61896267,
+			65.6799962, 54.16166547, 45.28073365, 38.4333048,
+			33.15375951, 29.08309311, 25.94450371, 23.52456986,
+			21.65873807, 20.22013336, 19.1109318, 18.25570862,
+			17.59630936, 17.08789543, 16.69589509, 16.39365266])
 
 		mags2 = np.linspace(np.min(tmags)-0.2, np.max(tmags)+0.2, 500)
 		nwid2 = np.array([2*(np.ceil(np.interp(m, mags, nwid))//2)+1 for m in mags2])
 		nhei2 = np.array([2*(np.ceil(np.interp(m, mags, nhei))//2)+1 for m in mags2])
 
-		nwid2[(nwid2<15)] = 15
-		nhei2[(nhei2<15)] = 15
+		nwid2[(nwid2 < 15)] = 15
+		nhei2[(nhei2 < 15)] = 15
 
-#		ax12.plot(mags2,nwid2, 'b--')
-#		ax11.plot(mags2,nhei2, 'b--')
+		#ax12.plot(mags2,nwid2, 'b--')
+		#ax11.plot(mags2,nhei2, 'b--')
 
 		ax12.set_ylabel('Stamp width (pixels)', fontsize=16, labelpad=10)
 		ax14.set_ylabel('Stamp width (pixels)', fontsize=16, labelpad=10)
@@ -1350,9 +1346,8 @@ class DataValidation(object):
 			axx.set_xlabel('Calculation time (sec)', fontsize=16, labelpad=10)
 			axx.legend(loc='upper right', prop={'size': 12})
 
-
-		filename = 'stamp_size.%s' %self.extension
-		filename2 = 'calc_time.%s' %self.extension
+		filename = 'stamp_size.%s' % self.extension
+		filename2 = 'calc_time.%s' % self.extension
 
 		fig1.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 		fig2.savefig(os.path.join(self.outfolders, filename2), bbox_inches='tight')
@@ -1370,7 +1365,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger=logging.getLogger(__name__)
+		logger = logging.getLogger(__name__)
 
 		logger.info('--------------------------------------')
 		logger.info('Plotting Magnitude distribution')
@@ -1412,9 +1407,9 @@ class DataValidation(object):
 		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
 		ax.yaxis.set_ticks_position('both')
 		ax.xaxis.set_ticks_position('both')
-		ax.legend(frameon=False, prop={'size':12} ,loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
+		ax.legend(frameon=False, prop={'size':12}, loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
 
-		filename = 'mag_dist.%s' %self.extension
+		filename = 'mag_dist.%s' % self.extension
 		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 
 		if self.show:
@@ -1439,7 +1434,6 @@ class DataValidation(object):
 		ax = fig.add_subplot(111)
 		fig.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
 
-
 		sets_lc = []
 		sets_sc = []
 		tmags_lc = []
@@ -1455,15 +1449,15 @@ class DataValidation(object):
 			conn.row_factory = sqlite3.Row
 			cursor = conn.cursor()
 
-			select=['todolist.starid','todolist.datasource','todolist.tmag']
+			select = ['todolist.starid','todolist.datasource','todolist.tmag']
 			select = ",".join(select)
-#			search=["status in (1,3)"]
-			search=["approved=1"]
+			#search=["status in (1,3)"]
+			search = ["approved=1"]
 			search = "WHERE " + " AND ".join(search)
 
-			query = "SELECT {select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority  {search:s};".format(
-			select=select,
-			search=search)
+			query = "SELECT {select:s} FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority {search:s};".format(
+				select=select,
+				search=search)
 
 			# Ask the database: status=1
 			cursor.execute(query)
@@ -1493,7 +1487,6 @@ class DataValidation(object):
 		indices_sc = [ sets_sc[1][x] for x in inter_sc ]
 		indices_sc2 = [ sets_sc[0][x] for x in inter_sc ]
 
-
 		print(tmags_lc[0][indices_lc2])
 		print(tmags_lc[1][indices_lc])
 		print(len(indices_lc), len(indices_sc))
@@ -1522,9 +1515,9 @@ class DataValidation(object):
 		ax.tick_params(which='major', pad=6, length=5,labelsize='15')
 		ax.yaxis.set_ticks_position('both')
 		ax.xaxis.set_ticks_position('both')
-		ax.legend(frameon=False, prop={'size':12} ,loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
+		ax.legend(frameon=False, prop={'size':12}, loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
 
-#		filename = 'mag_dist.%s' %self.extension
+#		filename = 'mag_dist.%s' % self.extension
 #		fig.savefig(os.path.join(self.outfolders, filename), bbox_inches='tight')
 
 		if self.show:
