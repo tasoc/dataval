@@ -38,13 +38,28 @@ def combine_flag_dicts(a, b):
 class DataValidation(object):
 
 	#----------------------------------------------------------------------------------------------
-	def __init__(self, input_folders, output_folder=None, validate=True, method='all', colorbysector=False, ext='png', showplots=False, sysnoise=0, corr=False):
+	def __init__(self, input_folders, output_folder=None, corr=False, validate=True,
+			colorbysector=False, ext='png', showplots=False, sysnoise=0):
+		"""
+		Initialize DataValidation object.
+
+		Parameters:
+			input_folders (list): DESCRIPTION.
+			output_folder (str, optional): DESCRIPTION. Defaults to None.
+			corr (bool, optional): DESCRIPTION. Defaults to False.
+			validate (bool, optional): DESCRIPTION. Defaults to True.
+			colorbysector (bool, optional): DESCRIPTION. Defaults to False.
+			ext (str, optional): DESCRIPTION. Defaults to 'png'.
+			showplots (bool, optional): DESCRIPTION. Defaults to False.
+			sysnoise (float, optional): DESCRIPTION. Defaults to 0.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		logger = logging.getLogger(__name__)
 
 		# Store inputs:
 		self.input_folders = input_folders
-		self.method = method
 		self.extension = ext
 		self.show = showplots
 		self.outfolders = output_folder
@@ -60,6 +75,7 @@ class DataValidation(object):
 
 		#load sqlite to-do files
 		for i, f in enumerate(self.input_folders):
+			logger.info("Loading input data from '%s'", f)
 			todo_file = os.path.join(f, 'todo.sqlite')
 			logger.debug("TODO file: %s", todo_file)
 			if not os.path.exists(todo_file):
@@ -79,7 +95,7 @@ class DataValidation(object):
 				raise Exception("Can not run dataval on corr when corrections have not been run")
 
 			# Create table for data-validation:
-			if self.method == 'all' and self.doval:
+			if self.doval:
 				self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
 				self.cursor.execute("CREATE TABLE IF NOT EXISTS " + self.dataval_table + """ (
 					priority INTEGER PRIMARY KEY ASC NOT NULL,
@@ -94,6 +110,7 @@ class DataValidation(object):
 		if len(self.input_folders) == 1 and self.outfolders is None:
 			self.outfolders = os.path.join(self.input_folders[0], 'data_validation')
 		os.makedirs(self.outfolders, exist_ok=True)
+		logger.info("Putting output data in '%s'", self.outfolders)
 
 		# Get the range of Tmags in the tables:
 		tmag_limits = self.search_database(select=['MIN(tmag) AS tmag_min', 'MAX(tmag) AS tmag_max'])[0]
@@ -101,6 +118,8 @@ class DataValidation(object):
 
 
 		# Plot settings:
+		if self.show:
+			plt.switch_backend('TKAgg')
 		mpl.style.use(os.path.join(os.path.dirname(__file__), 'dataval.mplstyle'))
 		mpl.rcParams['savefig.format'] = self.extension
 
@@ -166,7 +185,7 @@ class DataValidation(object):
 		# Which tables to join together:
 		default_joins = ['INNER JOIN diagnostics ON todolist.priority=diagnostics.priority']
 
-		if self.method == 'all' and self.doval:
+		if self.doval:
 			default_joins.append('LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority')
 
 		if self.corrections_done:
@@ -193,57 +212,36 @@ class DataValidation(object):
 	#----------------------------------------------------------------------------------------------
 	def Validations(self):
 
-		if self.method == 'all':
-			val1 = self.plot_magtoflux(return_val=True)
-			val2 = self.plot_pixinaperture(return_val=True)
-			val3 = self.plot_contam(return_val=True)
-			val4 = self.plot_onehour_noise(return_val=True)
-			self.plot_stamp()
-			self.plot_mag_dist()
-			self.plot_corrections_waittime()
+		val1 = self.plot_mag2flux(return_val=True)
+		val2 = self.plot_pixinaperture(return_val=True)
+		val3 = self.plot_contam(return_val=True)
+		val4 = self.plot_onehour_noise(return_val=True)
+		self.plot_stamp()
+		self.plot_mag_dist()
+		self.plot_waittime()
 
-			if self.doval:
-				val = combine_flag_dicts(val1, val2)
-				val = combine_flag_dicts(val, val3)
-				val = combine_flag_dicts(val, val4)
+		if self.doval:
+			val = combine_flag_dicts(val1, val2)
+			val = combine_flag_dicts(val, val3)
+			val = combine_flag_dicts(val, val4)
 
-				dv = np.array(list(val.values()), dtype="int32")
+			dv = np.array(list(val.values()), dtype="int32")
 
-				#Reject: Small/High apertures; Contamination>1;
-				app = np.ones_like(dv, dtype='bool')
-				qf = DatavalQualityFlags.filter(dv)
-				app[~qf] = False
+			#Reject: Small/High apertures; Contamination>1;
+			app = np.ones_like(dv, dtype='bool')
+			qf = DatavalQualityFlags.filter(dv)
+			app[~qf] = False
 
-				for v1,v2,v3 in zip(np.array(list(val.keys()), dtype="int32"), dv, app):
-					self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) VALUES (?,?,?);", (
-						int(v1),
-						int(v2),
-						bool(v3)
-					))
+			for v1,v2,v3 in zip(np.array(list(val.keys()), dtype="int32"), dv, app):
+				self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) VALUES (?,?,?);", (
+					int(v1),
+					int(v2),
+					bool(v3)
+				))
 
-				# Fill out the table, setting everything not already covered by the above to disapproved:
-				self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) SELECT todolist.priority, 0, 0 FROM todolist LEFT JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE " + self.dataval_table + ".priority IS NULL;")
-
-				self.conn.commit()
-
-		elif self.method == 'mag2flux':
-			self.plot_magtoflux()
-		elif self.method == 'pixvsmag':
-			self.plot_pixinaperture()
-		elif self.method == 'stamp':
-			self.plot_stamp()
-		elif self.method == 'magdist':
-			self.plot_mag_dist()
-		elif self.method == 'noise':
-			self.plot_onehour_noise()
-		elif self.method == 'noise_compare':
-			self.compare_noise()
-		elif self.method == 'magdist':
-			self.plot_mag_dist()
-		elif self.method == 'contam':
-			self.plot_contam()
-		elif self.method == 'magdistoverlap':
-			self.plot_mag_dist_overlap()
+			# Fill out the table, setting everything not already covered by the above to disapproved:
+			self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) SELECT todolist.priority, 0, 0 FROM todolist LEFT JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE " + self.dataval_table + ".priority IS NULL;")
+			self.conn.commit()
 
 	#----------------------------------------------------------------------------------------------
 	def plot_contam(self, return_val=False):
@@ -361,7 +359,7 @@ class DataValidation(object):
 		if return_val:
 			val0 = {}
 			val0['dv'] = np.zeros_like(pri, dtype="int32")
-			val0['dv'][cont >= 1] |= DatavalQualityFlags.ContaminationOne
+			val0['dv'][cont >= 1] |= DatavalQualityFlags.InvalidContamination
 			val0['dv'][(cont > cont_vs_mag(tmags)) & (cont < 1)] |= DatavalQualityFlags.ContaminationHigh
 
 			val = dict(zip(pri, val0['dv']))
@@ -760,7 +758,6 @@ class DataValidation(object):
 
 	#----------------------------------------------------------------------------------------------
 	def plot_pixinaperture(self, return_val=False):
-
 		"""
 		Function to plot number of pixels in determined apertures against the stellar TESS magnitudes
 
@@ -1027,7 +1024,7 @@ class DataValidation(object):
 			return val
 
 	#----------------------------------------------------------------------------------------------
-	def plot_magtoflux(self, return_val=False):
+	def plot_mag2flux(self, return_val=False):
 		"""
 		Function to plot flux values from apertures against the stellar TESS magnitudes,
 		and determine coefficient describing the relation
@@ -1478,7 +1475,7 @@ class DataValidation(object):
 			plt.close(fig)
 
 	#--------------------------------------------------------------------------
-	def plot_corrections_waittime(self):
+	def plot_waittime(self):
 		"""
 		Visiualize the worker wait-time during the processing.
 
@@ -1487,29 +1484,32 @@ class DataValidation(object):
 
 		logger = logging.getLogger(__name__)
 
-		if not self.corrections_done:
-			logger.debug('plot_corrections_waittime only works for corrected data.')
-			return
+		run_tables = ['diagnostics']
+		if self.corrections_done:
+			run_tables.append('diagnostics_corr')
 
-		self.cursor.execute("PRAGMA table_info(diagnostics_corr)")
-		if 'worker_waittime' not in [r['name'] for r in self.cursor.fetchall()]:
-			logger.info("WORKER_WAITTIME is not stored in database.")
-			return
+		for table in run_tables:
+			# Check if the worker_waittime column is in the database
+			# It was not generated in earlier versions of the pipeline
+			self.cursor.execute("PRAGMA table_info(" + table + ")")
+			if 'worker_waittime' not in [r['name'] for r in self.cursor.fetchall()]:
+				logger.info("WORKER_WAITTIME is not stored in database.")
+				return
 
-		# Get the data from the database:
-		star_vals = self.search_database(select=['todolist.priority','diagnostics_corr.worker_waittime'])
-		tab = Table(rows=star_vals)
+			# Get the data from the database:
+			star_vals = self.search_database(select=['todolist.priority', table + '.worker_waittime'])
+			tab = Table(rows=star_vals)
 
-		# Create figure figure:
-		fig = plt.figure()
-		ax = fig.add_subplot(111)
-		ax.scatter(tab['priority'], tab['worker_waittime'], alpha=0.3)
-		ax.set_xlabel('Priority')
-		ax.set_ylabel('Worker wait-time (s)')
+			# Create figure figure:
+			fig = plt.figure()
+			ax = fig.add_subplot(111)
+			ax.scatter(tab['priority'], tab['worker_waittime'], alpha=0.3)
+			ax.set_xlabel('Priority')
+			ax.set_ylabel('Worker wait-time (s)')
 
-		# Save figure to file and close:
-		fig.savefig(os.path.join(self.outfolders, 'corrections_worker_waittime'))
-		if self.show:
-			plt.show()
-		else:
-			plt.close(fig)
+			# Save figure to file and close:
+			fig.savefig(os.path.join(self.outfolders, 'worker_waittime_' + table))
+			if self.show:
+				plt.show()
+			else:
+				plt.close(fig)
