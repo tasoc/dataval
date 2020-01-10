@@ -579,6 +579,7 @@ class DataValidation(object):
 		Function to plot the light curve noise against the stellar TESS magnitudes
 
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
 		logger = logging.getLogger(__name__)

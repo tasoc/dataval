@@ -14,13 +14,21 @@ import logging
 
 #--------------------------------------------------------------------------------------------------
 def ZLnoise(gal_lat):
-	"""RMS noise from Zodiacal background"""
+	"""
+	RMS noise from Zodiacal background.
+
+	.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+	"""
 	rms = (16 - 10) * (gal_lat/90 - 1)**2 + 10 # e-1 / pix in 2sec integration
 	return rms
 
 #--------------------------------------------------------------------------------------------------
 def Pixinaperture(Tmag, cad=1800):
-	"""Number of pixels in aperture as a function of Tmag"""
+	"""
+	Number of pixels in aperture as a function of Tmag
+
+	.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+	"""
 
 	if cad == 1800:
 		ffi_tmag = np.array([2.05920002, 2.95159999, 3.84399996, 4.73639993, 5.6287999,
@@ -50,7 +58,11 @@ def Pixinaperture(Tmag, cad=1800):
 
 #--------------------------------------------------------------------------------------------------
 def mean_flux_level(Tmag):
-	"""Mean flux from TESS magnitude"""
+	"""
+	Mean flux from TESS magnitude
+
+	.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+	"""
 	# Magnitude system based on Sullivan et al.
 	#collecting_area = np.pi*(10.5/2)**2 # square cm
 	#Teff_list = np.array([2450, 3000, 3200, 3400, 3700, 4100, 4500, 5000, 5777, 6500, 7200, 9700]) # Based on Sullivan
@@ -86,6 +98,9 @@ def phot_noise(Tmag, timescale=3600, coord=None, sysnoise=60, Teff=5775, cadpix=
 
 	Raises:
 		ValueError: On invalid coord input.
+
+	.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
 	logger = logging.getLogger(__name__)
@@ -149,7 +164,7 @@ def phot_noise(Tmag, timescale=3600, coord=None, sysnoise=60, Teff=5775, cadpix=
 	logger.debug('Read noise: %f', read_noise)
 	logger.debug('Zodiacal noise: %f', zodiacal_noise)
 
-	#noise_vals = np.array([shot_noise, zodiacal_noise, read_noise, systematic_noise_ppm])
+	# Put individual components together in single table:
 	noise_vals = np.column_stack((shot_noise, zodiacal_noise, read_noise, systematic_noise))
 
 	# Calculate the total noise model by adding up the individual contributions:
