@@ -64,7 +64,7 @@ def mean_flux_level(Tmag):
 	return Flux
 
 #--------------------------------------------------------------------------------------------------
-def phot_noise(Tmag, Teff, cad, PARAM, verbose=False, sysnoise=60, cadpix='1800'):
+def phot_noise(Tmag, cad, PARAM, verbose=False, sysnoise=60, Teff=5775, cadpix='1800'):
 
 	# Calculate galactic latitude for Zodiacal noise
 	gc = SkyCoord(PARAM['RA']*u.degree, PARAM['DEC']*u.degree, frame='icrs')

@@ -60,7 +60,7 @@ def main():
 		if 'magdist' in args.method:
 			dataval.plot_mag_dist()
 		if 'noise' in args.method:
-			dataval.plot_onehour_noise()
+			dataval.plot_noise()
 		if 'noise_compare' in args.method:
 			dataval.compare_noise()
 		if 'contam' in args.method:

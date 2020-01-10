@@ -215,7 +215,7 @@ class DataValidation(object):
 		val1 = self.plot_mag2flux(return_val=True)
 		val2 = self.plot_pixinaperture(return_val=True)
 		val3 = self.plot_contam(return_val=True)
-		val4 = self.plot_onehour_noise(return_val=True)
+		val4 = self.plot_noise(return_val=True)
 		self.plot_stamp()
 		self.plot_mag_dist()
 		self.plot_waittime()
@@ -524,47 +524,47 @@ class DataValidation(object):
 
 		# Expected *1-hour* RMS noise fii
 		for i in range(len(mags)):
-			vals_rms_ffi[i,:], _ = phot_noise(mags[i], 5775, 3600, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
+			vals_rms_ffi[i,:], _ = phot_noise(mags[i], 3600, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_rms_ffi = np.sqrt(np.sum(vals_rms_ffi**2, axis=1))
 
-		ax11.semilogy(mags, vals_rms_ffi[:, 0], 'r-')
-		ax11.semilogy(mags, vals_rms_ffi[:, 1], 'g--')
-		ax11.semilogy(mags, vals_rms_ffi[:, 2], '-')
-		ax11.semilogy(mags, tot_noise_rms_ffi, 'k-')
-		ax11.axhline(y=self.sysnoise, color='b', ls='--')
+		ax11.semilogy(mags, vals_rms_ffi[:, 0], 'r-', label='Shot')
+		ax11.semilogy(mags, vals_rms_ffi[:, 1], 'g--', label='Zodiacal')
+		ax11.semilogy(mags, vals_rms_ffi[:, 2], '-', label='Read')
+		ax11.semilogy(mags, vals_rms_ffi[:, 3], 'b--', label='Systematic')
+		ax11.semilogy(mags, tot_noise_rms_ffi, 'k-', label='Total')
 
 		# Expected *1-hour* RMS noise tpf
 		for i in range(len(mags)):
-			vals_rms_tpf[i,:], _ = phot_noise(mags[i], 5775, 3600, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
+			vals_rms_tpf[i,:], _ = phot_noise(mags[i], 3600, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_rms_tpf = np.sqrt(np.sum(vals_rms_tpf**2, axis=1))
 
-		ax12.semilogy(mags, vals_rms_tpf[:, 0], 'r-')
-		ax12.semilogy(mags, vals_rms_tpf[:, 1], 'g--')
-		ax12.semilogy(mags, vals_rms_tpf[:, 2], '-')
-		ax12.semilogy(mags, tot_noise_rms_tpf, 'k-')
-		ax12.axhline(y=self.sysnoise, color='b', ls='--')
+		ax12.semilogy(mags, vals_rms_tpf[:, 0], 'r-', label='Shot')
+		ax12.semilogy(mags, vals_rms_tpf[:, 1], 'g--', label='Zodiacal')
+		ax12.semilogy(mags, vals_rms_tpf[:, 2], '-', label='Read')
+		ax12.semilogy(mags, vals_rms_tpf[:, 3], 'b--', label='Systematic')
+		ax12.semilogy(mags, tot_noise_rms_tpf, 'k-', label='Total')
 
 		# Expected ptp for 30-min
 		for i in range(len(mags)):
-			vals_ptp_ffi[i,:], _ = phot_noise(mags[i], 5775, 1800, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
+			vals_ptp_ffi[i,:], _ = phot_noise(mags[i], 1800, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_ptp_ffi = np.sqrt(np.sum(vals_ptp_ffi**2, axis=1))
 
-		ax21.semilogy(mags, vals_ptp_ffi[:, 0], 'r-')
-		ax21.semilogy(mags, vals_ptp_ffi[:, 1], 'g--')
-		ax21.semilogy(mags, vals_ptp_ffi[:, 2], '-')
-		ax21.semilogy(mags, tot_noise_ptp_ffi, 'k-')
-		ax21.axhline(y=self.sysnoise, color='b', ls='--')
+		ax21.semilogy(mags, vals_ptp_ffi[:, 0], 'r-', label='Shot')
+		ax21.semilogy(mags, vals_ptp_ffi[:, 1], 'g--', label='Zodiacal')
+		ax21.semilogy(mags, vals_ptp_ffi[:, 2], '-', label='Read')
+		ax21.semilogy(mags, vals_ptp_ffi[:, 3], 'b--', label='Systematic')
+		ax21.semilogy(mags, tot_noise_ptp_ffi, 'k-', label='Total')
 
 		# Expected ptp for 2-min
 		for i in range(len(mags)):
-			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 5775, 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
+			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_ptp_tpf = np.sqrt(np.sum(vals_ptp_tpf**2, axis=1))
 
-		ax22.semilogy(mags, vals_ptp_tpf[:, 0], 'r-')
-		ax22.semilogy(mags, vals_ptp_tpf[:, 1], 'g--')
-		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-')
-		ax22.semilogy(mags, tot_noise_ptp_tpf, 'k-')
-		ax22.axhline(y=self.sysnoise, color='b', ls='--')
+		ax22.semilogy(mags, vals_ptp_tpf[:, 0], 'r-', label='Shot')
+		ax22.semilogy(mags, vals_ptp_tpf[:, 1], 'g--', label='Zodiacal')
+		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-', label='Read')
+		ax22.semilogy(mags, vals_ptp_tpf[:, 3], 'b--', label='Systematic')
+		ax22.semilogy(mags, tot_noise_ptp_tpf, 'k-', label='Total')
 
 		ax11.set_ylabel(r'$\rm RMS\,\, (ppm\,\, hr^{-1})$')
 		ax21.set_ylabel('PTP-MDV (ppm)')
@@ -592,7 +592,7 @@ class DataValidation(object):
 			plt.close('all')
 
 	#----------------------------------------------------------------------------------------------
-	def plot_onehour_noise(self, return_val=False):
+	def plot_noise(self, return_val=False):
 		"""
 		Function to plot the light curve noise against the stellar TESS magnitudes
 
@@ -655,47 +655,47 @@ class DataValidation(object):
 
 		# Expected *1-hour* RMS noise fii
 		for i in range(len(mags)):
-			vals_rms_ffi[i,:], _ = phot_noise(mags[i], 5775, 3600, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
+			vals_rms_ffi[i,:], _ = phot_noise(mags[i], 3600, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_rms_ffi = np.sqrt(np.sum(vals_rms_ffi**2, axis=1))
 
-		ax11.semilogy(mags, vals_rms_ffi[:, 0], '-', color=cols[0])
-		ax11.semilogy(mags, vals_rms_ffi[:, 1], '--', color=cols[1])
-		ax11.semilogy(mags, vals_rms_ffi[:, 2], '-', color=cols[2])
-		ax11.semilogy(mags, tot_noise_rms_ffi, 'k-')
-		ax11.axhline(y=self.sysnoise, color=cols[3], ls='--')
+		ax11.semilogy(mags, vals_rms_ffi[:, 0], '-', color=cols[0], label='Shot')
+		ax11.semilogy(mags, vals_rms_ffi[:, 1], '--', color=cols[1], label='Zodiacal')
+		ax11.semilogy(mags, vals_rms_ffi[:, 2], '-', color=cols[2], label='Read')
+		ax11.semilogy(mags, vals_rms_ffi[:, 3], '--', color=cols[3], label='Systematic')
+		ax11.semilogy(mags, tot_noise_rms_ffi, 'k-', label='Total')
 
 		# Expected *1-hour* RMS noise tpf
 		for i in range(len(mags)):
-			vals_rms_tpf[i,:], _ = phot_noise(mags[i], 5775, 3600, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
+			vals_rms_tpf[i,:], _ = phot_noise(mags[i], 3600, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_rms_tpf = np.sqrt(np.sum(vals_rms_tpf**2, axis=1))
 
-		ax12.semilogy(mags, vals_rms_tpf[:, 0], '-', color=cols[0])
-		ax12.semilogy(mags, vals_rms_tpf[:, 1], '--', color=cols[1])
-		ax12.semilogy(mags, vals_rms_tpf[:, 2], '-', color=cols[2])
-		ax12.semilogy(mags, tot_noise_rms_tpf, 'k-')
-		ax12.axhline(y=self.sysnoise, color=cols[3], ls='--')
+		ax12.semilogy(mags, vals_rms_tpf[:, 0], '-', color=cols[0], label='Shot')
+		ax12.semilogy(mags, vals_rms_tpf[:, 1], '--', color=cols[1], label='Zodiacal')
+		ax12.semilogy(mags, vals_rms_tpf[:, 2], '-', color=cols[2], label='Read')
+		ax12.semilogy(mags, vals_rms_tpf[:, 3], '--', color=cols[3], label='Systematic')
+		ax12.semilogy(mags, tot_noise_rms_tpf, 'k-', label='Total')
 
 		# Expected ptp for 30-min
 		for i in range(len(mags)):
-			vals_ptp_ffi[i,:], _ = phot_noise(mags[i], 5775, 1800, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
+			vals_ptp_ffi[i,:], _ = phot_noise(mags[i], 1800, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_ptp_ffi = np.sqrt(np.sum(vals_ptp_ffi**2, axis=1))
 
-		ax21.semilogy(mags, vals_ptp_ffi[:, 0], '-', color=cols[0])
-		ax21.semilogy(mags, vals_ptp_ffi[:, 1], '--', color=cols[1])
-		ax21.semilogy(mags, vals_ptp_ffi[:, 2], '-', color=cols[2])
-		ax21.semilogy(mags, tot_noise_ptp_ffi, 'k-')
-		ax21.axhline(y=self.sysnoise, color=cols[3], ls='--')
+		ax21.semilogy(mags, vals_ptp_ffi[:, 0], '-', color=cols[0], label='Shot')
+		ax21.semilogy(mags, vals_ptp_ffi[:, 1], '--', color=cols[1], label='Zodiacal')
+		ax21.semilogy(mags, vals_ptp_ffi[:, 2], '-', color=cols[2], label='Read')
+		ax21.semilogy(mags, vals_ptp_ffi[:, 3], '--', color=cols[3], label='Systematic')
+		ax21.semilogy(mags, tot_noise_ptp_ffi, 'k-', label='Total')
 
 		# Expected ptp for 2-min
 		for i in range(len(mags)):
-			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 5775, 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
+			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
 		tot_noise_ptp_tpf = np.sqrt(np.sum(vals_ptp_tpf**2, axis=1))
 
-		ax22.semilogy(mags, vals_ptp_tpf[:, 0], '-', color=cols[0])
-		ax22.semilogy(mags, vals_ptp_tpf[:, 1], '--', color=cols[1])
-		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-', color=cols[2])
-		ax22.semilogy(mags, tot_noise_ptp_tpf, 'k-')
-		ax22.axhline(y=self.sysnoise, color=cols[3], ls='--')
+		ax22.semilogy(mags, vals_ptp_tpf[:, 0], '-', color=cols[0], label='Shot')
+		ax22.semilogy(mags, vals_ptp_tpf[:, 1], '--', color=cols[1], label='Zodiacal')
+		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-', color=cols[2], label='Read')
+		ax22.semilogy(mags, vals_ptp_tpf[:, 3], '--', color=cols[3], label='Systematic')
+		ax22.semilogy(mags, tot_noise_ptp_tpf, 'k-', label='Total')
 
 		ptp_tpf_vs_mag = INT.UnivariateSpline(mags, tot_noise_ptp_tpf)
 		ptp_ffi_vs_mag = INT.UnivariateSpline(mags, tot_noise_ptp_ffi)
