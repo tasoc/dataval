@@ -397,8 +397,6 @@ class DataValidation(object):
 		ax31 = fig3.add_subplot(121)
 		ax32 = fig3.add_subplot(122)
 
-		PARAM = {}
-
 #		if self.corr:
 		star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
 		factor = 1
@@ -493,10 +491,6 @@ class DataValidation(object):
 		ax31.axhline(y=1, ls='--', color='r')
 		ax32.axhline(y=1, ls='--', color='r')
 
-		# TODO: Update elat+elon based on observing sector?
-		PARAM['RA'] = 0
-		PARAM['DEC'] = 0
-
 		idx_lc = (source == 'ffi')
 		idx_sc = (source != 'ffi')
 
@@ -516,17 +510,11 @@ class DataValidation(object):
 #		ax21.scatter(tmags2[(source2=='ffi')], ptp2[(source2=='ffi')], marker='o', facecolors='r', edgecolor='r', alpha=0.1, label='30-min cadence')
 
 		# Plot theoretical lines
-		mags = np.linspace(self.tmag_limits[0], self.tmag_limits[1], 100)
-		vals_rms_tpf = np.zeros([len(mags), 4])
-		vals_rms_ffi = np.zeros([len(mags), 4])
-		vals_ptp_ffi = np.zeros([len(mags), 4])
-		vals_ptp_tpf = np.zeros([len(mags), 4])
+		mags = np.linspace(self.tmag_limits[0], self.tmag_limits[1], 200)
 
-		# Expected *1-hour* RMS noise fii
-		for i in range(len(mags)):
-			vals_rms_ffi[i,:], _ = phot_noise(mags[i], 3600, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
-		tot_noise_rms_ffi = np.sqrt(np.sum(vals_rms_ffi**2, axis=1))
-
+		# Expected *1-hour* RMS noise ffi
+		# TODO: Update elat+elon based on observing sector?
+		tot_noise_rms_ffi, vals_rms_ffi = phot_noise(mags, timescale=3600, cadpix=1800, sysnoise=self.sysnoise)
 		ax11.semilogy(mags, vals_rms_ffi[:, 0], 'r-', label='Shot')
 		ax11.semilogy(mags, vals_rms_ffi[:, 1], 'g--', label='Zodiacal')
 		ax11.semilogy(mags, vals_rms_ffi[:, 2], '-', label='Read')
@@ -534,10 +522,8 @@ class DataValidation(object):
 		ax11.semilogy(mags, tot_noise_rms_ffi, 'k-', label='Total')
 
 		# Expected *1-hour* RMS noise tpf
-		for i in range(len(mags)):
-			vals_rms_tpf[i,:], _ = phot_noise(mags[i], 3600, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
-		tot_noise_rms_tpf = np.sqrt(np.sum(vals_rms_tpf**2, axis=1))
-
+		# TODO: Update elat+elon based on observing sector?
+		tot_noise_rms_tpf, vals_rms_tpf = phot_noise(mags, timescale=3600, cadpix=120, sysnoise=self.sysnoise)
 		ax12.semilogy(mags, vals_rms_tpf[:, 0], 'r-', label='Shot')
 		ax12.semilogy(mags, vals_rms_tpf[:, 1], 'g--', label='Zodiacal')
 		ax12.semilogy(mags, vals_rms_tpf[:, 2], '-', label='Read')
@@ -545,10 +531,8 @@ class DataValidation(object):
 		ax12.semilogy(mags, tot_noise_rms_tpf, 'k-', label='Total')
 
 		# Expected ptp for 30-min
-		for i in range(len(mags)):
-			vals_ptp_ffi[i,:], _ = phot_noise(mags[i], 1800, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
-		tot_noise_ptp_ffi = np.sqrt(np.sum(vals_ptp_ffi**2, axis=1))
-
+		# TODO: Update elat+elon based on observing sector?
+		tot_noise_ptp_ffi, vals_ptp_ffi = phot_noise(mags, timescale=1800, cadpix=1800, sysnoise=self.sysnoise)
 		ax21.semilogy(mags, vals_ptp_ffi[:, 0], 'r-', label='Shot')
 		ax21.semilogy(mags, vals_ptp_ffi[:, 1], 'g--', label='Zodiacal')
 		ax21.semilogy(mags, vals_ptp_ffi[:, 2], '-', label='Read')
@@ -556,10 +540,8 @@ class DataValidation(object):
 		ax21.semilogy(mags, tot_noise_ptp_ffi, 'k-', label='Total')
 
 		# Expected ptp for 2-min
-		for i in range(len(mags)):
-			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
-		tot_noise_ptp_tpf = np.sqrt(np.sum(vals_ptp_tpf**2, axis=1))
-
+		# TODO: Update elat+elon based on observing sector?
+		tot_noise_ptp_tpf, vals_ptp_tpf = phot_noise(mags, timescale=120, cadpix=120, sysnoise=self.sysnoise)
 		ax22.semilogy(mags, vals_ptp_tpf[:, 0], 'r-', label='Shot')
 		ax22.semilogy(mags, vals_ptp_tpf[:, 1], 'g--', label='Zodiacal')
 		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-', label='Read')
@@ -614,8 +596,6 @@ class DataValidation(object):
 		ax21 = fig2.add_subplot(121)
 		ax22 = fig2.add_subplot(122)
 
-		PARAM = {}
-
 		if self.corr:
 			star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
 			factor = 1
@@ -630,10 +610,6 @@ class DataValidation(object):
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
 		contam = np.array([star['contamination'] for star in star_vals], dtype='float64')
 
-		# TODO: Update elat+elon based on observing sector?
-		PARAM['RA'] = 0
-		PARAM['DEC'] = 0
-
 		idx_lc = (source == 'ffi')
 		idx_sc = (source != 'ffi')
 
@@ -644,20 +620,12 @@ class DataValidation(object):
 		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
 
 		# Plot theoretical lines
-		mags = np.linspace(self.tmag_limits[0], self.tmag_limits[1], 100)
-
-		vals_rms_tpf = np.zeros([len(mags), 4])
-		vals_rms_ffi = np.zeros([len(mags), 4])
-		vals_ptp_ffi = np.zeros([len(mags), 4])
-		vals_ptp_tpf = np.zeros([len(mags), 4])
-
+		mags = np.linspace(self.tmag_limits[0], self.tmag_limits[1], 200)
 		cols = sns.color_palette("colorblind", 4)
 
-		# Expected *1-hour* RMS noise fii
-		for i in range(len(mags)):
-			vals_rms_ffi[i,:], _ = phot_noise(mags[i], 3600, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
-		tot_noise_rms_ffi = np.sqrt(np.sum(vals_rms_ffi**2, axis=1))
-
+		# Expected *1-hour* RMS noise ffi
+		# TODO: Update elat+elon based on observing sector?
+		tot_noise_rms_ffi, vals_rms_ffi = phot_noise(mags, timescale=3600, cadpix=1800, sysnoise=self.sysnoise)
 		ax11.semilogy(mags, vals_rms_ffi[:, 0], '-', color=cols[0], label='Shot')
 		ax11.semilogy(mags, vals_rms_ffi[:, 1], '--', color=cols[1], label='Zodiacal')
 		ax11.semilogy(mags, vals_rms_ffi[:, 2], '-', color=cols[2], label='Read')
@@ -665,10 +633,8 @@ class DataValidation(object):
 		ax11.semilogy(mags, tot_noise_rms_ffi, 'k-', label='Total')
 
 		# Expected *1-hour* RMS noise tpf
-		for i in range(len(mags)):
-			vals_rms_tpf[i,:], _ = phot_noise(mags[i], 3600, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
-		tot_noise_rms_tpf = np.sqrt(np.sum(vals_rms_tpf**2, axis=1))
-
+		# TODO: Update elat+elon based on observing sector?
+		tot_noise_rms_tpf, vals_rms_tpf = phot_noise(mags, timescale=3600, cadpix=120, sysnoise=self.sysnoise)
 		ax12.semilogy(mags, vals_rms_tpf[:, 0], '-', color=cols[0], label='Shot')
 		ax12.semilogy(mags, vals_rms_tpf[:, 1], '--', color=cols[1], label='Zodiacal')
 		ax12.semilogy(mags, vals_rms_tpf[:, 2], '-', color=cols[2], label='Read')
@@ -676,10 +642,8 @@ class DataValidation(object):
 		ax12.semilogy(mags, tot_noise_rms_tpf, 'k-', label='Total')
 
 		# Expected ptp for 30-min
-		for i in range(len(mags)):
-			vals_ptp_ffi[i,:], _ = phot_noise(mags[i], 1800, PARAM, cadpix='1800', sysnoise=self.sysnoise, verbose=False)
-		tot_noise_ptp_ffi = np.sqrt(np.sum(vals_ptp_ffi**2, axis=1))
-
+		# TODO: Update elat+elon based on observing sector?
+		tot_noise_ptp_ffi, vals_ptp_ffi = phot_noise(mags, timescale=1800, cadpix=1800, sysnoise=self.sysnoise)
 		ax21.semilogy(mags, vals_ptp_ffi[:, 0], '-', color=cols[0], label='Shot')
 		ax21.semilogy(mags, vals_ptp_ffi[:, 1], '--', color=cols[1], label='Zodiacal')
 		ax21.semilogy(mags, vals_ptp_ffi[:, 2], '-', color=cols[2], label='Read')
@@ -687,10 +651,8 @@ class DataValidation(object):
 		ax21.semilogy(mags, tot_noise_ptp_ffi, 'k-', label='Total')
 
 		# Expected ptp for 2-min
-		for i in range(len(mags)):
-			vals_ptp_tpf[i,:], _ = phot_noise(mags[i], 120, PARAM, cadpix='120', sysnoise=self.sysnoise, verbose=False)
-		tot_noise_ptp_tpf = np.sqrt(np.sum(vals_ptp_tpf**2, axis=1))
-
+		# TODO: Update elat+elon based on observing sector?
+		tot_noise_ptp_tpf, vals_ptp_tpf = phot_noise(mags, timescale=120, cadpix=120, sysnoise=self.sysnoise)
 		ax22.semilogy(mags, vals_ptp_tpf[:, 0], '-', color=cols[0], label='Shot')
 		ax22.semilogy(mags, vals_ptp_tpf[:, 1], '--', color=cols[1], label='Zodiacal')
 		ax22.semilogy(mags, vals_ptp_tpf[:, 2], '-', color=cols[2], label='Read')

@@ -10,6 +10,7 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 import scipy.interpolate as INT
+import logging
 
 #--------------------------------------------------------------------------------------------------
 def ZLnoise(gal_lat):
@@ -18,10 +19,10 @@ def ZLnoise(gal_lat):
 	return rms
 
 #--------------------------------------------------------------------------------------------------
-def Pixinaperture(Tmag, cad='1800'):
+def Pixinaperture(Tmag, cad=1800):
 	"""Number of pixels in aperture as a function of Tmag"""
 
-	if cad == '1800':
+	if cad == 1800:
 		ffi_tmag = np.array([2.05920002, 2.95159999, 3.84399996, 4.73639993, 5.6287999,
 			6.52119987, 7.41359984, 8.30599982, 9.19839979, 10.09079976,
 			10.98319973, 11.8755997, 12.76799967, 13.66039964, 14.55279961])
@@ -29,7 +30,8 @@ def Pixinaperture(Tmag, cad='1800'):
 			61., 49., 38., 28., 20., 14., 8.])
 		ffi_pix = INT.InterpolatedUnivariateSpline(ffi_tmag, ffi_mask, k=1)
 		pixels = ffi_pix(Tmag)
-	elif cad == '120':
+
+	elif cad == 120:
 		tpf_tmag = np.array([2.48170001, 3.56310005, 4.6445001, 5.72590014, 6.80730019,
 			7.88870023, 8.97010028, 10.05150032, 11.13290037, 12.21430041,
 			13.29570045, 14.3771005, 15.45850054, 16.53990059, 17.62130063])
@@ -37,13 +39,14 @@ def Pixinaperture(Tmag, cad='1800'):
 			13., 10., 12., 11.])
 		tpf_pix = INT.InterpolatedUnivariateSpline(tpf_tmag, tpf_mask, k=1)
 		pixels = tpf_pix(Tmag)
+
 	else:
-		pixels = 0
+		raise NotImplementedError()
 
 	# Approximate relation for pixels in aperture (based on plot in Sullivan et al.)
 	#pixels = (30 + (((3-30)/(14-7)) * (Tmag-7)))*(Tmag<14) + 3*(Tmag>=14)
 
-	return int(np.max([pixels, 3]))
+	return np.asarray(np.maximum(pixels, 3), dtype='int32')
 
 #--------------------------------------------------------------------------------------------------
 def mean_flux_level(Tmag):
@@ -64,18 +67,55 @@ def mean_flux_level(Tmag):
 	return Flux
 
 #--------------------------------------------------------------------------------------------------
-def phot_noise(Tmag, cad, PARAM, verbose=False, sysnoise=60, Teff=5775, cadpix='1800'):
+def phot_noise(Tmag, timescale=3600, coord=None, sysnoise=60, Teff=5775, cadpix=1800):
+	"""
+	Photometric noise model in ppm/timescale.
+
+	Parameters:
+		Tmag (ndarray or float): TESS magnitudes to calculate noise model for.
+		timescale (float): Timescale of noise model in seconds. Defaults to 3600 (1 hour).
+		coord (SkyCoord or dict, optional): Sky coordinate used for zodiacal noise. Defaults to RA=0, DEC=0.
+		sysnoise (float, optional): Systematic noise contribution in ppm/hr. Defaults to 60.
+		Teff (float, optional): Effective temperture. Defaults to 5775.
+		cadpix (TYPE, optional): Cadence where images are taken. Choices are 1800 and 120. Defaults to 1800.
+
+	Returns:
+		tuple:
+			- ndarray: Total noise model as a function of TESS magnitide.
+			- ndarray: Individual noise components in 4 columns: Shot, Zodiacal, Read and Systematic.
+
+	Raises:
+		ValueError: On invalid coord input.
+	"""
+
+	logger = logging.getLogger(__name__)
+
+	# Make sure Tmag is a numpy array:
+	Tmag = np.asarray(Tmag)
+
+	# Create SkyCoord object from the coordinates supplied:
+	if coord is None:
+		# TODO: Nothing is given, so use complete dummy coordinates
+		gc = SkyCoord(0*u.degree, 0*u.degree, frame='icrs')
+
+	elif isinstance(coord, dict):
+		if 'RA' in coord and 'DEC' in coord:
+			gc = SkyCoord(coord['RA']*u.degree, coord['DEC']*u.degree, frame='icrs')
+		elif 'ELON' in coord and 'ELAT' in coord:
+			gc = SkyCoord(lon=coord['ELON']*u.degree, lat=coord['ELAT']*u.degree, frame='barycentrictrueecliptic')
+		else:
+			raise ValueError("Invalid coord in dict format")
+
+	elif not isinstance(coord, SkyCoord):
+		raise ValueError("Invalid coord")
 
 	# Calculate galactic latitude for Zodiacal noise
-	gc = SkyCoord(PARAM['RA']*u.degree, PARAM['DEC']*u.degree, frame='icrs')
-	#gc = SkyCoord(lon=PARAM['ELON']*u.degree, lat=PARAM['ELAT']*u.degree, frame='barycentrictrueecliptic')
 	gc_gal = gc.transform_to('galactic')
 	gal_lat0 = gc_gal.b.deg
-
 	gal_lat = np.arcsin(np.abs(np.sin(gal_lat0*np.pi/180)))*180/np.pi
 
 	# Number of 2 sec integrations in cadence
-	integrations = cad/2
+	integrations = timescale/2
 
 	# Number of pixels in aperture given Tmag
 	pixels = Pixinaperture(Tmag, cadpix)
@@ -84,7 +124,7 @@ def phot_noise(Tmag, cad, PARAM, verbose=False, sysnoise=60, Teff=5775, cadpix='
 	Flux_factor = np.sqrt(integrations * pixels)
 
 	# Mean flux level in electrons per cadence
-	mean_level_ppm = mean_flux_level(Tmag) * cad # electrons (based on measurement) #, Teff
+	mean_level_ppm = mean_flux_level(Tmag) * timescale # electrons (based on measurement) #, Teff
 
 	# Shot noise
 	shot_noise = 1e6/np.sqrt(mean_level_ppm)
@@ -96,21 +136,23 @@ def phot_noise(Tmag, cad, PARAM, verbose=False, sysnoise=60, Teff=5775, cadpix='
 	zodiacal_noise = ZLnoise(gal_lat) * Flux_factor * 1e6/mean_level_ppm # ppm
 
 	# Systematic noise in ppm
-	systematic_noise_ppm = sysnoise / np.sqrt(cad/(60*60)) # ppm / sqrt(hr)
+	systematic_noise = np.full_like(Tmag, sysnoise / np.sqrt(timescale/3600)) # ppm / sqrt(hr)
 
-	if verbose:
-		print('Galactic latitude', gal_lat)
-		print('Systematic noise in ppm', systematic_noise_ppm)
-		print('Integrations', integrations)
-		print('Pixels', pixels)
-		print('Flux factor', Flux_factor)
-		print('Mean level ppm', mean_level_ppm)
-		print('Shot noise', shot_noise)
-		print('Read noise', read_noise)
-		print('Zodiacal noise', zodiacal_noise)
+	# Write out a lot of things for debugging only:
+	logger.debug('Galactic latitude: %f', gal_lat)
+	logger.debug('Systematic noise in ppm: %f', systematic_noise)
+	logger.debug('Integrations: %f', integrations)
+	logger.debug('Pixels: %d', pixels)
+	logger.debug('Flux factor: %f', Flux_factor)
+	logger.debug('Mean level ppm: %f', mean_level_ppm)
+	logger.debug('Shot noise: %f', shot_noise)
+	logger.debug('Read noise: %f', read_noise)
+	logger.debug('Zodiacal noise: %f', zodiacal_noise)
 
-	PARAM['Galactic_lat'] = gal_lat
-	PARAM['Pixels_in_aper'] = pixels
+	#noise_vals = np.array([shot_noise, zodiacal_noise, read_noise, systematic_noise_ppm])
+	noise_vals = np.column_stack((shot_noise, zodiacal_noise, read_noise, systematic_noise))
 
-	noise_vals = np.array([shot_noise, zodiacal_noise, read_noise, systematic_noise_ppm])
-	return noise_vals, PARAM # ppm per cadence
+	# Calculate the total noise model by adding up the individual contributions:
+	total_noise = np.sqrt(np.sum(noise_vals**2, axis=1))
+
+	return total_noise, noise_vals # ppm per cadence
