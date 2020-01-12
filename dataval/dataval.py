@@ -295,8 +295,8 @@ class DataValidation(object):
 		cont[np.isnan(cont)] = 1.2
 
 		# Plot individual contamination points
-		ax1.scatter(tmags[idx_low_ffi], cont[idx_low_ffi], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1)
-		ax2.scatter(tmags[idx_low_tpf], cont[idx_low_tpf], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1)
+		ax1.scatter(tmags[idx_low_ffi], cont[idx_low_ffi], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1, rasterized=True)
+		ax2.scatter(tmags[idx_low_tpf], cont[idx_low_tpf], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1, rasterized=True)
 
 		if self.doval:
 			ax1.scatter(tmags[idx_high_ffi], cont[idx_high_ffi], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
@@ -616,11 +616,11 @@ class DataValidation(object):
 		idx_lc = (source == 'ffi')
 		idx_sc = (source != 'ffi')
 
-		im1 = ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', c=contam[idx_lc], alpha=0.2, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
-		ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
+		im1 = ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', c=contam[idx_lc], alpha=0.2, label='30-min cadence', cmap=plt.get_cmap('PuOr'), rasterized=True)
+		ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'), rasterized=True)
 
-		im3 = ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', c=contam[idx_lc], alpha=0.2, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
-		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
+		im3 = ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', c=contam[idx_lc], alpha=0.2, label='30-min cadence', cmap=plt.get_cmap('PuOr'), rasterized=True)
+		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', c=contam[idx_sc], alpha=0.2, label='2-min cadence', cmap=plt.get_cmap('PuOr'), rasterized=True)
 
 		# Plot theoretical lines
 		mags = np.linspace(self.tmag_limits[0], self.tmag_limits[1], 200)
@@ -817,10 +817,10 @@ class DataValidation(object):
 		perm_lc = np.random.permutation(sum(idx_lc0))
 		perm_sc = np.random.permutation(sum(idx_sc0))
 
-		ax1.scatter(tmags[idx_lc0][perm_lc], masksizes[idx_lc0][perm_lc], marker='o', c=contam[idx_lc0][perm_lc], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'))
+		ax1.scatter(tmags[idx_lc0][perm_lc], masksizes[idx_lc0][perm_lc], marker='o', c=contam[idx_lc0][perm_lc], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'), rasterized=True)
 #		ax1.scatter(tmags[idx_lc1], masksizes[idx_lc1], marker='.', c=contam[idx_lc1], alpha=0.2, norm=norm, cmap=plt.get_cmap('PuOr'))
 
-		ax2.scatter(tmags[idx_sc0][perm_sc], masksizes[idx_sc0][perm_sc], marker='o', c=contam[idx_sc0][perm_sc], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'))
+		ax2.scatter(tmags[idx_sc0][perm_sc], masksizes[idx_sc0][perm_sc], marker='o', c=contam[idx_sc0][perm_sc], alpha=0.5, norm=norm, cmap=plt.get_cmap('PuOr'), rasterized=True)
 #		ax2.scatter(tmags[idx_sc1], masksizes[idx_sc1], marker='.', c=contam[idx_sc1], alpha=0.2, norm=norm, cmap=plt.get_cmap('PuOr'))
 
 		# Compute median-bin curve
@@ -1032,8 +1032,8 @@ class DataValidation(object):
 		perm_lc = np.random.permutation(sum(idx_lc))
 		perm_sc = np.random.permutation(sum(idx_sc))
 
-		ax1.scatter(tmags[idx_lc][perm_lc], meanfluxes[idx_lc][perm_lc], marker='o', c=contam[idx_lc][perm_lc], norm=norm, cmap=plt.get_cmap('PuOr'), alpha=0.1) # , label='30-min cadence')
-		ax2.scatter(tmags[idx_sc][perm_sc], meanfluxes[idx_sc][perm_sc], marker='o', c=contam[idx_sc][perm_sc], norm=norm, cmap=plt.get_cmap('PuOr'), alpha=0.1) # , label='2-min cadence')
+		ax1.scatter(tmags[idx_lc][perm_lc], meanfluxes[idx_lc][perm_lc], marker='o', c=contam[idx_lc][perm_lc], norm=norm, cmap=plt.get_cmap('PuOr'), alpha=0.1, rasterized=True) # , label='30-min cadence')
+		ax2.scatter(tmags[idx_sc][perm_sc], meanfluxes[idx_sc][perm_sc], marker='o', c=contam[idx_sc][perm_sc], norm=norm, cmap=plt.get_cmap('PuOr'), alpha=0.1, rasterized=True) # , label='2-min cadence')
 
 		xmin = np.array([0, 1.5, 9, 12.6, 13, 14, 15, 16, 17, 18, 19])
 		ymin = np.array([8e7, 1.8e7, 12500, 250, 59, 5, 1, 1, 1, 1, 1])
