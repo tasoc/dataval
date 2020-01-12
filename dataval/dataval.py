@@ -70,8 +70,10 @@ class DataValidation(object):
 
 		if self.corr:
 			self.dataval_table = 'datavalidation_corr'
+			subdir = 'corr'
 		else:
 			self.dataval_table = 'datavalidation_raw'
+			subdir = 'raw'
 
 		#load sqlite to-do files
 		for i, f in enumerate(self.input_folders):
@@ -108,7 +110,7 @@ class DataValidation(object):
 
 		# Create output directory:
 		if len(self.input_folders) == 1 and self.outfolders is None:
-			self.outfolders = os.path.join(self.input_folders[0], 'data_validation')
+			self.outfolders = os.path.join(self.input_folders[0], 'data_validation', subdir)
 		os.makedirs(self.outfolders, exist_ok=True)
 		logger.info("Putting output data in '%s'", self.outfolders)
 
