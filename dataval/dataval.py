@@ -10,10 +10,10 @@ Data Validation module for TASOC Pipeline.
 import os.path
 import logging
 import numpy as np
-from bottleneck import nansum
+from bottleneck import ss
 import sqlite3
 import scipy.interpolate as INT
-import scipy.optimize as OP
+from scipy.optimize import minimize
 from scipy.stats import binned_statistic as binning
 from statsmodels.nonparametric.kde import KDEUnivariate as KDE
 from astropy.table import Table
@@ -1007,9 +1007,6 @@ class DataValidation(object):
 		ax1 = fig.add_subplot(121)
 		ax2 = fig.add_subplot(122)
 
-		fig2 = plt.figure()
-		fig2.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
-		ax21 = fig2.add_subplot(111)
 
 #		fig3 = plt.figure(figsize=(15, 5))
 #		fig3.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
@@ -1048,27 +1045,31 @@ class DataValidation(object):
 			idx2 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source != 'ffi') & (contam < 0.15)
 
 		logger.info('Optimising coefficient of relation')
-		def z(c):
-			return np.log10(nansum(( (meanfluxes[idx1] - 10**(-0.4*(tmags[idx1] - c))) / (contam[idx1]+1) )**2))
-		cc = OP.minimize(z, 20.5, method='Nelder-Mead', options={'disp':False})
+		def chi2(c, idx):
+			return np.log10(ss( (meanfluxes[idx] - 10**(-0.4*(tmags[idx] - c))) / (contam[idx]+1) ))
 
-		def z2(c):
-			return np.log10(nansum(( (meanfluxes[idx2] - 10**(-0.4*(tmags[idx2] - c))) / (contam[idx2]+1) )**2))
-		cc2 = OP.minimize(z2, 20.5, method='Nelder-Mead', options={'disp':False})
+		cc = minimize(chi2, 20.5, args=(idx1,), method='Nelder-Mead', options={'disp':False})
+		cc2 = minimize(chi2, 20.5, args=(idx2,), method='Nelder-Mead', options={'disp':False})
 
 		logger.info('Optimisation terminated successfully? %s', cc.success)
 		logger.info('Coefficient is found to be %1.4f', cc.x)
 		logger.info('Coefficient is found to be %1.4f', cc2.x)
 
 		C = np.linspace(19, 22, 100)
-		for c in C:
-			ax21.scatter(c, z(c), marker='o', color='k')
-			ax21.scatter(c, z2(c), marker='o', color='b')
+		zc = [chi2(c, idx1) for c in C]
+		z2c = [chi2(c, idx2) for c in C]
+
+		# Create plot of
+		fig2 = plt.figure()
+		ax21 = fig2.add_subplot(111)
+		ax21.plot(C, zc, 'k-')
+		ax21.plot(C, z2c, 'b-')
 		ax21.axvline(x=cc.x, color='k', label='30-min')
 		ax21.axvline(x=cc2.x, color='b', ls='--', label='2-min')
 		ax21.set_xlabel('Coefficient')
 		ax21.set_ylabel(r'$\chi^2$')
 		ax21.legend(loc='upper left')
+		fig2.savefig(os.path.join(self.outfolders, 'mag_to_flux_optimize'))
 
 #		d1 = meanfluxes[idx1]/(10**(-0.4*(tmags[idx1] - cc.x))) - 1
 #		d2 = meanfluxes[idx2]/(10**(-0.4*(tmags[idx2] - cc2.x))) - 1
@@ -1116,7 +1117,6 @@ class DataValidation(object):
 		cb.ax.tick_params(axis='y', direction='out')
 
 		fig.savefig(os.path.join(self.outfolders, 'mag_to_flux'))
-		fig2.savefig(os.path.join(self.outfolders, 'mag_to_flux_optimize'))
 		#fig3.savefig(os.path.join(self.outfolders, 'mag_to_flux_dev'))
 		if self.show:
 			plt.show()
