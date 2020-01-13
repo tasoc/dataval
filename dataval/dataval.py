@@ -75,12 +75,15 @@ class DataValidation(object):
 			self.dataval_table = 'datavalidation_raw'
 			subdir = 'raw'
 
-		#load sqlite to-do files
-		for i, f in enumerate(self.input_folders):
-			logger.info("Loading input data from '%s'", f)
-			todo_file = os.path.join(f, 'todo.sqlite')
-			logger.debug("TODO file: %s", todo_file)
-			if not os.path.exists(todo_file):
+		# Load SQLite TODO files:
+		# TODO: How do we handle cases with more than one input?
+		for todo_file in self.input_folders:
+			# If it was just a directory, then append the default todo-file:
+			if os.path.isdir(todo_file):
+				todo_file = os.path.join(todo_file, 'todo.sqlite')
+
+			logger.info("Loading input data from '%s'", todo_file)
+			if not os.path.isfile(todo_file):
 				raise FileNotFoundError("TODO file not found: '%s'" % todo_file)
 
 			# Open the SQLite file:
@@ -110,7 +113,7 @@ class DataValidation(object):
 
 		# Create output directory:
 		if len(self.input_folders) == 1 and self.outfolders is None:
-			self.outfolders = os.path.join(self.input_folders[0], 'data_validation', subdir)
+			self.outfolders = os.path.join(os.path.dirname(self.input_folders[0]), 'data_validation', subdir)
 		os.makedirs(self.outfolders, exist_ok=True)
 		logger.info("Putting output data in '%s'", self.outfolders)
 
