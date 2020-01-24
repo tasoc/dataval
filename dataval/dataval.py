@@ -50,7 +50,7 @@ class STATUS(enum.IntEnum):
 	ABORT = 4   #: The calculation was aborted.
 	SKIPPED = 5 #: The target was skipped because the algorithm found that to be the best solution.
 
-#------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 class DataValidation(object):
 
 	#----------------------------------------------------------------------------------------------
@@ -233,7 +233,7 @@ class DataValidation(object):
 	#----------------------------------------------------------------------------------------------
 	def Validations(self):
 
-		self.basics()
+		self.basic()
 		val1 = self.plot_mag2flux(return_val=True)
 		val2 = self.plot_pixinaperture(return_val=True)
 		val3 = self.plot_contam(return_val=True)
@@ -266,9 +266,11 @@ class DataValidation(object):
 			self.conn.commit()
 
 	#----------------------------------------------------------------------------------------------
-	def basics(self):
+	def basic(self):
 		"""
 		Perform basic checks of the TODO-file and the lightcurve files.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
 		logger = logging.getLogger(__name__)
@@ -302,7 +304,7 @@ class DataValidation(object):
 		self.cursor.execute("SELECT * FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE diagnostics.priority IS NULL AND status != {skipped:d};".format(
 			skipped=STATUS.SKIPPED
 		))
-		rowcount =  len(self.cursor.fetchall())
+		rowcount = len(self.cursor.fetchall())
 		logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in DIAGNOSTICS", rowcount)
 
 		# Check that everything that should have, has a diagnostics_corr entry:
@@ -311,8 +313,18 @@ class DataValidation(object):
 			self.cursor.execute("SELECT * FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE diagnostics_corr.priority IS NULL AND corr_status != {skipped:d};".format(
 				skipped=STATUS.SKIPPED
 			))
-			rowcount =  len(self.cursor.fetchall())
+			rowcount = len(self.cursor.fetchall())
 			logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in DIAGNOSTICS_CORR", rowcount)
+
+		# Check photometry_skipped table. All stars marked as SKIPPED in photometry should
+		# have an entry explaining which target that was responsible for it being skipped:
+		# NOTE: This will currently fail for most TODO-files due to a bug/feature in the photometry
+		#       code, where an entry is not created in all cases.
+		self.cursor.execute("SELECT COUNT(*) FROM todolist LEFT JOIN photometry_skipped ON todolist.priority=photometry_skipped.priority WHERE status={skipped:d} AND photometry_skipped.priority IS NULL;".format(
+			skipped=STATUS.SKIPPED
+		))
+		rowcount = self.cursor.fetchone()[0]
+		logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in PHOTOMETRY_SKIPPED", rowcount)
 
 		# Check if any raw lightcurve files are missing:
 		logger.info("Checking if any raw lightcurve files are missing...")

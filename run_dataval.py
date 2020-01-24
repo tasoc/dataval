@@ -16,7 +16,7 @@ def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
 	parser.add_argument('-c', '--corrected', help='Use corrected or raw values.', action='store_true')
-	parser.add_argument('-m', '--method', help='Corrector method to use.', action='append', default=[], choices=('basics', 'pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'noise_compare', 'magdist', 'waittime'))
+	parser.add_argument('-m', '--method', help='Corrector method to use.', action='append', default=[], choices=('basic', 'pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'noise_compare', 'magdist', 'waittime'))
 	parser.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png','eps','pdf'))
 	parser.add_argument('-s', '--show', help='Show plots.', action='store_true')
 	parser.add_argument('-v', '--validate', help='Compute validation (only run is method is "all").', action='store_true')
@@ -51,8 +51,8 @@ def main():
 		validate=args.validate, colorbysector=args.colorbysector,
 		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise) as dataval:
 
-		if 'basics' in args.method:
-			dataval.basics()
+		if 'basic' in args.method:
+			dataval.basic()
 		if 'mag2flux' in args.method:
 			dataval.plot_mag2flux()
 		if 'pixvsmag' in args.method:
