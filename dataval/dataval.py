@@ -17,6 +17,8 @@ from scipy.optimize import minimize
 from scipy.stats import binned_statistic as binning
 from statsmodels.nonparametric.kde import KDEUnivariate as KDE
 from astropy.table import Table
+from tqdm import tqdm
+import enum
 
 # Plotting:
 from .plots import plt, matplotlib as mpl
@@ -33,6 +35,20 @@ from .noise_model import phot_noise
 
 def combine_flag_dicts(a, b):
 	return {key: a.get(key, 0) | b.get(key, 0) for key in set().union(a.keys(), b.keys())}
+
+#--------------------------------------------------------------------------------------------------
+class STATUS(enum.IntEnum):
+	"""
+	Status indicator of the status of the correction.
+
+	"""
+	UNKNOWN = 0 #: The status is unknown. The actual calculation has not started yet.
+	STARTED = 6 #: The calculation has started, but not yet finished.
+	OK = 1      #: Everything has gone well.
+	ERROR = 2   #: Encountered a catastrophic error that I could not recover from.
+	WARNING = 3 #: Something is a bit fishy. Maybe we should try again with a different algorithm?
+	ABORT = 4   #: The calculation was aborted.
+	SKIPPED = 5 #: The target was skipped because the algorithm found that to be the best solution.
 
 #------------------------------------------------------------------------------
 class DataValidation(object):
@@ -217,6 +233,7 @@ class DataValidation(object):
 	#----------------------------------------------------------------------------------------------
 	def Validations(self):
 
+		self.basics()
 		val1 = self.plot_mag2flux(return_val=True)
 		val2 = self.plot_pixinaperture(return_val=True)
 		val3 = self.plot_contam(return_val=True)
@@ -247,6 +264,74 @@ class DataValidation(object):
 			# Fill out the table, setting everything not already covered by the above to disapproved:
 			self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) SELECT todolist.priority, 0, 0 FROM todolist LEFT JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE " + self.dataval_table + ".priority IS NULL;")
 			self.conn.commit()
+
+	#----------------------------------------------------------------------------------------------
+	def basics(self):
+		"""
+		Perform basic checks of the TODO-file and the lightcurve files.
+		"""
+
+		logger = logging.getLogger(__name__)
+		logger.info('------------------------------------------')
+		logger.info('Testing basics')
+		tqdm_settings = {'disable': not logger.isEnabledFor(logging.INFO)}
+
+		# Status that we should check for in the database. They should not be present if the
+		# processing was completed correctly:
+		bad_status = str(STATUS.UNKNOWN.value) + ',' + str(STATUS.STARTED.value) + ',' + str(STATUS.ABORT.value)
+
+		# Check the status of the photometry:
+		self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE status IS NULL OR status IN (" + bad_status + ");")
+		rowcount = self.cursor.fetchone()[0]
+		if rowcount:
+			logger.error("%d entries have not had PHOTOMETRY run", rowcount)
+		else:
+			logger.info("All PHOTOMETRY has been run.")
+
+		# Check the status of corrections:
+		if self.corrections_done:
+			self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE corr_status IS NULL OR corr_status IN (" + bad_status + ");")
+			rowcount = self.cursor.fetchone()[0]
+			if rowcount:
+				logger.error("%d entries have not had CORRECTIONS run", rowcount)
+			else:
+				logger.info("All CORRECTIONS have been run.")
+
+		# Check that everything that should have, has a diagnostics entry:
+		# Ignore status=SKIPPED, since these will not have a diagnostics entry.
+		self.cursor.execute("SELECT * FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE diagnostics.priority IS NULL AND status != {skipped:d};".format(
+			skipped=STATUS.SKIPPED
+		))
+		rowcount =  len(self.cursor.fetchall())
+		logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in DIAGNOSTICS", rowcount)
+
+		# Check that everything that should have, has a diagnostics_corr entry:
+		# Ignore status=SKIPPED, since these will not have a diagnostics_corr entry.
+		if self.corrections_done:
+			self.cursor.execute("SELECT * FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE diagnostics_corr.priority IS NULL AND corr_status != {skipped:d};".format(
+				skipped=STATUS.SKIPPED
+			))
+			rowcount =  len(self.cursor.fetchall())
+			logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in DIAGNOSTICS_CORR", rowcount)
+
+		# Check if any raw lightcurve files are missing:
+		logger.info("Checking if any raw lightcurve files are missing...")
+		missing_phot_lightcurves = 0
+		self.cursor.execute("SELECT todolist.priority,lightcurve FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status IN (1,3);")
+		for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
+			if not row['lightcurve'] or not os.path.isfile(os.path.join(self.input_folders[0], row['lightcurve'])):
+				missing_phot_lightcurves += 1
+		logger.log(logging.ERROR if missing_phot_lightcurves else logging.INFO, "%d missing photometry lightcurves", missing_phot_lightcurves)
+
+		# Check of any corrected lightcurve files are missing:
+		if self.corrections_done:
+			logger.info("Checking if any corrected lightcurve files are missing...")
+			missing_corr_lightcurves = 0
+			self.cursor.execute("SELECT todolist.priority,diagnostics_corr.lightcurve FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE corr_status IN (1,3);")
+			for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
+				if row['lightcurve'] is None or not os.path.isfile(os.path.join(self.input_folders[0], row['lightcurve'])):
+					missing_corr_lightcurves += 1
+			logger.log(logging.ERROR if missing_corr_lightcurves else logging.INFO, "%d missing corrected lightcurves", missing_corr_lightcurves)
 
 	#----------------------------------------------------------------------------------------------
 	def plot_contam(self, return_val=False):
