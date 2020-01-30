@@ -7,7 +7,7 @@ Data Validation module for TASOC Pipeline.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-import os.path
+import os
 import logging
 import numpy as np
 from bottleneck import ss
@@ -329,21 +329,37 @@ class DataValidation(object):
 		# Check if any raw lightcurve files are missing:
 		logger.info("Checking if any raw lightcurve files are missing...")
 		missing_phot_lightcurves = 0
-		self.cursor.execute("SELECT todolist.priority,lightcurve FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status IN (1,3);")
-		for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
-			if not row['lightcurve'] or not os.path.isfile(os.path.join(self.input_folders[0], row['lightcurve'])):
-				missing_phot_lightcurves += 1
-		logger.log(logging.ERROR if missing_phot_lightcurves else logging.INFO, "%d missing photometry lightcurves", missing_phot_lightcurves)
+		missing_phot_lightcurves_list = os.path.join(self.outfolders, 'missing_raw.txt')
+		with open(missing_phot_lightcurves_list, 'w') as fid:
+			self.cursor.execute("SELECT todolist.priority,lightcurve FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status IN (1,3);")
+			for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
+				if not row['lightcurve'] or not os.path.isfile(os.path.join(self.input_folders[0], row['lightcurve'])):
+					missing_phot_lightcurves += 1
+					fid.write("{priority:6d}  {lightcurve:s}\n".format(**row))
+
+		if missing_phot_lightcurves == 0:
+			logger.info("All photometry lightcurves avaliable.")
+			os.remove(missing_phot_lightcurves_list)
+		else:
+			logger.error("%d missing photometry lightcurves.", missing_phot_lightcurves)
 
 		# Check of any corrected lightcurve files are missing:
 		if self.corrections_done:
 			logger.info("Checking if any corrected lightcurve files are missing...")
 			missing_corr_lightcurves = 0
-			self.cursor.execute("SELECT todolist.priority,diagnostics_corr.lightcurve FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE corr_status IN (1,3);")
-			for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
-				if row['lightcurve'] is None or not os.path.isfile(os.path.join(self.input_folders[0], row['lightcurve'])):
-					missing_corr_lightcurves += 1
-			logger.log(logging.ERROR if missing_corr_lightcurves else logging.INFO, "%d missing corrected lightcurves", missing_corr_lightcurves)
+			missing_corr_lightcurves_list = os.path.join(self.outfolders, 'missing_corr.txt')
+			with open(missing_corr_lightcurves_list, 'w') as fid:
+				self.cursor.execute("SELECT todolist.priority,diagnostics_corr.lightcurve FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE corr_status IN (1,3);")
+				for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
+					if row['lightcurve'] is None or not os.path.isfile(os.path.join(self.input_folders[0], row['lightcurve'])):
+						missing_corr_lightcurves += 1
+						fid.write("{priority:6d}  {lightcurve:s}\n".format(**row))
+
+			if missing_corr_lightcurves == 0:
+				logger.info("All corrected lightcurves avaliable.")
+				os.remove(missing_corr_lightcurves_list)
+			else:
+				logger.error("%d missing corrected lightcurves.", missing_corr_lightcurves)
 
 	#----------------------------------------------------------------------------------------------
 	def plot_contam(self, return_val=False):
