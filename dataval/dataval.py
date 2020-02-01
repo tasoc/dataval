@@ -291,7 +291,7 @@ class DataValidation(object):
 			logger.info("All PHOTOMETRY has been run.")
 
 		# Check the status of corrections:
-		if self.corrections_done:
+		if self.corr:
 			self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE corr_status IS NULL OR corr_status IN (" + bad_status + ");")
 			rowcount = self.cursor.fetchone()[0]
 			if rowcount:
@@ -309,7 +309,7 @@ class DataValidation(object):
 
 		# Check that everything that should have, has a diagnostics_corr entry:
 		# Ignore status=SKIPPED, since these will not have a diagnostics_corr entry.
-		if self.corrections_done:
+		if self.corr:
 			self.cursor.execute("SELECT * FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE diagnostics_corr.priority IS NULL AND corr_status != {skipped:d};".format(
 				skipped=STATUS.SKIPPED
 			))
@@ -347,7 +347,7 @@ class DataValidation(object):
 			logger.error("%d missing photometry lightcurves.", missing_phot_lightcurves)
 
 		# Check of any corrected lightcurve files are missing:
-		if self.corrections_done:
+		if self.corr:
 			logger.info("Checking if any corrected lightcurve files are missing...")
 			missing_corr_lightcurves = 0
 			missing_corr_lightcurves_list = os.path.join(self.outfolders, 'missing_corr.txt')
