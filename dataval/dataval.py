@@ -326,6 +326,9 @@ class DataValidation(object):
 		rowcount = self.cursor.fetchone()[0]
 		logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in PHOTOMETRY_SKIPPED", rowcount)
 
+		# Root directory for files assocuated with this TODO-file:
+		rootdir = os.path.dirname(self.input_folders[0])
+
 		# Check if any raw lightcurve files are missing:
 		logger.info("Checking if any raw lightcurve files are missing...")
 		missing_phot_lightcurves = 0
@@ -333,7 +336,7 @@ class DataValidation(object):
 		with open(missing_phot_lightcurves_list, 'w') as fid:
 			self.cursor.execute("SELECT todolist.priority,lightcurve FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status IN (1,3);")
 			for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
-				if not row['lightcurve'] or not os.path.isfile(os.path.join(self.input_folders[0], row['lightcurve'])):
+				if row['lightcurve'] is None or not os.path.isfile(os.path.join(rootdir, row['lightcurve'])):
 					missing_phot_lightcurves += 1
 					fid.write("{priority:6d}  {lightcurve:s}\n".format(**row))
 
@@ -351,7 +354,7 @@ class DataValidation(object):
 			with open(missing_corr_lightcurves_list, 'w') as fid:
 				self.cursor.execute("SELECT todolist.priority,diagnostics_corr.lightcurve FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE corr_status IN (1,3);")
 				for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
-					if row['lightcurve'] is None or not os.path.isfile(os.path.join(self.input_folders[0], row['lightcurve'])):
+					if row['lightcurve'] is None or not os.path.isfile(os.path.join(rootdir, row['lightcurve'])):
 						missing_corr_lightcurves += 1
 						fid.write("{priority:6d}  {lightcurve:s}\n".format(**row))
 
