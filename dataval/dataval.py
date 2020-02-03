@@ -19,6 +19,7 @@ from statsmodels.nonparametric.kde import KDEUnivariate as KDE
 from astropy.table import Table
 from tqdm import tqdm
 import enum
+import itertools
 
 # Plotting:
 from .plots import plt, matplotlib as mpl
@@ -295,15 +296,28 @@ class DataValidation(object):
 			logger.info("All PHOTOMETRY has been run.")
 
 		# Warn if it seems that there is a large number of ERROR, compared to OK and WARNING:
-		self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE status IN (%d,%d);" % (STATUS.OK.value, STATUS.WARNING.value))
-		count_good = self.cursor.fetchone()[0]
-		self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE status=%d;" % STATUS.ERROR.value)
-		count_errors = self.cursor.fetchone()[0]
-		if count_errors/count_good > warn_errors_ratio:
-			logger.warning("High number of errors detected: %.2f%% (%d errors, %d good)",
-				100*count_errors/count_good,
-				count_errors,
-				count_good)
+		logger.info("Checking number of errors:")
+		for camera, ccd in itertools.product((1,2,3,4),(1,2,3,4)):
+			self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE status IN ({ok:d},{warning:d}) AND camera={camera:d} AND ccd={ccd:d};".format(
+				ok=STATUS.OK.value,
+				warning=STATUS.WARNING.value,
+				camera=camera,
+				ccd=ccd
+			))
+			count_good = self.cursor.fetchone()[0]
+			self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE status={error:d} AND camera={camera:d} AND ccd={ccd:d};".format(
+				error=STATUS.ERROR.value,
+				camera=camera,
+				ccd=ccd
+			))
+			count_errors = self.cursor.fetchone()[0]
+			ratio = count_errors/(count_good + count_errors) if count_good + count_errors > 0 else 0
+			if ratio > warn_errors_ratio:
+				logger.warning("  CAMERA=%d, CCD=%d: High number of errors detected: %.2f%% (%d errors, %d good)",
+					camera, ccd, 100*ratio, count_errors, count_good)
+			else:
+				logger.info("  CAMERA=%d, CCD=%d: %.2f%% (%d errors, %d good)",
+					camera, ccd, 100*ratio, count_errors, count_good)
 
 		# Check the status of corrections:
 		if self.corr:
