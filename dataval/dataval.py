@@ -266,9 +266,13 @@ class DataValidation(object):
 			self.conn.commit()
 
 	#----------------------------------------------------------------------------------------------
-	def basic(self):
+	def basic(self, warn_errors_ratio=0.05):
 		"""
 		Perform basic checks of the TODO-file and the lightcurve files.
+
+		Parameters:
+			warn_errors_ratio (float, optional): Fraction of photometry ERRORs to OK and WARNINGs
+				to warn about. Default=5%.
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
@@ -289,6 +293,17 @@ class DataValidation(object):
 			logger.error("%d entries have not had PHOTOMETRY run", rowcount)
 		else:
 			logger.info("All PHOTOMETRY has been run.")
+
+		# Warn if it seems that there is a large number of ERROR, compared to OK and WARNING:
+		self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE status IN (%d,%d);" % (STATUS.OK.value, STATUS.WARNING.value))
+		count_good = self.cursor.fetchone()[0]
+		self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE status=%d;" % STATUS.ERROR.value)
+		count_errors = self.cursor.fetchone()[0]
+		if count_errors/count_good > warn_errors_ratio:
+			logger.warning("High number of errors detected: %.2f%% (%d errors, %d good)",
+				100*count_errors/count_good,
+				count_errors,
+				count_good)
 
 		# Check the status of corrections:
 		if self.corr:
