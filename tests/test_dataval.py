@@ -17,7 +17,7 @@ INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.datafiles(INPUT_DIR)
 @pytest.mark.parametrize("inp,corr", [
-	pytest.param('does-not-exist', None, marks=pytest.mark.xfail(raises=FileNotFoundError)),
+	pytest.param('does-not-exist', False, marks=pytest.mark.xfail(raises=FileNotFoundError)),
 	('only_raw', False),
 	pytest.param('only_raw', True, marks=pytest.mark.xfail(raises=ValueError)),
 	('with_corr', False),

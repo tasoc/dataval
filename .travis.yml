@@ -1,6 +1,6 @@
 language: python
 cache: pip
-sudo: required
+os: linux
 
 # We are specifying the build matrix manually, since there is too little overlap
 # between the different builds:
@@ -59,7 +59,7 @@ install:
 script:
   - pytest --cov=dataval/
 after_success:
-  - codecov  
+  - codecov
 
 branches:
   only:
@@ -69,13 +69,15 @@ branches:
 
 # Deploy to GitHub Releases, making a release of the
 # code whenever a new tag is added on the master branch
+before_deploy:
+  - git stash --all
 deploy:
   provider: releases
-  api_key: $GITHUB_TOKEN
+  token: $GITHUB_TOKEN
   skip_cleanup: true
   draft: true
-  name: "Version $TRAVIS_TAG"
-  body: "Version $TRAVIS_TAG"
+  name: "${TRAVIS_TAG/v/Version }"
+  body: "${TRAVIS_TAG/v/Version }"
   on:
     branch:
       - master
