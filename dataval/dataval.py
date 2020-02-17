@@ -112,9 +112,8 @@ class DataValidation(object):
 			# Check if corrections have been run:
 			self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
 			self.corrections_done = bool(self.cursor.fetchone()[0] == 1)
-
 			if self.corr and not self.corrections_done:
-				raise Exception("Can not run dataval on corr when corrections have not been run")
+				raise ValueError("Can not run dataval on corr when corrections have not been run")
 
 			# Create table for data-validation:
 			if self.doval:
@@ -349,11 +348,15 @@ class DataValidation(object):
 		# have an entry explaining which target that was responsible for it being skipped:
 		# NOTE: This will currently fail for most TODO-files due to a bug/feature in the photometry
 		#       code, where an entry is not created in all cases.
-		self.cursor.execute("SELECT COUNT(*) FROM todolist LEFT JOIN photometry_skipped ON todolist.priority=photometry_skipped.priority WHERE status={skipped:d} AND photometry_skipped.priority IS NULL;".format(
-			skipped=STATUS.SKIPPED
-		))
-		rowcount = self.cursor.fetchone()[0]
-		logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in PHOTOMETRY_SKIPPED", rowcount)
+		self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='photometry_skipped';")
+		if self.cursor.fetchone()[0] == 1:
+			self.cursor.execute("SELECT COUNT(*) FROM todolist LEFT JOIN photometry_skipped ON todolist.priority=photometry_skipped.priority WHERE status={skipped:d} AND photometry_skipped.priority IS NULL;".format(
+				skipped=STATUS.SKIPPED
+			))
+			rowcount = self.cursor.fetchone()[0]
+			logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in PHOTOMETRY_SKIPPED", rowcount)
+		else:
+			logger.warning("PHOTOMETRY_SKIPPED table not found!")
 
 		# Root directory for files assocuated with this TODO-file:
 		rootdir = os.path.dirname(self.input_folders[0])

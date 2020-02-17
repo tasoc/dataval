@@ -6,7 +6,7 @@ Tests of  dataval quality flags.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, print_function, with_statement, absolute_import
+import pytest
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -25,4 +25,4 @@ def test_dataval_flags():
 
 #----------------------------------------------------------------------
 if __name__ == '__main__':
-	test_dataval_flags()
+	pytest.main([__file__])

@@ -15,47 +15,24 @@ from dataval import DataValidation, DatavalQualityFlags
 INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
 
 #--------------------------------------------------------------------------------------------------
-def test_dataval_notodo():
+@pytest.mark.datafiles(INPUT_DIR)
+@pytest.mark.parametrize("inp,corr", [
+	pytest.param('does-not-exist', None, marks=pytest.mark.xfail(raises=FileNotFoundError)),
+	('only_raw', False),
+	pytest.param('only_raw', True, marks=pytest.mark.xfail(raises=ValueError)),
+	('with_corr', False),
+	('with_corr', True),
+])
+def test_dataval(datafiles, inp, corr):
 	"""
-	Try initializing DataValidation with a wrong input path
-	"""
-
-	INPUT_DIR_NOTODO = os.path.join(os.path.dirname(__file__), 'input', 'does-not-exist')
-
-	# Create DataValidation object:
-	with pytest.raises(FileNotFoundError):
-		with DataValidation([INPUT_DIR_NOTODO]):
-			pass
-
-#--------------------------------------------------------------------------------------------------
-def test_dataval_raw():
-	"""
-	Try to run DataValidation on ONLY_RAW input
+	Try to run DataValidation on different input
 	"""
 
-	INPUT = os.path.join(INPUT_DIR, 'only_raw')
-
-	# We should throw an exception when trying to run corr=True on TODO-file where
-	# corrections have not been run:
-	with pytest.raises(Exception):
-		with DataValidation([INPUT], corr=True):
-			pass
-
-	# Create DataValidation object:
-	with DataValidation([INPUT], corr=False) as dataval:
-		dataval.Validations()
-
-#--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize("corr", [False, True])
-def test_dataval_corr(corr):
-	"""
-	Try to run DataValidation on CORRECTED input
-	"""
-
-	INPUT = os.path.join(INPUT_DIR, 'with_corr')
+	test_dir = str(datafiles)
+	test_dir = os.path.join(test_dir, inp)
 
 	# On this input file it should be possible to run with both
-	with DataValidation([INPUT], corr=corr) as dataval:
+	with DataValidation([test_dir], corr=corr) as dataval:
 		# Run validation:
 		dataval.Validations()
 
@@ -79,7 +56,4 @@ def test_dataval_corr(corr):
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	test_dataval_notodo()
-	test_dataval_raw()
-	test_dataval_corr(False)
-	test_dataval_corr(True)
+	pytest.main([__file__])

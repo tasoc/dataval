@@ -42,12 +42,14 @@ if __name__ == '__main__':
 		print("Cleaning file...")
 
 		# Delete old datavalidation tables:
+		cursor.execute("DROP TABLE IF EXISTS datavalidation;")
 		cursor.execute("DROP TABLE IF EXISTS datavalidation_raw;")
 		cursor.execute("DROP TABLE IF EXISTS datavalidation_corr;")
 		conn.commit()
 
 		# Delete photometry_skipped table, since it is not needed in dataval,
 		# and it takes up a lot of space:
+		# TODO: But that means we can not test it currently!
 		cursor.execute("DROP TABLE IF EXISTS photometry_skipped;")
 		conn.commit()
 
@@ -58,9 +60,10 @@ if __name__ == '__main__':
 		conn.commit()
 
 		# Clean the file, to recover the deleted space:
+		cursor.execute("ANALYZE;")
+		conn.commit()
 		conn.isolation_level = None
 		cursor.execute("VACUUM;")
-
 		cursor.close()
 
 	# Copy the file to the ONLY_RAW directory:
@@ -73,12 +76,14 @@ if __name__ == '__main__':
 		cursor = conn.cursor()
 		cursor.execute("PRAGMA foreign_keys=ON;")
 
-		# Delete photometry_skipped table, since it is not needed in dataval,
-		# and it takes up a lot of space:
+		# Clean table for raw:
+		cursor.execute("UPDATE todolist SET corr_status=NULL;") # TODO: Ideally we should drop the column
 		cursor.execute("DROP TABLE IF EXISTS diagnostics_corr;")
 		conn.commit()
 
 		# Clean the file, to recover the deleted space:
+		cursor.execute("ANALYZE;")
+		conn.commit()
 		conn.isolation_level = None
 		cursor.execute("VACUUM;")
 		cursor.close()

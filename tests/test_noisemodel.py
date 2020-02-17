@@ -67,6 +67,4 @@ def test_noise_model_coord():
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	test_noise_model()
-	test_noise_model_invalid_input()
-	test_noise_model_coord()
+	pytest.main([__file__])
