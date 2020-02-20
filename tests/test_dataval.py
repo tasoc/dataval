@@ -12,10 +12,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from dataval import DataValidation, DatavalQualityFlags
 
-INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
-
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.datafiles(INPUT_DIR)
 @pytest.mark.parametrize("inp,corr", [
 	pytest.param('does-not-exist', False, marks=pytest.mark.xfail(raises=FileNotFoundError)),
 	('only_raw', False),
@@ -23,13 +20,12 @@ INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
 	('with_corr', False),
 	('with_corr', True),
 ])
-def test_dataval(datafiles, inp, corr):
+def test_dataval(PRIVATE_INPUT_DIR, inp, corr):
 	"""
 	Try to run DataValidation on different input
 	"""
 
-	test_dir = str(datafiles)
-	test_dir = os.path.join(test_dir, inp)
+	test_dir = os.path.join(PRIVATE_INPUT_DIR, inp)
 
 	# On this input file it should be possible to run with both
 	with DataValidation([test_dir], corr=corr) as dataval:
