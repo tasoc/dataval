@@ -103,8 +103,6 @@ def phot_noise(Tmag, timescale=3600, coord=None, sysnoise=60, Teff=5775, cadpix=
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	logger = logging.getLogger(__name__)
-
 	# Make sure Tmag is a numpy array:
 	Tmag = np.asarray(Tmag)
 
@@ -152,17 +150,6 @@ def phot_noise(Tmag, timescale=3600, coord=None, sysnoise=60, Teff=5775, cadpix=
 
 	# Systematic noise in ppm
 	systematic_noise = np.full_like(Tmag, sysnoise / np.sqrt(timescale/3600)) # ppm / sqrt(hr)
-
-	# Write out a lot of things for debugging only:
-	logger.debug('Galactic latitude: %f', gal_lat)
-	logger.debug('Systematic noise in ppm: %f', systematic_noise)
-	logger.debug('Integrations: %f', integrations)
-	logger.debug('Pixels: %d', pixels)
-	logger.debug('Flux factor: %f', Flux_factor)
-	logger.debug('Mean level ppm: %f', mean_level_ppm)
-	logger.debug('Shot noise: %f', shot_noise)
-	logger.debug('Read noise: %f', read_noise)
-	logger.debug('Zodiacal noise: %f', zodiacal_noise)
 
 	# Put individual components together in single table:
 	noise_vals = np.column_stack((shot_noise, zodiacal_noise, read_noise, systematic_noise))
