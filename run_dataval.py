@@ -16,7 +16,7 @@ def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
 	parser.add_argument('-c', '--corrected', help='Use corrected or raw values.', action='store_true')
-	parser.add_argument('-m', '--method', help='Corrector method to use.', action='append', default=[], choices=('basic', 'pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'noise_compare', 'magdist', 'waittime'))
+	parser.add_argument('-m', '--method', help='Corrector method to use.', action='append', default=[], choices=('basic', 'pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'noise_compare', 'magdist', 'waittime', 'haloswitch'))
 	parser.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png','eps','pdf'))
 	parser.add_argument('-s', '--show', help='Show plots.', action='store_true')
 	parser.add_argument('-v', '--validate', help='Compute validation (only run is method is "all").', action='store_true')
@@ -71,6 +71,8 @@ def main():
 			dataval.plot_mag_dist_overlap()
 		if 'waittime' in args.method:
 			dataval.plot_waittime()
+		if 'haloswitch' in args.method:
+			dataval.plot_haloswitch()
 
 		# Run validation
 		if not args.method:

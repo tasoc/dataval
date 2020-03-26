@@ -31,7 +31,7 @@ import seaborn as sns
 
 # Local packages:
 from .quality import DatavalQualityFlags
-from .utilities import mad # rms_timescale, sphere_distance
+from .utilities import mag2flux, mad # rms_timescale, sphere_distance
 from .noise_model import phot_noise
 
 def combine_flag_dicts(a, b):
@@ -241,6 +241,7 @@ class DataValidation(object):
 		self.plot_stamp()
 		self.plot_mag_dist()
 		self.plot_waittime()
+		self.plot_haloswitch()
 
 		if self.doval:
 			val = combine_flag_dicts(val1, val2)
@@ -1590,7 +1591,7 @@ class DataValidation(object):
 		else:
 			plt.close(fig)
 
-	#--------------------------------------------------------------------------
+	#----------------------------------------------------------------------------------------------
 	def plot_waittime(self):
 		"""
 		Visiualize the worker wait-time during the processing.
@@ -1629,3 +1630,54 @@ class DataValidation(object):
 				plt.show()
 			else:
 				plt.close(fig)
+
+	#----------------------------------------------------------------------------------------------
+	def plot_haloswitch(self):
+		"""
+		Visiualize the disgnostics used to automatically switch to Halo photometry.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+
+		logger = logging.getLogger(__name__)
+
+		# Check if the worker_waittime column is in the database
+		# It was not generated in earlier versions of the pipeline
+		self.cursor.execute("PRAGMA table_info(diagnostics)")
+		if 'edge_flux' not in [r['name'] for r in self.cursor.fetchall()]:
+			logger.info("EDGE_FLUX is not stored in database.")
+			return
+
+		haloswitch_tmag_limit = 6.0 # Maximal Tmag to apply Halo photometry automatically
+		haloswitch_flux_limit = 0.01
+
+		# Get the data from the database:
+		star_vals = self.search_database(
+			select=['todolist.priority', 'todolist.tmag', 'diagnostics.edge_flux', "(diagnostics.errors IS NOT NULL AND INSTR(diagnostics.errors, 'Automatically switched to Halo photometry')>0) AS switched"],
+			search=['edge_flux > 0']) # 'tmag < %f' % (haloswitch_tmag_limit+1.5),
+		tab = Table(rows=star_vals,
+			  names=('priority', 'tmag', 'edge_flux', 'switched'),
+			  dtype=('int64', 'float32', 'float64', 'bool'))
+
+		switched = tab['switched']
+		expected_flux = mag2flux(tab['tmag'])
+
+		# Create figure figure:
+		fig = plt.figure(figsize=(12,8))
+		ax = fig.add_subplot(111)
+		ax.scatter(tab['tmag'], tab['edge_flux']/expected_flux, alpha=0.3)
+		ax.scatter(tab['tmag'][switched], tab['edge_flux'][switched]/expected_flux[switched], c='r', marker='x')
+		ax.axvline(haloswitch_tmag_limit, c='r', ls='--')
+		ax.axhline(haloswitch_flux_limit, c='r', ls='--')
+		ax.set_xlabel('Tmag')
+		ax.set_ylabel('Edge flux / Expected total flux')
+		ax.set_yscale('log')
+		ax.set_ylim([1e-5, 1.0])
+		ax.set_xlim(self.tmag_limits)
+
+		# Save figure to file and close:
+		fig.savefig(os.path.join(self.outfolders, 'haloswitch'))
+		if self.show:
+			plt.show()
+		else:
+			plt.close(fig)

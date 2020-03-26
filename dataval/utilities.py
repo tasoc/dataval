@@ -135,3 +135,19 @@ def mad(x):
 		float: Median absolute deviation scaled to standard deviation.
 	"""
 	return mad_to_sigma * nanmedian(np.abs(x - nanmedian(x)))
+
+#--------------------------------------------------------------------------------------------------
+def mag2flux(mag):
+	"""
+	Convert from magnitude to flux using scaling relation from
+	aperture photometry. This is an estimate.
+
+	The scaling is based on fast-track TESS data from sectors 1 and 2.
+
+	Parameters:
+		mag (float): Magnitude in TESS band.
+
+	Returns:
+		float: Corresponding flux value
+	"""
+	return 10**(-0.4*(mag - 20.60654144))
