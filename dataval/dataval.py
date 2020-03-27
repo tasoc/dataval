@@ -221,9 +221,6 @@ class DataValidation(object):
 		# Which tables to join together:
 		default_joins = ['INNER JOIN diagnostics ON todolist.priority=diagnostics.priority']
 
-		if self.doval:
-			default_joins.append('LEFT JOIN datavalidation_raw ON todolist.priority=datavalidation_raw.priority')
-
 		if self.corrections_done:
 			default_joins.append('LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority')
 
