@@ -308,8 +308,8 @@ class DataValidation(object):
 			logger.info("All PHOTOMETRY has been run.")
 
 		# Warn if it seems that there is a large number of ERROR, compared to OK and WARNING:
-		logger.info("Checking number of errors:")
-		for camera, ccd in itertools.product((1,2,3,4),(1,2,3,4)):
+		logger.info("Checking number of photometry errors:")
+		for camera, ccd in itertools.product((1,2,3,4), (1,2,3,4)):
 			self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE status IN ({ok:d},{warning:d}) AND camera={camera:d} AND ccd={ccd:d};".format(
 				ok=STATUS.OK.value,
 				warning=STATUS.WARNING.value,
@@ -331,15 +331,6 @@ class DataValidation(object):
 				logger.info("  CAMERA=%d, CCD=%d: %.2f%% (%d errors, %d good)",
 					camera, ccd, 100*ratio, count_errors, count_good)
 
-		# Check the status of corrections:
-		if self.corr:
-			self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE corr_status IS NULL OR corr_status IN (" + bad_status + ");")
-			rowcount = self.cursor.fetchone()[0]
-			if rowcount:
-				logger.error("%d entries have not had CORRECTIONS run", rowcount)
-			else:
-				logger.info("All CORRECTIONS have been run.")
-
 		# Check that everything that should have, has a diagnostics entry:
 		# Ignore status=SKIPPED, since these will not have a diagnostics entry.
 		self.cursor.execute("SELECT * FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE diagnostics.priority IS NULL AND status != {skipped:d};".format(
@@ -347,15 +338,6 @@ class DataValidation(object):
 		))
 		rowcount = len(self.cursor.fetchall())
 		logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in DIAGNOSTICS", rowcount)
-
-		# Check that everything that should have, has a diagnostics_corr entry:
-		# Ignore status=SKIPPED, since these will not have a diagnostics_corr entry.
-		if self.corr:
-			self.cursor.execute("SELECT * FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE diagnostics_corr.priority IS NULL AND corr_status != {skipped:d};".format(
-				skipped=STATUS.SKIPPED
-			))
-			rowcount = len(self.cursor.fetchall())
-			logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in DIAGNOSTICS_CORR", rowcount)
 
 		# Check photometry_skipped table. All stars marked as SKIPPED in photometry should
 		# have an entry explaining which target that was responsible for it being skipped:
@@ -370,6 +352,47 @@ class DataValidation(object):
 			logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in PHOTOMETRY_SKIPPED", rowcount)
 		else:
 			logger.warning("PHOTOMETRY_SKIPPED table not found!")
+
+		# Check the status of corrections:
+		if self.corr:
+			self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE corr_status IS NULL OR corr_status IN (" + bad_status + ");")
+			rowcount = self.cursor.fetchone()[0]
+			if rowcount:
+				logger.error("%d entries have not had CORRECTIONS run", rowcount)
+			else:
+				logger.info("All CORRECTIONS have been run.")
+
+			# Warn if it seems that there is a large number of ERROR, compared to OK and WARNING:
+			logger.info("Checking number of correction errors:")
+			for camera, ccd in itertools.product((1,2,3,4), (1,2,3,4)):
+				self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE corr_status IN ({ok:d},{warning:d}) AND camera={camera:d} AND ccd={ccd:d};".format(
+					ok=STATUS.OK.value,
+					warning=STATUS.WARNING.value,
+					camera=camera,
+					ccd=ccd
+				))
+				count_good = self.cursor.fetchone()[0]
+				self.cursor.execute("SELECT COUNT(*) FROM todolist WHERE corr_status={error:d} AND camera={camera:d} AND ccd={ccd:d};".format(
+					error=STATUS.ERROR.value,
+					camera=camera,
+					ccd=ccd
+				))
+				count_errors = self.cursor.fetchone()[0]
+				ratio = count_errors/(count_good + count_errors) if count_good + count_errors > 0 else 0
+				if ratio > warn_errors_ratio:
+					logger.warning("  CAMERA=%d, CCD=%d: High number of errors detected: %.2f%% (%d errors, %d good)",
+						camera, ccd, 100*ratio, count_errors, count_good)
+				else:
+					logger.info("  CAMERA=%d, CCD=%d: %.2f%% (%d errors, %d good)",
+						camera, ccd, 100*ratio, count_errors, count_good)
+
+			# Check that everything that should have, has a diagnostics_corr entry:
+			# Ignore status=SKIPPED, since these will not have a diagnostics_corr entry.
+			self.cursor.execute("SELECT * FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE diagnostics_corr.priority IS NULL AND corr_status != {skipped:d};".format(
+				skipped=STATUS.SKIPPED
+			))
+			rowcount = len(self.cursor.fetchall())
+			logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in DIAGNOSTICS_CORR", rowcount)
 
 		# Root directory for files assocuated with this TODO-file:
 		rootdir = os.path.dirname(self.input_folders[0])
