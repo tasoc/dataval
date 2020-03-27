@@ -451,25 +451,25 @@ class DataValidation(object):
 		source = np.array([star['datasource'] for star in star_vals], dtype=str)
 
 		# Indices for plotting
-		idx_high_ffi = (cont > 1) & (source == 'ffi')
-		idx_high_tpf = (cont > 1) & (source != 'ffi')
-		idx_low_ffi = (cont <= 1) & (source == 'ffi')
-		idx_low_tpf = (cont <= 1) & (source != 'ffi')
-		cont[idx_high_ffi] = 1.1
-		cont[idx_high_tpf] = 1.1
+		with np.errstate(invalid='ignore'): # We know that some cont may be NaN
+			idx_high_ffi = (cont > 1) & (source == 'ffi')
+			idx_high_tpf = (cont > 1) & (source != 'ffi')
+			idx_low_ffi = (cont <= 1) & (source == 'ffi')
+			idx_low_tpf = (cont <= 1) & (source != 'ffi')
 
 		# Remove nan contaminations (should be only from Halo targets)
+		cont[idx_high_ffi] = 1.1
+		cont[idx_high_tpf] = 1.1
 		cont[np.isnan(cont)] = 1.2
 
 		# Plot individual contamination points
 		ax1.scatter(tmags[idx_low_ffi], cont[idx_low_ffi], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1, rasterized=True)
 		ax2.scatter(tmags[idx_low_tpf], cont[idx_low_tpf], marker='o', facecolors=rgba_color, color=rgba_color, alpha=0.1, rasterized=True)
 
-		if self.doval:
-			ax1.scatter(tmags[idx_high_ffi], cont[idx_high_ffi], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
-			ax1.scatter(tmags[(cont == 1.2) & (source == 'ffi')], cont[(cont == 1.2) & (source == 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
-			ax2.scatter(tmags[idx_high_tpf], cont[idx_high_tpf], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
-			ax2.scatter(tmags[(cont == 1.2) & (source != 'ffi')], cont[(cont == 1.2) & (source != 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
+		ax1.scatter(tmags[idx_high_ffi], cont[idx_high_ffi], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
+		ax1.scatter(tmags[(cont == 1.2) & (source == 'ffi')], cont[(cont == 1.2) & (source == 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
+		ax2.scatter(tmags[idx_high_tpf], cont[idx_high_tpf], marker='o', facecolors='None', color=rgba_color, alpha=0.9)
+		ax2.scatter(tmags[(cont == 1.2) & (source != 'ffi')], cont[(cont == 1.2) & (source != 'ffi')], marker='o', facecolors='None', color='r', alpha=0.9)
 
 		# Indices for finding validation limit
 		#idx_low = (cont <= 1)
@@ -497,16 +497,12 @@ class DataValidation(object):
 		for axx in np.array([ax1, ax2]):
 			#axx.plot(mags, cont_vs_mag(mags))
 
-			if self.doval:
-				axx.set_ylim([-0.05, 1.3])
-			else:
-				axx.set_ylim([-0.05, 1.1])
+			axx.set_ylim([-0.05, 1.3])
 
 			axx.axhline(y=0, ls='--', color='k', zorder=-1)
 
-			if self.doval:
-				axx.axhline(y=1.1, ls=':', color='k', zorder=-1)
-				axx.axhline(y=1.2, ls=':', color='r', zorder=-1)
+			axx.axhline(y=1.1, ls=':', color='k', zorder=-1)
+			axx.axhline(y=1.2, ls=':', color='r', zorder=-1)
 			axx.axhline(y=1, ls=':', color='k', zorder=-1)
 			axx.set_xlabel('TESS magnitude')
 			axx.set_ylabel('Contamination')
