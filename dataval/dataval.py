@@ -133,10 +133,16 @@ class DataValidation(object):
 		os.makedirs(self.outfolders, exist_ok=True)
 		logger.info("Putting output data in '%s'", self.outfolders)
 
+		# Also write any logging output to the
+		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+		fh = logging.FileHandler(os.path.join(self.outfolders, 'dataval.log'), mode='w')
+		fh.setFormatter(formatter)
+		fh.setLevel(logging.INFO)
+		logger.addHandler(fh)
+
 		# Get the range of Tmags in the tables:
 		tmag_limits = self.search_database(select=['MIN(tmag) AS tmag_min', 'MAX(tmag) AS tmag_max'])[0]
 		self.tmag_limits = (tmag_limits['tmag_min']-0.5, tmag_limits['tmag_max']+0.5)
-
 
 		# Plot settings:
 		if self.show:
@@ -145,19 +151,28 @@ class DataValidation(object):
 		mpl.rcParams['savefig.format'] = self.extension
 
 	#----------------------------------------------------------------------------------------------
-	def close(self):
-		"""Close DataValidation object and all associated objects."""
-		self.cursor.close()
-		self.conn.close()
-		mpl.style.use('default')
+	def __enter__(self):
+		return self
 
 	#----------------------------------------------------------------------------------------------
 	def __exit__(self, *args):
 		self.close()
 
 	#----------------------------------------------------------------------------------------------
-	def __enter__(self):
-		return self
+	def __del__(self):
+		self.close()
+
+	#----------------------------------------------------------------------------------------------
+	def close(self):
+		"""Close DataValidation object and all associated objects."""
+		mpl.style.use('default')
+		if hasattr(self, 'cursor') and self.cursor:
+			try:
+				self.cursor.close()
+			except sqlite3.ProgrammingError:
+				pass
+		if hasattr(self, 'conn') and self.conn:
+			self.conn.close()
 
 	#----------------------------------------------------------------------------------------------
 	def search_database(self, select=None, search=None, order_by=None, limit=None, distinct=False, joins=None):
