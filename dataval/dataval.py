@@ -79,7 +79,7 @@ class DataValidation(object):
 		self.input_folders = input_folders
 		self.extension = ext
 		self.show = showplots
-		self.outfolders = output_folder
+		self.outfolder = output_folder
 		self.sysnoise = sysnoise
 		self.doval = validate
 		self.color_by_sector = colorbysector
@@ -94,10 +94,12 @@ class DataValidation(object):
 
 		# Load SQLite TODO files:
 		# TODO: How do we handle cases with more than one input?
-		for todo_file in self.input_folders:
+		for k, todo_file in enumerate(self.input_folders):
 			# If it was just a directory, then append the default todo-file:
 			if os.path.isdir(todo_file):
 				todo_file = os.path.join(todo_file, 'todo.sqlite')
+			else:
+				self.input_folders[k] = os.path.dirname(todo_file)
 
 			logger.info("Loading input data from '%s'", todo_file)
 			if not os.path.isfile(todo_file):
@@ -128,14 +130,14 @@ class DataValidation(object):
 				self.conn.commit()
 
 		# Create output directory:
-		if len(self.input_folders) == 1 and self.outfolders is None:
-			self.outfolders = os.path.join(os.path.dirname(self.input_folders[0]), 'data_validation', subdir)
-		os.makedirs(self.outfolders, exist_ok=True)
-		logger.info("Putting output data in '%s'", self.outfolders)
+		if len(self.input_folders) == 1 and self.outfolder is None:
+			self.outfolder = os.path.join(self.input_folders[0], 'data_validation', subdir)
+		os.makedirs(self.outfolder, exist_ok=True)
+		logger.info("Putting output data in '%s'", self.outfolder)
 
 		# Also write any logging output to the
 		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-		fh = logging.FileHandler(os.path.join(self.outfolders, 'dataval.log'), mode='w')
+		fh = logging.FileHandler(os.path.join(self.outfolder, 'dataval.log'), mode='w')
 		fh.setFormatter(formatter)
 		fh.setLevel(logging.INFO)
 		logger.addHandler(fh)
@@ -291,8 +293,7 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
-		logger.info('------------------------------------------')
-		logger.info('Testing basics')
+		logger.info('Testing basics...')
 		tqdm_settings = {'disable': not logger.isEnabledFor(logging.INFO)}
 
 		# Status that we should check for in the database. They should not be present if the
@@ -395,12 +396,12 @@ class DataValidation(object):
 			logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in DIAGNOSTICS_CORR", rowcount)
 
 		# Root directory for files assocuated with this TODO-file:
-		rootdir = os.path.dirname(self.input_folders[0])
+		rootdir = self.input_folders[0]
 
 		# Check if any raw lightcurve files are missing:
 		logger.info("Checking if any raw lightcurve files are missing...")
 		missing_phot_lightcurves = 0
-		missing_phot_lightcurves_list = os.path.join(self.outfolders, 'missing_raw.txt')
+		missing_phot_lightcurves_list = os.path.join(self.outfolder, 'missing_raw.txt')
 		with open(missing_phot_lightcurves_list, 'w') as fid:
 			self.cursor.execute("SELECT todolist.priority,lightcurve FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status IN (1,3);")
 			for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
@@ -418,7 +419,7 @@ class DataValidation(object):
 		if self.corr:
 			logger.info("Checking if any corrected lightcurve files are missing...")
 			missing_corr_lightcurves = 0
-			missing_corr_lightcurves_list = os.path.join(self.outfolders, 'missing_corr.txt')
+			missing_corr_lightcurves_list = os.path.join(self.outfolder, 'missing_corr.txt')
 			with open(missing_corr_lightcurves_list, 'w') as fid:
 				self.cursor.execute("SELECT todolist.priority,diagnostics_corr.lightcurve FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE corr_status IN (1,3);")
 				for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
@@ -442,9 +443,7 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
-
-		logger.info('------------------------------------------')
-		logger.info('Plotting Contamination vs. Magnitude')
+		logger.info('Plotting Contamination vs. Magnitude...')
 
 		fig = plt.figure(figsize=(10, 5))
 		fig.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
@@ -534,7 +533,7 @@ class DataValidation(object):
 			#axx.legend(loc='upper left')
 
 		###########
-		fig.savefig(os.path.join(self.outfolders, 'contam'))
+		fig.savefig(os.path.join(self.outfolder, 'contam'))
 		if self.show:
 			plt.show()
 		else:
@@ -559,13 +558,11 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
+		logger.info('Plotting Noise Comparison...')
 
 		if not self.corrections_done:
 			logger.info("Can not run compare_noise when corrections have not been run")
 			return {}
-
-		logger.info('------------------------------------------')
-		logger.info('Plotting Noise Comparison')
 
 		fig1 = plt.figure(figsize=(15, 5))
 		fig1.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
@@ -582,7 +579,7 @@ class DataValidation(object):
 		ax31 = fig3.add_subplot(121)
 		ax32 = fig3.add_subplot(122)
 
-#		if self.corr:
+		#if self.corr:
 		star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
 		factor = 1
 		star_vals2 = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
@@ -623,9 +620,9 @@ class DataValidation(object):
 
 		#88518 956502
 
-#		tcomp = np.array([tmags[(pri==i)] for i in pri_overlap[5000:10000]])
-#		rmscomp = np.array([rms[(pri==i)]/rms2[(pri2==i)] for i in pri_overlap[5000:10000]])
-#		ptpcomp = np.array([ptp[(pri==i)]/ptp2[(pri2==i)] for i in pri_overlap[5000:10000]])
+		#tcomp = np.array([tmags[(pri==i)] for i in pri_overlap[5000:10000]])
+		#rmscomp = np.array([rms[(pri==i)]/rms2[(pri2==i)] for i in pri_overlap[5000:10000]])
+		#ptpcomp = np.array([ptp[(pri==i)]/ptp2[(pri2==i)] for i in pri_overlap[5000:10000]])
 
 		tcomp = tmags[(source == 'ffi')][idx_o]
 		rmscomp = rms[(source == 'ffi')][idx_o]/rms2[(source2 == 'ffi')][idx2_o]
@@ -750,9 +747,9 @@ class DataValidation(object):
 		ax32.set_xlim(self.tmag_limits)
 		###########
 
-		fig1.savefig(os.path.join(self.outfolders, 'rms_comp'))
-		fig2.savefig(os.path.join(self.outfolders, 'ptp_comp'))
-		fig3.savefig(os.path.join(self.outfolders, 'comp'))
+		fig1.savefig(os.path.join(self.outfolder, 'rms_comp'))
+		fig2.savefig(os.path.join(self.outfolder, 'ptp_comp'))
+		fig3.savefig(os.path.join(self.outfolder, 'comp'))
 		if self.show:
 			plt.show()
 		else:
@@ -768,9 +765,7 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
-
-		logger.info('------------------------------------------')
-		logger.info('Plotting Noise vs. Magnitude')
+		logger.info('Plotting Noise vs. Magnitude...')
 
 		fig1 = plt.figure(figsize=(15, 5))
 		fig1.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
@@ -877,8 +872,8 @@ class DataValidation(object):
 
 		###########
 
-		fig1.savefig(os.path.join(self.outfolders, 'rms'))
-		fig2.savefig(os.path.join(self.outfolders, 'ptp'))
+		fig1.savefig(os.path.join(self.outfolder, 'rms'))
+		fig2.savefig(os.path.join(self.outfolder, 'ptp'))
 		if self.show:
 			plt.show()
 		else:
@@ -913,9 +908,7 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
-
-		logger.info('------------------------------------------')
-		logger.info('Plotting Pixels in aperture vs. Magnitude')
+		logger.info('Plotting Pixels in aperture vs. Magnitude...')
 
 		fig = plt.figure(figsize=(15, 5))
 		ax1 = fig.add_subplot(121)
@@ -956,7 +949,7 @@ class DataValidation(object):
 #			cats[cams] = {}
 #			for jj in range(4):
 #				cam_file = os.path.join(self.input_folders[0], 'catalog_camera' + str(int(cams)) +'_ccd' + str(jj+1) + '.sqlite')
-##				with contextlib.closing(sqlite3.connect(cam_file)) as conn:
+#				with contextlib.closing(sqlite3.connect(cam_file)) as conn:
 #				with sqlite3.connect(cam_file) as conn:
 #					conn.row_factory = sqlite3.Row
 #					cursor = conn.cursor()
@@ -1140,7 +1133,7 @@ class DataValidation(object):
 			axx.yaxis.set_minor_locator(MultipleLocator(ytick_major/2))
 			axx.set_yscale("log", nonposy='clip')
 			axx.yaxis.set_major_formatter(ScalarFormatter())
-#			axx.legend(loc='upper right')
+			#axx.legend(loc='upper right')
 
 		pos = ax2.get_position()
 		axc = fig.add_axes([pos.x0 + pos.width+0.01, pos.y0, 0.01, pos.height], zorder=-1)
@@ -1148,7 +1141,7 @@ class DataValidation(object):
 		cb.set_label('Contamination', fontsize=12, labelpad=6)
 		cb.ax.tick_params(axis='y', direction='out')
 
-		fig.savefig(os.path.join(self.outfolders, 'pix_in_aper'))
+		fig.savefig(os.path.join(self.outfolder, 'pix_in_aper'))
 		if self.show:
 			plt.show()
 		else:
@@ -1181,20 +1174,17 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
-
-		logger.info('--------------------------------------')
-		logger.info('Plotting Magnitude to Flux conversion')
+		logger.info('Plotting Magnitude to Flux conversion...')
 
 		fig = plt.figure(figsize=(15, 5))
 		fig.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
 		ax1 = fig.add_subplot(121)
 		ax2 = fig.add_subplot(122)
 
-
-#		fig3 = plt.figure(figsize=(15, 5))
-#		fig3.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
-#		ax31 = fig3.add_subplot(121)
-#		ax32 = fig3.add_subplot(122)
+		#fig3 = plt.figure(figsize=(15, 5))
+		#fig3.subplots_adjust(left=0.14, wspace=0.3, top=0.94, bottom=0.155, right=0.96)
+		#ax31 = fig3.add_subplot(121)
+		#ax32 = fig3.add_subplot(122)
 
 		star_vals = self.search_database(select=['todolist.priority','todolist.datasource','todolist.sector','todolist.tmag','mean_flux','contamination'])
 
@@ -1228,6 +1218,7 @@ class DataValidation(object):
 			idx2 = np.isfinite(meanfluxes) & np.isfinite(tmags) & (source != 'ffi') & (contam < 0.15)
 
 		logger.info('Optimising coefficient of relation')
+
 		def chi2(c, idx):
 			return np.log10(ss( (meanfluxes[idx] - 10**(-0.4*(tmags[idx] - c))) / (contam[idx]+1) ))
 
@@ -1252,7 +1243,7 @@ class DataValidation(object):
 		ax21.set_xlabel('Coefficient')
 		ax21.set_ylabel(r'$\chi^2$')
 		ax21.legend(loc='upper left')
-		fig2.savefig(os.path.join(self.outfolders, 'mag_to_flux_optimize'))
+		fig2.savefig(os.path.join(self.outfolder, 'mag_to_flux_optimize'))
 
 #		d1 = meanfluxes[idx1]/(10**(-0.4*(tmags[idx1] - cc.x))) - 1
 #		d2 = meanfluxes[idx2]/(10**(-0.4*(tmags[idx2] - cc2.x))) - 1
@@ -1299,8 +1290,8 @@ class DataValidation(object):
 		cb.set_label('Contamination', fontsize=12, labelpad=6)
 		cb.ax.tick_params(axis='y', direction='out')
 
-		fig.savefig(os.path.join(self.outfolders, 'mag_to_flux'))
-		#fig3.savefig(os.path.join(self.outfolders, 'mag_to_flux_dev'))
+		fig.savefig(os.path.join(self.outfolder, 'mag_to_flux'))
+		#fig3.savefig(os.path.join(self.outfolder, 'mag_to_flux_dev'))
 		if self.show:
 			plt.show()
 		else:
@@ -1326,9 +1317,7 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
-
-		logger.info('--------------------------------------')
-		logger.info('Plotting Stamp sizes')
+		logger.info('Plotting Stamp sizes...')
 
 		fig1 = plt.figure(figsize=(15, 10))
 		ax11 = fig1.add_subplot(221)
@@ -1458,8 +1447,8 @@ class DataValidation(object):
 			axx.set_xlabel('Calculation time (sec)')
 			axx.legend(loc='upper right')
 
-		fig1.savefig(os.path.join(self.outfolders, 'stamp_size'))
-		fig2.savefig(os.path.join(self.outfolders, 'calc_time'))
+		fig1.savefig(os.path.join(self.outfolder, 'stamp_size'))
+		fig2.savefig(os.path.join(self.outfolder, 'calc_time'))
 		if self.show:
 			plt.show()
 		else:
@@ -1474,9 +1463,7 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
-
-		logger.info('--------------------------------------')
-		logger.info('Plotting Magnitude distribution')
+		logger.info('Plotting Magnitude distribution...')
 
 		fig = plt.figure(figsize=(10,5))
 		ax = fig.add_subplot(111)
@@ -1513,7 +1500,7 @@ class DataValidation(object):
 		ax.xaxis.set_minor_locator(MultipleLocator(1))
 		ax.legend(frameon=False, loc='upper left', borderaxespad=0, handlelength=2.5, handletextpad=0.4)
 
-		fig.savefig(os.path.join(self.outfolders, 'mag_dist'))
+		fig.savefig(os.path.join(self.outfolder, 'mag_dist'))
 		if self.show:
 			plt.show()
 		else:
@@ -1528,9 +1515,7 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
-
-		logger.info('--------------------------------------')
-		logger.info('Plotting Magnitude distribution')
+		logger.info('Plotting Magnitude distribution...')
 
 		fig = plt.figure(figsize=(10,5))
 		ax = fig.add_subplot(111)
@@ -1616,7 +1601,7 @@ class DataValidation(object):
 		ax.legend(frameon=False, loc='upper left', borderaxespad=0,handlelength=2.5, handletextpad=0.4)
 
 #		filename = 'mag_dist.%s' % self.extension
-#		fig.savefig(os.path.join(self.outfolders, filename))
+#		fig.savefig(os.path.join(self.outfolder, filename))
 		if self.show:
 			plt.show()
 		else:
@@ -1631,6 +1616,7 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
+		logger.info("Running waittime diagnostics...")
 
 		run_tables = ['diagnostics']
 		if self.corrections_done:
@@ -1656,7 +1642,7 @@ class DataValidation(object):
 			ax.set_ylabel('Worker wait-time (s)')
 
 			# Save figure to file and close:
-			fig.savefig(os.path.join(self.outfolders, 'worker_waittime_' + table))
+			fig.savefig(os.path.join(self.outfolder, 'worker_waittime_' + table))
 			if self.show:
 				plt.show()
 			else:
@@ -1671,24 +1657,26 @@ class DataValidation(object):
 		"""
 
 		logger = logging.getLogger(__name__)
+		logger.info("Running halo-switch diagnostics...")
 
-		# Check if the worker_waittime column is in the database
+		# Check if the edge_flux column is in the database
 		# It was not generated in earlier versions of the pipeline
 		self.cursor.execute("PRAGMA table_info(diagnostics)")
 		if 'edge_flux' not in [r['name'] for r in self.cursor.fetchall()]:
 			logger.info("EDGE_FLUX is not stored in database.")
 			return
 
+		# TODO: Store these in the database as well
 		haloswitch_tmag_limit = 6.0 # Maximal Tmag to apply Halo photometry automatically
 		haloswitch_flux_limit = 0.01
 
 		# Get the data from the database:
 		star_vals = self.search_database(
 			select=['todolist.priority', 'todolist.tmag', 'diagnostics.edge_flux', "(diagnostics.errors IS NOT NULL AND INSTR(diagnostics.errors, 'Automatically switched to Halo photometry')>0) AS switched"],
-			search=['edge_flux > 0']) # 'tmag < %f' % (haloswitch_tmag_limit+1.5),
+			search=['edge_flux > 0'])
 		tab = Table(rows=star_vals,
-			  names=('priority', 'tmag', 'edge_flux', 'switched'),
-			  dtype=('int64', 'float32', 'float64', 'bool'))
+			names=('priority', 'tmag', 'edge_flux', 'switched'),
+			dtype=('int64', 'float32', 'float64', 'bool'))
 
 		switched = tab['switched']
 		expected_flux = mag2flux(tab['tmag'])
@@ -1707,7 +1695,7 @@ class DataValidation(object):
 		ax.set_xlim(self.tmag_limits)
 
 		# Save figure to file and close:
-		fig.savefig(os.path.join(self.outfolders, 'haloswitch'))
+		fig.savefig(os.path.join(self.outfolder, 'haloswitch'))
 		if self.show:
 			plt.show()
 		else:

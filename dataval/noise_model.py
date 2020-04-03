@@ -10,7 +10,6 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 import scipy.interpolate as INT
-import logging
 
 #--------------------------------------------------------------------------------------------------
 def ZLnoise(gal_lat):
