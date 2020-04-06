@@ -137,7 +137,7 @@ def mad(x):
 	return mad_to_sigma * nanmedian(np.abs(x - nanmedian(x)))
 
 #--------------------------------------------------------------------------------------------------
-def mag2flux(mag):
+def mag2flux(mag, zp=20.60654144):
 	"""
 	Convert from magnitude to flux using scaling relation from
 	aperture photometry. This is an estimate.
@@ -150,4 +150,4 @@ def mag2flux(mag):
 	Returns:
 		float: Corresponding flux value
 	"""
-	return 10**(-0.4*(mag - 20.60654144))
+	return np.clip(10**(-0.4*(mag - zp)), 0, None)

@@ -117,6 +117,15 @@ class DataValidation(object):
 			if self.corr and not self.corrections_done:
 				raise ValueError("Can not run dataval on corr when corrections have not been run")
 
+			# Get the corrector that was run on this TODO-file, if the corr_settings table is available:
+			if self.corr:
+				self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='corr_settings';")
+				if self.cursor.fetchone()[0] == 1:
+					self.cursor.execute("SELECT corrector FROM corr_settings LIMIT 1;")
+					row = self.cursor.fetchone()
+					if row is not None and row['corrector'] is not None:
+						subdir += '-' + row['corrector'].strip()
+
 			# Create table for data-validation:
 			if self.doval:
 				self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
@@ -137,10 +146,10 @@ class DataValidation(object):
 
 		# Also write any logging output to the
 		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-		fh = logging.FileHandler(os.path.join(self.outfolder, 'dataval.log'), mode='w')
-		fh.setFormatter(formatter)
-		fh.setLevel(logging.INFO)
-		logger.addHandler(fh)
+		self._filehandler = logging.FileHandler(os.path.join(self.outfolder, 'dataval.log'), mode='w')
+		self._filehandler.setFormatter(formatter)
+		self._filehandler.setLevel(logging.INFO)
+		logger.addHandler(self._filehandler)
 
 		# Get the range of Tmags in the tables:
 		tmag_limits = self.search_database(select=['MIN(tmag) AS tmag_min', 'MAX(tmag) AS tmag_max'])[0]
@@ -168,13 +177,19 @@ class DataValidation(object):
 	def close(self):
 		"""Close DataValidation object and all associated objects."""
 		mpl.style.use('default')
-		if hasattr(self, 'cursor') and self.cursor:
+		if hasattr(self, 'cursor'):
 			try:
 				self.cursor.close()
 			except sqlite3.ProgrammingError:
 				pass
-		if hasattr(self, 'conn') and self.conn:
+		if hasattr(self, 'conn'):
 			self.conn.close()
+
+		# Close the logging FileHandler:
+		if hasattr(self, '_filehandler'):
+			logger = logging.getLogger(__name__)
+			self._filehandler.close()
+			logger.removeHandler(self._filehandler)
 
 	#----------------------------------------------------------------------------------------------
 	def search_database(self, select=None, search=None, order_by=None, limit=None, distinct=False, joins=None):
@@ -307,6 +322,18 @@ class DataValidation(object):
 			logger.error("%d entries have not had PHOTOMETRY run", rowcount)
 		else:
 			logger.info("All PHOTOMETRY has been run.")
+
+		# Summary of all photometry status:
+		logger.info("Summary of photometry status:")
+		self.cursor.execute("SELECT status,COUNT(*) AS antal FROM todolist WHERE status NOT IN ({ok:d},{warning:d}) GROUP BY status;".format(
+			ok=STATUS.OK.value,
+			warning=STATUS.WARNING.value
+		))
+		total_bad_phot_status = 0
+		for sta in self.cursor.fetchall():
+			total_bad_phot_status += sta['antal']
+			logger.info("  %s: %,d", STATUS(sta['status']).name, sta['antal'])
+		logger.info("  TOTAL: {:,}", total_bad_phot_status)
 
 		# Warn if it seems that there is a large number of ERROR, compared to OK and WARNING:
 		logger.info("Checking number of photometry errors:")
@@ -1678,7 +1705,7 @@ class DataValidation(object):
 
 		for datasource in ('ffi', 'tpf'):
 			# Get the data from the database:
-			constraint_cadence = "datasource='ffi'" if datasource == 'FFI' else "datasource!='ffi'"
+			constraint_cadence = "datasource='ffi'" if datasource == 'ffi' else "datasource!='ffi'"
 			star_vals = self.search_database(
 				select=['todolist.priority', 'todolist.tmag', 'diagnostics.edge_flux', "(diagnostics.errors IS NOT NULL AND INSTR(diagnostics.errors, 'Automatically switched to Halo photometry')>0) AS switched"],
 				search=['edge_flux > 0', constraint_cadence])
