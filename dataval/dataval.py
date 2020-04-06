@@ -34,9 +34,6 @@ from .quality import DatavalQualityFlags
 from .utilities import mag2flux, mad # rms_timescale, sphere_distance
 from .noise_model import phot_noise
 
-def combine_flag_dicts(a, b):
-	return {key: a.get(key, 0) | b.get(key, 0) for key in set().union(a.keys(), b.keys())}
-
 #--------------------------------------------------------------------------------------------------
 class STATUS(enum.IntEnum):
 	"""
@@ -91,6 +88,8 @@ class DataValidation(object):
 		else:
 			self.dataval_table = 'datavalidation_raw'
 			subdir = 'raw'
+		if not self.doval:
+			self.dataval_table += '_temp'
 
 		# Load SQLite TODO files:
 		# TODO: How do we handle cases with more than one input?
@@ -127,16 +126,34 @@ class DataValidation(object):
 						subdir += '-' + row['corrector'].strip()
 
 			# Create table for data-validation:
+			# Depending if we are saving the results or not (self.doval) we are creating
+			# it either as a real table, or as a TEMPORARY table, which will only exist in memory
+			# as long as the database connection is opened.
+			self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
 			if self.doval:
-				self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
 				self.cursor.execute("CREATE TABLE IF NOT EXISTS " + self.dataval_table + """ (
 					priority INTEGER PRIMARY KEY ASC NOT NULL,
-					dataval INT NOT NULL,
-					approved BOOLEAN NOT NULL,
+					dataval INTEGER NOT NULL DEFAULT 0,
+					approved BOOLEAN,
 					FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 				);""")
-				self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_approved_idx ON " + self.dataval_table + " (approved);")
-				self.conn.commit()
+			else:
+				# Temporary tables can not use foreign keys to real tables, which is why
+				# we are not putting in the same foreign key here.
+				self.cursor.execute("CREATE TEMPORARY TABLE " + self.dataval_table + """ (
+					priority INTEGER PRIMARY KEY ASC NOT NULL,
+					dataval INTEGER NOT NULL DEFAULT 0,
+					approved BOOLEAN
+				);""")
+
+			# Create a couple of indicies on the two columns:
+			self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_approved_idx ON " + self.dataval_table + " (approved);")
+			self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_dataval_idx ON " + self.dataval_table + " (dataval);")
+			self.conn.commit()
+
+			# Fill out the table with zero dataval and NULL in approved:
+			self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority) SELECT priority FROM todolist;")
+			self.conn.commit()
 
 		# Create output directory:
 		if len(self.input_folders) == 1 and self.outfolder is None:
@@ -260,40 +277,126 @@ class DataValidation(object):
 		return [dict(row) for row in self.cursor.fetchall()]
 
 	#----------------------------------------------------------------------------------------------
-	def Validations(self):
+	def update_dataval(self, priorities, values):
+		"""
+		Update data validation table in database.
 
+		Parameters:
+			priorities (array): Array of priorities.
+			values (array): Array of data validation flags to be assigned each corresponding priority.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+
+		logger = logging.getLogger(__name__)
+
+		values = np.asarray(values, dtype='int32')
+		v = [(int(val), int(pri)) for pri, val in zip(priorities, values) if val != 0]
+		if v:
+			self.cursor.executemany("UPDATE " + self.dataval_table + " SET dataval=(dataval | ?) WHERE priority=?;", v)
+			self.conn.commit()
+			logger.info("Updated %d entries of %d possible.", self.cursor.rowcount, len(v))
+		else:
+			logger.info("Nothing to update.")
+
+	#----------------------------------------------------------------------------------------------
+	def Validations(self):
+		"""
+		Run all validations and write out summary.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+
+		logger = logging.getLogger(__name__)
+		logger.info('--------------------------------------------------------')
+
+		# Run all the validation subroutines:
 		self.basic()
-		val1 = self.plot_mag2flux(return_val=True)
-		val2 = self.plot_pixinaperture(return_val=True)
-		val3 = self.plot_contam(return_val=True)
-		val4 = self.plot_noise(return_val=True)
+		self.plot_mag2flux()
+		self.plot_pixinaperture()
+		self.plot_contam()
+		self.plot_noise()
 		self.plot_stamp()
 		self.plot_mag_dist()
 		self.plot_waittime()
 		self.plot_haloswitch()
 
-		if self.doval:
-			val = combine_flag_dicts(val1, val2)
-			val = combine_flag_dicts(val, val3)
-			val = combine_flag_dicts(val, val4)
+		# All the data validation flags are now saved in the database table, so let's combine
+		# them and mark which targets should be approved:
+		logger.info('--------------------------------------------------------')
+		logger.info("Setting approved flags...")
+		self.cursor.execute("UPDATE " + self.dataval_table + " SET approved=1 WHERE dataval=0;")
+		self.cursor.execute("UPDATE " + self.dataval_table + " SET approved=(dataval & %d = 0) WHERE dataval > 0;" % DatavalQualityFlags.DEFAULT_BITMASK)
 
-			dv = np.array(list(val.values()), dtype="int32")
+		self.cursor.execute("UPDATE " + self.dataval_table + " SET approved=0 WHERE priority IN (SELECT priority FROM todolist WHERE status NOT IN ({ok:d},{warning:d}));".format(
+			ok=STATUS.OK.value,
+			warning=STATUS.WARNING.value,
+		))
 
-			#Reject: Small/High apertures; Contamination>1;
-			app = np.ones_like(dv, dtype='bool')
-			qf = DatavalQualityFlags.filter(dv)
-			app[~qf] = False
+		if self.corr:
+			self.cursor.execute("UPDATE " + self.dataval_table + " SET approved=0 WHERE priority IN (SELECT priority FROM todolist WHERE corr_status NOT IN ({ok:d},{warning:d}));".format(
+				ok=STATUS.OK.value,
+				warning=STATUS.WARNING.value,
+			))
+		self.conn.commit()
 
-			for v1,v2,v3 in zip(np.array(list(val.keys()), dtype="int32"), dv, app):
-				self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) VALUES (?,?,?);", (
-					int(v1),
-					int(v2),
-					bool(v3)
-				))
+		# Check that all entries have been set:
+		self.cursor.execute("SELECT COUNT(*) AS antal FROM " + self.dataval_table + " WHERE approved IS NULL;")
+		if self.cursor.fetchone()['antal'] > 0:
+			logger.error("Not all approved were set")
 
-			# Fill out the table, setting everything not already covered by the above to disapproved:
-			self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority, dataval, approved) SELECT todolist.priority, 0, 0 FROM todolist LEFT JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE " + self.dataval_table + ".priority IS NULL;")
-			self.conn.commit()
+		# Write out summary of validations
+		logger.info('--------------------------------------------------------')
+		logger.info("Summary of approved and rejected targets:")
+		for camera, ccd in itertools.product((1,2,3,4), (1,2,3,4)):
+			self.cursor.execute("SELECT COUNT(*) AS antal FROM todolist INNER JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE status!=? AND camera=? AND ccd=? AND approved=1;", (
+				STATUS.SKIPPED.value,
+				camera,
+				ccd
+			))
+			count_approved = self.cursor.fetchone()['antal']
+			self.cursor.execute("SELECT COUNT(*) AS antal FROM todolist INNER JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE status!=? AND camera=? AND ccd=? AND approved=0;", (
+				STATUS.SKIPPED.value,
+				camera,
+				ccd
+			))
+			count_notapproved = self.cursor.fetchone()['antal']
+
+			percent = 100*count_notapproved/(count_notapproved + count_approved)
+			logger.info("  CAMERA=%d, CCD=%d: %.2f%% (%d rejected, %d approved)", camera, ccd, percent, count_notapproved, count_approved)
+
+		self.cursor.execute("SELECT COUNT(*) AS antal FROM todolist INNER JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE status!={skipped:d} AND approved=1;".format(
+			skipped=STATUS.SKIPPED.value
+		))
+		count_total_approved = self.cursor.fetchone()['antal']
+		self.cursor.execute("SELECT COUNT(*) AS antal FROM todolist INNER JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE status!={skipped:d} AND approved=0;".format(
+			skipped=STATUS.SKIPPED.value
+		))
+		count_total_notapproved = self.cursor.fetchone()['antal']
+
+		percent = 100*count_total_notapproved/(count_total_notapproved + count_total_approved)
+		logger.info("  TOTAL: %.2f%% (%d rejected, %d approved)", percent, count_total_notapproved, count_total_approved)
+
+		logger.info("Reasons for rejections:")
+		for b in range(14): # TODO: Loop over DatavalQualityFlags instead - requires it to be a real enum
+			flag = 2**b
+
+			# Only show flags that cause rejection:
+			if flag & DatavalQualityFlags.DEFAULT_BITMASK == 0:
+				continue
+
+			# Count the number of targets where the flag is set:
+			self.cursor.execute("SELECT COUNT(*) AS antal FROM todolist INNER JOIN " + self.dataval_table + " ON todolist.priority=" + self.dataval_table + ".priority WHERE status IN (:ok,:warning) AND dataval > 0 AND dataval & :dataval != 0;", {
+				'ok': STATUS.OK.value,
+				'warning': STATUS.WARNING.value,
+				'dataval': flag
+			})
+			count_flag = self.cursor.fetchone()['antal']
+
+			percent = 100*count_flag/count_total_notapproved
+			logger.info("  %s: %d (%.2f%%)", flag, count_flag, percent)
+
+		logger.info('--------------------------------------------------------')
 
 	#----------------------------------------------------------------------------------------------
 	def basic(self, warn_errors_ratio=0.05):
@@ -461,7 +564,7 @@ class DataValidation(object):
 				logger.error("%d missing corrected lightcurves.", missing_corr_lightcurves)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_contam(self, return_val=False):
+	def plot_contam(self):
 		"""
 		Function to plot the contamination against the stellar TESS magnitudes
 
@@ -567,14 +670,10 @@ class DataValidation(object):
 			plt.close(fig)
 
 		# Assign validation bits
-		if return_val:
-			val0 = {}
-			val0['dv'] = np.zeros_like(pri, dtype="int32")
-			val0['dv'][cont >= 1] |= DatavalQualityFlags.InvalidContamination
-			val0['dv'][(cont > cont_vs_mag(tmags)) & (cont < 1)] |= DatavalQualityFlags.ContaminationHigh
-
-			val = dict(zip(pri, val0['dv']))
-			return val
+		dv = np.zeros_like(pri, dtype='int32')
+		dv[cont >= 1] |= DatavalQualityFlags.InvalidContamination
+		dv[(cont > cont_vs_mag(tmags)) & (cont < 1)] |= DatavalQualityFlags.ContaminationHigh
+		self.update_dataval(pri, dv)
 
 	#----------------------------------------------------------------------------------------------
 	def compare_noise(self):
@@ -589,7 +688,7 @@ class DataValidation(object):
 
 		if not self.corrections_done:
 			logger.info("Can not run compare_noise when corrections have not been run")
-			return {}
+			return
 
 		fig1 = plt.figure(figsize=(15, 5))
 		fig1.subplots_adjust(left=0.145, wspace=0.3, top=0.945, bottom=0.145, right=0.975)
@@ -783,7 +882,7 @@ class DataValidation(object):
 			plt.close('all')
 
 	#----------------------------------------------------------------------------------------------
-	def plot_noise(self, return_val=False):
+	def plot_noise(self):
 		"""
 		Function to plot the light curve noise against the stellar TESS magnitudes
 
@@ -906,28 +1005,26 @@ class DataValidation(object):
 		else:
 			plt.close('all')
 
-		# Assign validation bits, for both FFI and TPF
-		if return_val:
-			dv = np.zeros_like(pri, dtype="int32")
+		# Assign validation bits
+		dv = np.zeros_like(pri, dtype='int32')
 
-			idx_tpf_ptp = (ptp < ptp_tpf_vs_mag(tmags)) & (ptp > 0)
-			idx_ffi_ptp = (ptp < ptp_ffi_vs_mag(tmags)) & (ptp > 0)
-			idx_tpf_rms = (rms < rms_tpf_vs_mag(tmags)) & (rms > 0)
-			idx_ffi_rms = (rms < rms_ffi_vs_mag(tmags)) & (rms > 0)
-			idx_invalid = (rms <= 0) | ~np.isfinite(rms) | (ptp <= 0) | ~np.isfinite(ptp)
+		idx_tpf_ptp = (ptp < ptp_tpf_vs_mag(tmags)) & (ptp > 0)
+		idx_ffi_ptp = (ptp < ptp_ffi_vs_mag(tmags)) & (ptp > 0)
+		idx_tpf_rms = (rms < rms_tpf_vs_mag(tmags)) & (rms > 0)
+		idx_ffi_rms = (rms < rms_ffi_vs_mag(tmags)) & (rms > 0)
+		idx_invalid = (rms <= 0) | ~np.isfinite(rms) | (ptp <= 0) | ~np.isfinite(ptp)
 
-			dv[idx_sc & idx_tpf_ptp] |= DatavalQualityFlags.LowPTP
-			dv[idx_lc & idx_ffi_ptp] |= DatavalQualityFlags.LowPTP
-			dv[idx_sc & idx_tpf_rms] |= DatavalQualityFlags.LowRMS
-			dv[idx_lc & idx_ffi_rms] |= DatavalQualityFlags.LowRMS
-			dv[idx_lc & idx_ffi_rms] |= DatavalQualityFlags.LowRMS
-			dv[idx_invalid] |= DatavalQualityFlags.InvalidNoise
+		dv[idx_sc & idx_tpf_ptp] |= DatavalQualityFlags.LowPTP
+		dv[idx_lc & idx_ffi_ptp] |= DatavalQualityFlags.LowPTP
+		dv[idx_sc & idx_tpf_rms] |= DatavalQualityFlags.LowRMS
+		dv[idx_lc & idx_ffi_rms] |= DatavalQualityFlags.LowRMS
+		dv[idx_lc & idx_ffi_rms] |= DatavalQualityFlags.LowRMS
+		dv[idx_invalid] |= DatavalQualityFlags.InvalidNoise
 
-			val = dict(zip(list(pri), list(dv)))
-			return val
+		self.update_dataval(pri, dv)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_pixinaperture(self, return_val=False):
+	def plot_pixinaperture(self):
 		"""
 		Function to plot number of pixels in determined apertures against the stellar TESS magnitudes
 
@@ -1175,24 +1272,20 @@ class DataValidation(object):
 			plt.close(fig)
 
 		# Assign validation bits, for both FFI and TPF
-		if return_val:
-			# Create validation dict:
-			val0 = {}
-			val0['dv'] = np.zeros_like(pri, dtype="int32")
+		dv = np.zeros_like(pri, dtype='int32')
 
-			# Minimal masks were used:
-			val0['dv'][minimal_mask_used] |= DatavalQualityFlags.MinimalMask
+		# Minimal masks were used:
+		dv[minimal_mask_used] |= DatavalQualityFlags.MinimalMask
 
-			# Small and Large masks:
-			val0['dv'][idx_lc & (masksizes < min_bound(tmags)) & (masksizes > 0)] |= DatavalQualityFlags.SmallMask
-			val0['dv'][idx_lc & (masksizes > max_bound(tmags))] |= DatavalQualityFlags.LargeMask
-			val0['dv'][idx_sc & (masksizes < min_bound_sc(tmags)) & (masksizes > 0)] |= DatavalQualityFlags.SmallMask
+		# Small and Large masks:
+		dv[idx_lc & (masksizes < min_bound(tmags)) & (masksizes > 0)] |= DatavalQualityFlags.SmallMask
+		dv[idx_lc & (masksizes > max_bound(tmags))] |= DatavalQualityFlags.LargeMask
+		dv[idx_sc & (masksizes < min_bound_sc(tmags)) & (masksizes > 0)] |= DatavalQualityFlags.SmallMask
 
-			val = dict(zip(pri, val0['dv']))
-			return val
+		self.update_dataval(pri, dv)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_mag2flux(self, return_val=False):
+	def plot_mag2flux(self):
 		"""
 		Function to plot flux values from apertures against the stellar TESS magnitudes,
 		and determine coefficient describing the relation
@@ -1324,19 +1417,14 @@ class DataValidation(object):
 		else:
 			plt.close('all')
 
-#		# Assign validation bits, for both FFI and TPF
-		#self.flags[] |= DatavalQualityFlags.MagVsFluxLow
-		if return_val:
-			val0 = {}
-			val0['dv'] = np.zeros_like(pri, dtype="int32")
-			val0['dv'][meanfluxes < min_bound(tmags)] |= DatavalQualityFlags.MagVsFluxLow
-			val0['dv'][(~np.isfinite(meanfluxes)) | (meanfluxes <= 0)] |= DatavalQualityFlags.InvalidFlux
-
-			val = dict(zip(pri, val0['dv']))
-			return val
+		# Assign validation bits, for both FFI and TPF
+		dv = np.zeros_like(pri, dtype='int32')
+		dv[meanfluxes < min_bound(tmags)] |= DatavalQualityFlags.MagVsFluxLow
+		dv[(~np.isfinite(meanfluxes)) | (meanfluxes <= 0)] |= DatavalQualityFlags.InvalidFlux
+		self.update_dataval(pri, dv)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_stamp(self, return_val=False):
+	def plot_stamp(self):
 		"""
 		Function to plot width and height of pixel stamps against the stellar TESS magnitudes
 
