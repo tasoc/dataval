@@ -16,16 +16,22 @@ def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
 	parser.add_argument('-c', '--corrected', help='Use corrected or raw values.', action='store_true')
-	parser.add_argument('-m', '--method', help='Corrector method to use.', action='append', default=[], choices=('basic', 'pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'noise_compare', 'magdist', 'waittime', 'haloswitch'))
-	parser.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png','eps','pdf'))
-	parser.add_argument('-s', '--show', help='Show plots.', action='store_true')
-	parser.add_argument('-v', '--validate', help='Compute validation (only run is method is "all").', action='store_true')
+	parser.add_argument('-v', '--validate', help='Store validation.', action='store_true')
+	parser.add_argument('-m', '--method', help='Corrector method to run.', action='append', default=[], choices=('basic', 'pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'noise_compare', 'magdist', 'waittime', 'haloswitch'))
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
-	parser.add_argument('-cbs', '--colorbysector', help='Color by sector', action='store_true')
-	parser.add_argument('-sn', '--sysnoise', type=float, help='systematic noise level for noise plot.', nargs='?', default=5.0)
+
 	parser.add_argument('-o', '--output', type=str, help='Directory in which to place output if several input folders are given.', nargs='?', default=None)
-	parser.add_argument('input_folders', type=str, help='Directory to create catalog files in.', nargs='+')
+	parser.add_argument('input_folders', type=str, help='Directory to load from.', nargs='+')
+
+	group = parser.add_argument_group('Plotting settings')
+	group.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png','eps','pdf'))
+	group.add_argument('-s', '--show', help='Show plots.', action='store_true')
+	group.add_argument('-cbs', '--colorbysector', help='Color by sector.', action='store_true')
+
+	group = parser.add_argument_group('Noise model settings')
+	group.add_argument('-sn', '--sysnoise', type=float, help='Systematic noise level for noise model.', nargs='?', default=5.0)
+
 	args = parser.parse_args()
 
 	if args.output is None and len(args.input_folders) > 1:
