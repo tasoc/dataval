@@ -332,8 +332,8 @@ class DataValidation(object):
 		total_bad_phot_status = 0
 		for sta in self.cursor.fetchall():
 			total_bad_phot_status += sta['antal']
-			logger.info("  %s: %,d", STATUS(sta['status']).name, sta['antal'])
-		logger.info("  TOTAL: {:,}", total_bad_phot_status)
+			logger.info("  %s: %d", STATUS(sta['status']).name, sta['antal'])
+		logger.info("  TOTAL: %d", total_bad_phot_status)
 
 		# Warn if it seems that there is a large number of ERROR, compared to OK and WARNING:
 		logger.info("Checking number of photometry errors:")
