@@ -90,9 +90,6 @@ class DataValidation(object):
 			subdir = 'raw'
 		if not self.doval:
 			self.dataval_table += '_temp'
-			logger.info("Not saving final validations in TODO-file.")
-		else:
-			logger.info("Saving final validations in TODO-file.")
 
 		# Load SQLite TODO files:
 		# TODO: How do we handle cases with more than one input?
@@ -170,6 +167,12 @@ class DataValidation(object):
 		self._filehandler.setFormatter(formatter)
 		self._filehandler.setLevel(logging.INFO)
 		logger.addHandler(self._filehandler)
+
+		# Write to log if we are saving or not:
+		if self.doval:
+			logger.info("Saving final validations in TODO-file.")
+		else:
+			logger.info("Not saving final validations in TODO-file.")
 
 		# Get the range of Tmags in the tables:
 		tmag_limits = self.search_database(select=['MIN(tmag) AS tmag_min', 'MAX(tmag) AS tmag_max'])[0]
