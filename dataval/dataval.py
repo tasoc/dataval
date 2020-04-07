@@ -31,7 +31,7 @@ import seaborn as sns
 
 # Local packages:
 from .quality import DatavalQualityFlags
-from .utilities import mag2flux, mad # rms_timescale, sphere_distance
+from .utilities import mag2flux, mad, CounterFilter # rms_timescale, sphere_distance
 from .noise_model import phot_noise
 
 #--------------------------------------------------------------------------------------------------
@@ -168,6 +168,11 @@ class DataValidation(object):
 		self._filehandler.setLevel(logging.INFO)
 		logger.addHandler(self._filehandler)
 
+		# Add a CounterFilter to the logger, which will count the number of log-records
+		# being passed through the logger. Can be used to count the number of errors/warnings:
+		self._counterfilter = CounterFilter()
+		logger.addFilter(self._counterfilter)
+
 		# Write to log if we are saving or not:
 		if self.doval:
 			logger.info("Saving final validations in TODO-file.")
@@ -213,6 +218,11 @@ class DataValidation(object):
 			logger = logging.getLogger(__name__)
 			self._filehandler.close()
 			logger.removeHandler(self._filehandler)
+
+	#----------------------------------------------------------------------------------------------
+	@property
+	def logcounts(self):
+		return self._counterfilter.counter
 
 	#----------------------------------------------------------------------------------------------
 	def search_database(self, select=None, search=None, order_by=None, limit=None, distinct=False, joins=None):
@@ -486,7 +496,9 @@ class DataValidation(object):
 				skipped=STATUS.SKIPPED
 			))
 			rowcount = self.cursor.fetchone()[0]
-			logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in PHOTOMETRY_SKIPPED", rowcount)
+			# TODO: For now, this is just a warning, because there is a known bug in photometry
+			#       causing this to often having non-zero number of missing entries.
+			logger.log(logging.WARNING if rowcount else logging.INFO, "%d entries missing in PHOTOMETRY_SKIPPED", rowcount)
 		else:
 			logger.warning("PHOTOMETRY_SKIPPED table not found!")
 

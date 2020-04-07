@@ -12,6 +12,8 @@ import pickle
 import gzip
 from bottleneck import nanmedian, nanmean, allnan
 from scipy.stats import binned_statistic
+import logging
+from collections import defaultdict
 
 # Constants:
 mad_to_sigma = 1.482602218505602 #: Conversion constant from MAD to Sigma. Constant is 1/norm.ppf(3/4)
@@ -151,3 +153,17 @@ def mag2flux(mag, zp=20.60654144):
 		float: Corresponding flux value
 	"""
 	return np.clip(10**(-0.4*(mag - zp)), 0, None)
+
+#--------------------------------------------------------------------------------------------------
+class CounterFilter(logging.Filter):
+	"""
+	A logging filter which counts the number of log records in each level.
+	"""
+
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.counter = defaultdict(int)
+
+	def filter(self, record):
+		self.counter[record.levelname] += 1
+		return True

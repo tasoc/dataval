@@ -9,6 +9,7 @@ Run TASOC Data Validation Pipeline.
 
 import argparse
 import logging
+import sys
 from dataval import DataValidation
 
 #--------------------------------------------------------------------------------------------------
@@ -84,6 +85,17 @@ def main():
 		if not args.method:
 			dataval.Validations()
 
+		# Get the number of logs (errors, warnings, info) issued during the validations:
+		logcounts = dataval.logcounts
+
+	# Check the number of errors or warnings issued, and convert these to a return-code:
+	if logcounts.get('ERROR', 0) > 0 or logcounts.get('CRITICAL', 0) > 0:
+		return 4
+	elif logcounts.get('WARNING', 0) > 0:
+		return 3
+	return 0
+
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	main()
+	returncode = main()
+	sys.exit(returncode)
