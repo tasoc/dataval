@@ -90,6 +90,9 @@ class DataValidation(object):
 			subdir = 'raw'
 		if not self.doval:
 			self.dataval_table += '_temp'
+			logger.info("Not saving final validations in TODO-file.")
+		else:
+			logger.info("Saving final validations in TODO-file.")
 
 		# Load SQLite TODO files:
 		# TODO: How do we handle cases with more than one input?
