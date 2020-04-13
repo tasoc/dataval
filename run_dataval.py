@@ -10,7 +10,7 @@ Run TASOC Data Validation Pipeline.
 import argparse
 import logging
 import sys
-from dataval import DataValidation
+import dataval
 
 #--------------------------------------------------------------------------------------------------
 def main():
@@ -18,7 +18,7 @@ def main():
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
 	parser.add_argument('-c', '--corrected', help='Use corrected or raw values.', action='store_true')
 	parser.add_argument('-v', '--validate', help='Store validation.', action='store_true')
-	parser.add_argument('-m', '--method', help='Corrector method to run.', action='append', default=[], choices=('basic', 'pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'noise_compare', 'magdist', 'waittime', 'haloswitch'))
+	parser.add_argument('-m', '--method', help='Corrector method to run.', action='append', default=[], choices=('basic', 'pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'noise_compare', 'magdist', 'waittime', 'haloswitch', 'sumimage'))
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 
@@ -54,39 +54,43 @@ def main():
 	logger.setLevel(logging_level)
 
 	# Create DataValidation object:
-	with DataValidation(args.input_folders, output_folder=args.output, corr=args.corrected,
+	with dataval.DataValidation(args.input_folders, output_folder=args.output, corr=args.corrected,
 		validate=args.validate, colorbysector=args.colorbysector,
-		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise) as dataval:
+		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise) as dval:
 
 		if 'basic' in args.method:
-			dataval.basic()
+			dval.basic()
 		if 'mag2flux' in args.method:
-			dataval.plot_mag2flux()
+			dval.plot_mag2flux()
 		if 'pixvsmag' in args.method:
-			dataval.plot_pixinaperture()
+			dval.plot_pixinaperture()
 		if 'stamp' in args.method:
-			dataval.plot_stamp()
+			dval.plot_stamp()
 		if 'magdist' in args.method:
-			dataval.plot_mag_dist()
+			dval.plot_mag_dist()
 		if 'noise' in args.method:
-			dataval.plot_noise()
+			dval.plot_noise()
 		if 'noise_compare' in args.method:
-			dataval.compare_noise()
+			dval.compare_noise()
 		if 'contam' in args.method:
-			dataval.plot_contam()
+			dval.plot_contam()
 		if 'magdistoverlap' in args.method:
-			dataval.plot_mag_dist_overlap()
+			dval.plot_mag_dist_overlap()
 		if 'waittime' in args.method:
-			dataval.plot_waittime()
+			dval.plot_waittime()
 		if 'haloswitch' in args.method:
-			dataval.plot_haloswitch()
+			dval.plot_haloswitch()
+
+		# Special methods:
+		if 'sumimage' in args.method:
+			dataval.special.check_sumimage(dval)
 
 		# Run validation
 		if not args.method:
-			dataval.Validations()
+			dval.Validations()
 
 		# Get the number of logs (errors, warnings, info) issued during the validations:
-		logcounts = dataval.logcounts
+		logcounts = dval.logcounts
 
 	# Check the number of errors or warnings issued, and convert these to a return-code:
 	if logcounts.get('ERROR', 0) > 0 or logcounts.get('CRITICAL', 0) > 0:

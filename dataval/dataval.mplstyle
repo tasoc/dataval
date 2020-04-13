@@ -1,5 +1,6 @@
 font.family      : serif
 text.usetex      : False
+mathtext.fontset : dejavuserif
 
 savefig.bbox     : tight
 
