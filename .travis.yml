@@ -1,20 +1,20 @@
 language: python
 cache: pip
 os: linux
+dist: xenial
 
 # We are specifying the build matrix manually, since there is too little overlap
 # between the different builds:
 jobs:
   include:
-    - name: "Python 3.5 on Linux"
-      python: "3.5"
-
     - name: "Python 3.6 on Linux"
       python: "3.6"
 
     - name: "Python 3.7 on Linux"
       python: "3.7"
-      dist: xenial
+
+    - name: "Python 3.8 on Linux"
+      python: "3.8"
 
     - name: "Python 3.6 on Windows"
       os: windows
@@ -33,6 +33,16 @@ jobs:
         - python --version
         - git lfs pull
       env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
+
+    - name: "Python 3.8 on Windows"
+      os: windows
+      language: shell  # 'language: python' is an error on Travis CI Windows
+      before_install:
+        - choco install python --version 3.8.2
+        - python --version
+        - git lfs pull
+      env:
+        - PATH=/c/Python38:/c/Python38/Scripts:$PATH
 
     - name: "Flake8"
       python: "3.6"
@@ -77,7 +87,7 @@ deploy:
   skip_cleanup: true
   draft: true
   name: "${TRAVIS_TAG/v/Version }"
-  body: "${TRAVIS_TAG/v/Version }"
+  release_notes: "${TRAVIS_TAG/v/Version }"
   on:
     branch:
       - master
