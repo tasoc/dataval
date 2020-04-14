@@ -90,6 +90,9 @@ class DataValidation(object):
 			subdir = 'raw'
 		if not self.doval:
 			self.dataval_table += '_temp'
+			logfilename = 'dataval.log'
+		else:
+			logfilename = 'dataval_save.log'
 
 		# Load SQLite TODO files:
 		# TODO: How do we handle cases with more than one input?
@@ -163,7 +166,7 @@ class DataValidation(object):
 
 		# Also write any logging output to the
 		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-		self._filehandler = logging.FileHandler(os.path.join(self.outfolder, 'dataval.log'), mode='w')
+		self._filehandler = logging.FileHandler(os.path.join(self.outfolder, logfilename), mode='w')
 		self._filehandler.setFormatter(formatter)
 		self._filehandler.setLevel(logging.INFO)
 		logger.addHandler(self._filehandler)

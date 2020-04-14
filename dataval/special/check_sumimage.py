@@ -26,17 +26,21 @@ def check_sumimage(dval, warn_abs=5, warn_rel=0.05):
 	logger = logging.getLogger(__name__)
 	logger.info("Checking sumimages...")
 
+	# Settings for tqdm:
+	tqdm_settings = {
+		'disable': not logger.isEnabledFor(logging.INFO)
+	}
+
+	# Get list of lightcurves from TODO-file:
 	if dval.corr:
 		files = dval.search_database(select=['todolist.priority', 'diagnostics_corr.lightcurve'])
 	else:
 		files = dval.search_database(select=['todolist.priority', 'diagnostics.lightcurve'])
 
-	print(files)
-
 	rootdir = dval.input_folders[0]
 
 	missing_files = False
-	for row in tqdm(files):
+	for row in tqdm(files, **tqdm_settings):
 		fpath = os.path.join(rootdir, row['lightcurve'])
 		logger.debug("Checking file: %s", fpath)
 
