@@ -31,7 +31,7 @@ import seaborn as sns
 
 # Local packages:
 from .quality import DatavalQualityFlags
-from .utilities import mag2flux, mad, CounterFilter # rms_timescale, sphere_distance
+from .utilities import mag2flux, mad, CounterFilter, find_lightcurve_files # rms_timescale, sphere_distance
 from .noise_model import phot_noise
 
 #--------------------------------------------------------------------------------------------------
@@ -81,6 +81,7 @@ class DataValidation(object):
 		self.doval = validate
 		self.color_by_sector = colorbysector
 		self.corr = corr
+		self.corr_method = None
 
 		if self.corr:
 			self.dataval_table = 'datavalidation_corr'
@@ -126,6 +127,7 @@ class DataValidation(object):
 					self.cursor.execute("SELECT corrector FROM corr_settings LIMIT 1;")
 					row = self.cursor.fetchone()
 					if row is not None and row['corrector'] is not None:
+						self.corr_method = row['corrector'].strip()
 						subdir += '-' + row['corrector'].strip()
 
 			# Create table for data-validation:
@@ -152,6 +154,12 @@ class DataValidation(object):
 			# Create a couple of indicies on the two columns:
 			self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_approved_idx ON " + self.dataval_table + " (approved);")
 			self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_dataval_idx ON " + self.dataval_table + " (dataval);")
+			self.conn.commit()
+
+			logger.info("Creating lightcurve indicies...")
+			self.cursor.execute("CREATE INDEX IF NOT EXISTS diagnostics_lightcurve_idx ON diagnostics (lightcurve);")
+			if self.corrections_done:
+				self.cursor.execute("CREATE INDEX IF NOT EXISTS diagnostics_corr_lightcurve_idx ON diagnostics_corr (lightcurve);")
 			self.conn.commit()
 
 			# Fill out the table with zero dataval and NULL in approved:
@@ -583,6 +591,41 @@ class DataValidation(object):
 				os.remove(missing_corr_lightcurves_list)
 			else:
 				logger.error("%d missing corrected lightcurves.", missing_corr_lightcurves)
+
+		# Checking for leftover lightcurve files:
+		logger.info("Checking for any leftover orphaned lightcurve files...")
+		leftover_lightcurves = 0
+		leftover_lightcurves_list = os.path.join(self.outfolder, 'leftover_lightcurves.txt')
+		with open(leftover_lightcurves_list, 'w') as fid:
+			for fname in tqdm(find_lightcurve_files(rootdir, 'tess*-tasoc_lc.fits.gz'), **tqdm_settings):
+				# Find relative path to find in database:
+				relpath = os.path.relpath(fname, rootdir)
+				logger.debug("Checking: %s", relpath)
+
+				self.cursor.execute("SELECT * FROM diagnostics WHERE lightcurve=?;", [relpath])
+				if self.cursor.fetchone() is None:
+					leftover_lightcurves += 1
+					fid.write(fname + "\n")
+
+			if self.corrections_done:
+				if self.corr_method is None:
+					logger.error("Correction method not given")
+				fname_filter = {'ensemble': 'ens', 'cbv': 'cbv', 'kasoc_filter': 'kf', None: '*'}[self.corr_method]
+				for fname in tqdm(find_lightcurve_files(rootdir, 'tess*-tasoc-%s_lc.fits.gz' % fname_filter), **tqdm_settings):
+					# Find relative path to find in database:
+					relpath = os.path.relpath(fname, rootdir)
+					logger.debug("Checking: %s", relpath)
+
+					self.cursor.execute("SELECT * FROM diagnostics_corr WHERE lightcurve=?;", [relpath])
+					if self.cursor.fetchone() is None:
+						leftover_lightcurves += 1
+						fid.write(fname + "\n")
+
+		if leftover_lightcurves == 0:
+			logger.info("No leftover lightcurves.")
+			os.remove(leftover_lightcurves_list)
+		else:
+			logger.error("%d leftover lightcurves.", leftover_lightcurves)
 
 	#----------------------------------------------------------------------------------------------
 	def plot_contam(self):

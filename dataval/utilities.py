@@ -10,6 +10,8 @@ the corrections package.
 import numpy as np
 import pickle
 import gzip
+import os
+import fnmatch
 from bottleneck import nanmedian, nanmean, allnan
 from scipy.stats import binned_statistic
 import logging
@@ -153,6 +155,22 @@ def mag2flux(mag, zp=20.60654144):
 		float: Corresponding flux value
 	"""
 	return np.clip(10**(-0.4*(mag - zp)), 0, None)
+
+#--------------------------------------------------------------------------------------------------
+def find_lightcurve_files(rootdir, pattern='tess*-tasoc_lc.fits.gz'):
+	"""
+	Find lightcurve files matching filename pattern.
+
+	Parameters:
+		rootdir (str): Root directory to search for lightcurve files.
+		pattern (str): Pattern to match filenames. Default is for raw TASOC lightcurves.
+
+	Returns:
+		iterator: Iterator of paths to found lightcurve files.
+	"""
+	for root, dirnames, filenames in os.walk(rootdir, followlinks=True):
+		for filename in fnmatch.filter(filenames, pattern):
+			yield os.path.join(root, filename)
 
 #--------------------------------------------------------------------------------------------------
 class CounterFilter(logging.Filter):
