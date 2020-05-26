@@ -605,9 +605,9 @@ class DataValidation(object):
 				self.cursor.execute("SELECT * FROM diagnostics WHERE lightcurve=?;", [relpath])
 				if self.cursor.fetchone() is None:
 					leftover_lightcurves += 1
-					fid.write(fname + "\n")
+					fid.write(relpath + "\n")
 
-			if self.corrections_done:
+			if self.corr:
 				if self.corr_method is None:
 					logger.error("Correction method not given")
 				fname_filter = {'ensemble': 'ens', 'cbv': 'cbv', 'kasoc_filter': 'kf', None: '*'}[self.corr_method]
@@ -619,7 +619,7 @@ class DataValidation(object):
 					self.cursor.execute("SELECT * FROM diagnostics_corr WHERE lightcurve=?;", [relpath])
 					if self.cursor.fetchone() is None:
 						leftover_lightcurves += 1
-						fid.write(fname + "\n")
+						fid.write(relpath + "\n")
 
 		if leftover_lightcurves == 0:
 			logger.info("No leftover lightcurves.")
