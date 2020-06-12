@@ -38,7 +38,6 @@ from .noise_model import phot_noise
 class STATUS(enum.IntEnum):
 	"""
 	Status indicator of the status of the correction.
-
 	"""
 	UNKNOWN = 0 #: The status is unknown. The actual calculation has not started yet.
 	STARTED = 6 #: The calculation has started, but not yet finished.
@@ -53,7 +52,7 @@ class DataValidation(object):
 
 	#----------------------------------------------------------------------------------------------
 	def __init__(self, input_folders, output_folder=None, corr=False, validate=True,
-			colorbysector=False, ext='png', showplots=False, sysnoise=0):
+		colorbysector=False, ext='png', showplots=False, sysnoise=0):
 		"""
 		Initialize DataValidation object.
 
@@ -236,18 +235,22 @@ class DataValidation(object):
 		return self._counterfilter.counter
 
 	#----------------------------------------------------------------------------------------------
-	def search_database(self, select=None, search=None, order_by=None, limit=None, distinct=False, joins=None):
+	def search_database(self, select=None, search=None, order_by=None, limit=None, distinct=False,
+		joins=None):
 		"""
 		Search list of lightcurves and return a list of tasks/stars matching the given criteria.
 
 		Parameters:
-			search (list of strings or None): Conditions to apply to the selection of stars from the database
+			search (list of strings or None): Conditions to apply to the selection of stars
+				from the database.
 			order_by (list, string or None): Column to order the database output by.
-			limit (int or None): Maximum number of rows to retrieve from the database. If limit is None, all the rows are retrieved.
+			limit (int or None): Maximum number of rows to retrieve from the database.
+				If limit is None, all the rows are retrieved.
 			distinct (boolean): Boolean indicating if the query should return unique elements only.
 
 		Returns:
-			list of dicts: Returns all stars retrieved by the call to the database as dicts/tasks that can be consumed directly by load_lightcurve
+			list of dicts: Returns all stars retrieved by the call to the database as dicts/tasks
+			that can be consumed directly by load_lightcurve
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
@@ -770,9 +773,27 @@ class DataValidation(object):
 		ax32 = fig3.add_subplot(122)
 
 		#if self.corr:
-		star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
+		star_vals = self.search_database(select=[
+			'todolist.priority',
+			'todolist.starid',
+			'todolist.datasource',
+			'todolist.sector',
+			'todolist.tmag',
+			'diagnostics_corr.rms_hour',
+			'diagnostics_corr.ptp',
+			'diagnostics.contamination',
+			'ccd'])
 		factor = 1
-		star_vals2 = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
+		star_vals2 = self.search_database(select=[
+			'todolist.priority',
+			'todolist.starid',
+			'todolist.datasource',
+			'todolist.sector',
+			'todolist.tmag',
+			'diagnostics.rms_hour',
+			'diagnostics.ptp',
+			'diagnostics.contamination',
+			'ccd'])
 		factor2 = 1e6
 
 		tmags = np.array([star['tmag'] for star in star_vals], dtype=float)
@@ -968,10 +989,28 @@ class DataValidation(object):
 		ax22 = fig2.add_subplot(122)
 
 		if self.corr:
-			star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics_corr.rms_hour','diagnostics_corr.ptp','diagnostics.contamination','ccd'])
+			star_vals = self.search_database(select=[
+				'todolist.priority',
+				'todolist.starid',
+				'todolist.datasource',
+				'todolist.sector',
+				'todolist.tmag',
+				'diagnostics_corr.rms_hour',
+				'diagnostics_corr.ptp',
+				'diagnostics.contamination',
+				'ccd'])
 			factor = 1
 		else:
-			star_vals = self.search_database(select=['todolist.priority','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.rms_hour','diagnostics.ptp','diagnostics.contamination','ccd'])
+			star_vals = self.search_database(select=[
+				'todolist.priority',
+				'todolist.starid',
+				'todolist.datasource',
+				'todolist.sector',
+				'todolist.tmag',
+				'diagnostics.rms_hour',
+				'diagnostics.ptp',
+				'diagnostics.contamination',
+				'ccd'])
 			factor = 1e6
 
 		tmags = np.array([star['tmag'] for star in star_vals], dtype='float64')
@@ -1090,7 +1129,8 @@ class DataValidation(object):
 	#----------------------------------------------------------------------------------------------
 	def plot_pixinaperture(self):
 		"""
-		Function to plot number of pixels in determined apertures against the stellar TESS magnitudes
+		Function to plot number of pixels in determined apertures against the stellar
+		TESS magnitudes.
 
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
@@ -1104,7 +1144,17 @@ class DataValidation(object):
 		fig.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
 
 #		if not self.doval:
-		star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors'])
+		star_vals = self.search_database(select=[
+			'todolist.priority',
+			'todolist.ccd',
+			'todolist.starid',
+			'todolist.datasource',
+			'todolist.sector',
+			'todolist.tmag',
+			'diagnostics.mask_size',
+			'diagnostics.contamination',
+			'todolist.camera',
+			'diagnostics.errors'])
 #		else:
 #			star_vals = self.search_database(select=['todolist.priority','todolist.ccd','todolist.starid','todolist.datasource','todolist.sector','todolist.tmag','diagnostics.mask_size','diagnostics.contamination','todolist.camera','diagnostics.errors','datavalidation_raw.dataval'])
 
@@ -1370,7 +1420,13 @@ class DataValidation(object):
 		#ax31 = fig3.add_subplot(121)
 		#ax32 = fig3.add_subplot(122)
 
-		star_vals = self.search_database(select=['todolist.priority','todolist.datasource','todolist.sector','todolist.tmag','mean_flux','contamination'])
+		star_vals = self.search_database(select=[
+			'todolist.priority',
+			'todolist.datasource',
+			'todolist.sector',
+			'todolist.tmag',
+			'mean_flux',
+			'contamination'])
 
 		tmags = np.array([star['tmag'] for star in star_vals], dtype='float64')
 		meanfluxes = np.array([star['mean_flux'] for star in star_vals], dtype='float64')
@@ -1508,7 +1564,14 @@ class DataValidation(object):
 		ax21 = fig2.add_subplot(121)
 		ax22 = fig2.add_subplot(122)
 
-		star_vals = self.search_database(select=['todolist.datasource','todolist.sector','todolist.tmag','stamp_resizes','stamp_width','stamp_height', 'diagnostics.elaptime'])
+		star_vals = self.search_database(select=[
+			'todolist.datasource',
+			'todolist.sector',
+			'todolist.tmag',
+			'stamp_resizes',
+			'stamp_width',
+			'stamp_height',
+			'diagnostics.elaptime'])
 
 		rgba_color = 'r'
 		if self.color_by_sector:

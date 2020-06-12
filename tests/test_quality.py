@@ -7,9 +7,7 @@ Tests of  dataval quality flags.
 """
 
 import pytest
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import conftest # noqa: F401
 from dataval import DatavalQualityFlags
 
 #INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')

@@ -7,10 +7,8 @@ Tests of DataValidation.
 """
 
 import pytest
-import sys
-import os
 import numpy as np
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import conftest # noqa: F401
 from dataval.noise_model import phot_noise
 
 #--------------------------------------------------------------------------------------------------

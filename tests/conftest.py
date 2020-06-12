@@ -10,6 +10,10 @@ import pytest
 import os.path
 import tempfile
 import shutil
+import sys
+
+if sys.path[0] != os.path.abspath(os.path.join(os.path.dirname(__file__), '..')):
+	sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 #--------------------------------------------------------------------------------------------------
 @pytest.fixture(scope='session')
