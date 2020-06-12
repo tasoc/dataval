@@ -600,6 +600,7 @@ class DataValidation(object):
 		leftover_lightcurves = 0
 		leftover_lightcurves_list = os.path.join(self.outfolder, 'leftover_lightcurves.txt')
 		with open(leftover_lightcurves_list, 'w') as fid:
+			logger.info("  Checking for orphaned raw lightcurves...")
 			for fname in tqdm(find_lightcurve_files(rootdir, 'tess*-tasoc_lc.fits.gz'), **tqdm_settings):
 				# Find relative path to find in database:
 				relpath = os.path.relpath(fname, rootdir)
@@ -611,6 +612,7 @@ class DataValidation(object):
 					fid.write(relpath + "\n")
 
 			if self.corr:
+				logger.info("  Checking for orphaned corrected lightcurves...")
 				if self.corr_method is None:
 					logger.error("Correction method not given")
 				fname_filter = {'ensemble': 'ens', 'cbv': 'cbv', 'kasoc_filter': 'kf', None: '*'}[self.corr_method]
@@ -1878,12 +1880,20 @@ class DataValidation(object):
 				names=('priority', 'worker_wait_time'),
 				dtype=('int64', 'float32'))
 
+			# Bin the wait-time to see main systematic:
+			bin_means, bin_edges, _ = binning(tab['priority'], tab['worker_wait_time'], statistic='median', bins=25)
+			bin_width = (bin_edges[1] - bin_edges[0])
+			bin_centers = bin_edges[1:] - bin_width/2
+
 			# Create figure figure:
-			fig = plt.figure()
+			fig = plt.figure(figsize=(16,8))
 			ax = fig.add_subplot(111)
-			ax.scatter(tab['priority'], tab['worker_wait_time'], alpha=0.3)
+			ax.scatter(tab['priority'], tab['worker_wait_time'], marker='.', alpha=0.1)
+			ax.scatter(bin_centers, bin_means, c='r')
 			ax.set_xlabel('Priority')
 			ax.set_ylabel('Worker wait-time (s)')
+			ax.set_xlim(left=0)
+			ax.set_ylim(bottom=0)
 
 			# Save figure to file and close:
 			fig.savefig(os.path.join(self.outfolder, 'worker_waittime_' + table))
@@ -1922,8 +1932,17 @@ class DataValidation(object):
 			# Get the data from the database:
 			constraint_cadence = "datasource='ffi'" if datasource == 'ffi' else "datasource!='ffi'"
 			star_vals = self.search_database(
-				select=['todolist.priority', 'todolist.tmag', 'diagnostics.edge_flux', "(diagnostics.errors IS NOT NULL AND INSTR(diagnostics.errors, 'Automatically switched to Halo photometry')>0) AS switched"],
-				search=['edge_flux > 0', constraint_cadence])
+				select=[
+					'todolist.priority',
+					'todolist.tmag',
+					'diagnostics.edge_flux',
+					"(diagnostics.errors IS NOT NULL AND INSTR(diagnostics.errors, 'Automatically switched to Halo photometry') > 0) AS switched"
+				],
+				search=[
+					'edge_flux > 0',
+					constraint_cadence,
+					"(todolist.method IS NULL OR todolist.method != 'halo')" # Don't include things already processed with Halo
+				])
 			if not star_vals:
 				continue
 
@@ -1934,8 +1953,10 @@ class DataValidation(object):
 			switched = tab['switched']
 			expected_flux = mag2flux(tab['tmag'])
 
-			ax.scatter(tab['tmag'], tab['edge_flux']/expected_flux, alpha=0.3, label=datasource)
-			ax.scatter(tab['tmag'][switched], tab['edge_flux'][switched]/expected_flux[switched], c='r', marker='x', label='Switched')
+			i = ax.scatter(tab['tmag'], tab['edge_flux']/expected_flux,
+				alpha=0.3, label=datasource.upper())
+			ax.scatter(tab['tmag'][switched], tab['edge_flux'][switched]/expected_flux[switched],
+				c=i.get_facecolor(), alpha=1, marker='x', label=datasource.upper() + ' Switched')
 
 		ax.axvline(haloswitch_tmag_limit, c='r', ls='--')
 		ax.axhline(haloswitch_flux_limit, c='r', ls='--')
