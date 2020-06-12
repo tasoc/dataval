@@ -16,7 +16,6 @@ import scipy.interpolate as INT
 from scipy.optimize import minimize
 from scipy.stats import binned_statistic as binning
 from statsmodels.nonparametric.kde import KDEUnivariate as KDE
-from astropy.table import Table
 from tqdm import tqdm
 import enum
 import itertools
@@ -31,8 +30,12 @@ import seaborn as sns
 
 # Local packages:
 from .quality import DatavalQualityFlags
-from .utilities import mag2flux, mad, CounterFilter, find_lightcurve_files # rms_timescale, sphere_distance
+from .utilities import mad, CounterFilter, find_lightcurve_files # rms_timescale, sphere_distance
 from .noise_model import phot_noise
+
+# Data Validation methods in separate sub-packages:
+from .waittime import plot_waittime
+from .haloswitch import plot_haloswitch
 
 #--------------------------------------------------------------------------------------------------
 class STATUS(enum.IntEnum):
@@ -1853,123 +1856,8 @@ class DataValidation(object):
 
 	#----------------------------------------------------------------------------------------------
 	def plot_waittime(self):
-		"""
-		Visiualize the worker wait-time during the processing.
-
-		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
-		"""
-
-		logger = logging.getLogger(__name__)
-		logger.info("Running waittime diagnostics...")
-
-		run_tables = ['diagnostics']
-		if self.corrections_done:
-			run_tables.append('diagnostics_corr')
-
-		for table in run_tables:
-			# Check if the worker_waittime column is in the database
-			# It was not generated in earlier versions of the pipeline
-			self.cursor.execute("PRAGMA table_info(" + table + ")")
-			if 'worker_wait_time' not in [r['name'] for r in self.cursor.fetchall()]:
-				logger.info("WORKER_WAIT_TIME is not stored in database.")
-				return
-
-			# Get the data from the database:
-			star_vals = self.search_database(select=['todolist.priority', table + '.worker_wait_time'])
-			tab = Table(rows=star_vals,
-				names=('priority', 'worker_wait_time'),
-				dtype=('int64', 'float32'))
-
-			# Bin the wait-time to see main systematic:
-			bin_means, bin_edges, _ = binning(tab['priority'], tab['worker_wait_time'], statistic='median', bins=25)
-			bin_width = (bin_edges[1] - bin_edges[0])
-			bin_centers = bin_edges[1:] - bin_width/2
-
-			# Create figure figure:
-			fig = plt.figure(figsize=(16,8))
-			ax = fig.add_subplot(111)
-			ax.scatter(tab['priority'], tab['worker_wait_time'], marker='.', alpha=0.1)
-			ax.scatter(bin_centers, bin_means, c='r')
-			ax.set_xlabel('Priority')
-			ax.set_ylabel('Worker wait-time (s)')
-			ax.set_xlim(left=0)
-			ax.set_ylim(bottom=0)
-
-			# Save figure to file and close:
-			fig.savefig(os.path.join(self.outfolder, 'worker_waittime_' + table))
-			if self.show:
-				plt.show()
-			else:
-				plt.close(fig)
+		plot_waittime(self)
 
 	#----------------------------------------------------------------------------------------------
 	def plot_haloswitch(self):
-		"""
-		Visiualize the disgnostics used to automatically switch to Halo photometry.
-
-		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
-		"""
-
-		logger = logging.getLogger(__name__)
-		logger.info("Running halo-switch diagnostics...")
-
-		# Check if the edge_flux column is in the database
-		# It was not generated in earlier versions of the pipeline
-		self.cursor.execute("PRAGMA table_info(diagnostics)")
-		if 'edge_flux' not in [r['name'] for r in self.cursor.fetchall()]:
-			logger.info("EDGE_FLUX is not stored in database.")
-			return
-
-		# TODO: Store these in the database as well
-		haloswitch_tmag_limit = 6.0 # Maximal Tmag to apply Halo photometry automatically
-		haloswitch_flux_limit = 0.01
-
-		# Create figure figure:
-		fig = plt.figure(figsize=(12,8))
-		ax = fig.add_subplot(111)
-
-		for datasource in ('ffi', 'tpf'):
-			# Get the data from the database:
-			constraint_cadence = "datasource='ffi'" if datasource == 'ffi' else "datasource!='ffi'"
-			star_vals = self.search_database(
-				select=[
-					'todolist.priority',
-					'todolist.tmag',
-					'diagnostics.edge_flux',
-					"(diagnostics.errors IS NOT NULL AND INSTR(diagnostics.errors, 'Automatically switched to Halo photometry') > 0) AS switched"
-				],
-				search=[
-					'edge_flux > 0',
-					constraint_cadence,
-					"(todolist.method IS NULL OR todolist.method != 'halo')" # Don't include things already processed with Halo
-				])
-			if not star_vals:
-				continue
-
-			tab = Table(rows=star_vals,
-				names=('priority', 'tmag', 'edge_flux', 'switched'),
-				dtype=('int64', 'float32', 'float64', 'bool'))
-
-			switched = tab['switched']
-			expected_flux = mag2flux(tab['tmag'])
-
-			i = ax.scatter(tab['tmag'], tab['edge_flux']/expected_flux,
-				alpha=0.3, label=datasource.upper())
-			ax.scatter(tab['tmag'][switched], tab['edge_flux'][switched]/expected_flux[switched],
-				c=i.get_facecolor(), alpha=1, marker='x', label=datasource.upper() + ' Switched')
-
-		ax.axvline(haloswitch_tmag_limit, c='r', ls='--')
-		ax.axhline(haloswitch_flux_limit, c='r', ls='--')
-		ax.set_xlabel('TESS magnitude')
-		ax.set_ylabel('Edge flux / Expected total flux')
-		ax.set_yscale('log')
-		ax.set_ylim([1e-5, 1.0])
-		ax.set_xlim(self.tmag_limits)
-		ax.legend()
-
-		# Save figure to file and close:
-		fig.savefig(os.path.join(self.outfolder, 'haloswitch'))
-		if self.show:
-			plt.show()
-		else:
-			plt.close(fig)
+		plot_haloswitch(self)
