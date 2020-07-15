@@ -15,7 +15,7 @@ from .utilities import mag2flux
 #--------------------------------------------------------------------------------------------------
 def plot_haloswitch(dval):
 	"""
-	Visiualize the disgnostics used to automatically switch to Halo photometry.
+	Visualize the diagnostics used to automatically switch to Halo photometry.
 
 	Parameters:
 		dval (:class:`DataValidation`): Data Validation object.

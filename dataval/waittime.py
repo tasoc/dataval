@@ -15,7 +15,7 @@ from .plots import plt
 #--------------------------------------------------------------------------------------------------
 def plot_waittime(dval):
 	"""
-	Visiualize the worker wait-time during the processing.
+	Visualize the worker wait-time during the processing.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""

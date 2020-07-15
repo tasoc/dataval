@@ -560,6 +560,21 @@ class DataValidation(object):
 			rowcount = len(self.cursor.fetchall())
 			logger.log(logging.ERROR if rowcount else logging.INFO, "%d entries missing in DIAGNOSTICS_CORR", rowcount)
 
+		# Check for specific errors that should be flagged:
+		# Patterns can contain wildcards (% or _):
+		specific_errors = [
+			'FileNotFoundError',
+			'sqlite3.%'
+		]
+
+		logger.info("Checking for specific errors...")
+		tbls = ('diagnostics', 'diagnostics_corr') if self.corr else ('diagnostics',)
+		for tbl, keyword in itertools.product(tbls, specific_errors):
+			self.cursor.execute('SELECT COUNT(*) FROM ' + tbl + ' WHERE errors IS NOT NULL AND errors LIKE "%' + keyword + ': %";')
+			count_specificerror = self.cursor.fetchone()[0]
+			logger.log(logging.ERROR if count_specificerror else logging.INFO,
+				"  %s (%s): %d", keyword, tbl, count_specificerror)
+
 		# Root directory for files assocuated with this TODO-file:
 		rootdir = self.input_folders[0]
 
