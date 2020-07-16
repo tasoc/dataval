@@ -28,7 +28,8 @@ def main():
 		'magdist',
 		'waittime',
 		'haloswitch',
-		'sumimage'
+		'sumimage',
+		'camera_overlap'
 	]
 
 	# Parse command line arguments:
@@ -99,6 +100,8 @@ def main():
 			dval.plot_waittime()
 		if 'haloswitch' in args.method:
 			dval.plot_haloswitch()
+		if 'camera_overlap' in args.method:
+			dval.camera_overlap()
 
 		# Special methods:
 		if 'sumimage' in args.method:

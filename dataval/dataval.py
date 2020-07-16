@@ -35,6 +35,7 @@ from .noise_model import phot_noise
 
 # Data Validation methods in separate sub-packages:
 from .cleanup import cleanup
+from .camera_overlap import camera_overlap
 from .waittime import plot_waittime
 from .haloswitch import plot_haloswitch
 
@@ -345,6 +346,7 @@ class DataValidation(object):
 
 		# Run all the validation subroutines:
 		self.basic()
+		self.cleanup()
 		self.plot_mag2flux()
 		self.plot_pixinaperture()
 		self.plot_contam()
@@ -353,7 +355,7 @@ class DataValidation(object):
 		self.plot_mag_dist()
 		self.plot_waittime()
 		self.plot_haloswitch()
-		self.cleanup()
+		self.camera_overlap()
 
 		# All the data validation flags are now saved in the database table, so let's combine
 		# them and mark which targets should be approved:
@@ -1873,6 +1875,10 @@ class DataValidation(object):
 	#----------------------------------------------------------------------------------------------
 	def cleanup(self):
 		cleanup(self)
+
+	#----------------------------------------------------------------------------------------------
+	def camera_overlap(self):
+		camera_overlap(self)
 
 	#----------------------------------------------------------------------------------------------
 	def plot_waittime(self):
