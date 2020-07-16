@@ -114,7 +114,7 @@ class DataValidation(object):
 				# Since this one is NOT NULL, we have to do some magic to fill out the
 				# new column after creation, by finding keywords in other columns.
 				# This can be a pretty slow process, but it only has to be done once.
-				self.logger.debug("Adding method_used column to diagnostics")
+				logger.debug("Adding method_used column to diagnostics")
 				self.cursor.execute("ALTER TABLE diagnostics ADD COLUMN method_used TEXT NOT NULL DEFAULT 'aperture';")
 				for m in ('aperture', 'halo', 'psf', 'linpsf'):
 					self.cursor.execute("UPDATE diagnostics SET method_used=? WHERE priority IN (SELECT priority FROM todolist WHERE method=?);", [m, m])
