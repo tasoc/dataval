@@ -64,7 +64,7 @@ def main():
 		logging_level = logging.DEBUG
 
 	# Setup logging:
-	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+	formatter = logging.Formatter('%(asctime)s - %(levelname)-7s - %(funcName)-10.10s - %(message)s')
 	console = logging.StreamHandler()
 	console.setFormatter(formatter)
 	logger = logging.getLogger('dataval')

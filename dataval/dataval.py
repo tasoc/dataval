@@ -95,6 +95,9 @@ class DataValidation(object):
 			else:
 				self.input_folders[k] = os.path.dirname(todo_file)
 
+			# Make sure it is an absolute path:
+			todo_file = os.path.abspath(todo_file)
+
 			logger.info("Loading input data from '%s'", todo_file)
 			if not os.path.isfile(todo_file):
 				raise FileNotFoundError("TODO file not found: '%s'" % todo_file)
@@ -178,7 +181,7 @@ class DataValidation(object):
 		logger.info("Putting output data in '%s'", self.outfolder)
 
 		# Also write any logging output to the
-		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+		formatter = logging.Formatter('%(asctime)s - %(levelname)-7s - %(funcName)-10.10s - %(message)s')
 		self._filehandler = logging.FileHandler(os.path.join(self.outfolder, logfilename), mode='w')
 		self._filehandler.setFormatter(formatter)
 		self._filehandler.setLevel(logging.INFO)

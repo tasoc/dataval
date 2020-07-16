@@ -35,7 +35,7 @@ def cleanup(dval):
 	results = dval.cursor.fetchall()
 	num_cleanups = len(results)
 
-	logger.info("%d files can be cleaned up", num_cleanups)
+	logger.info("  %d files can be cleaned up", num_cleanups)
 
 	# Only actually perform the cleanups if we are saving validations:
 	if dval.doval and num_cleanups > 0:
