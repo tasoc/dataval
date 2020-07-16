@@ -17,7 +17,6 @@ from scipy.optimize import minimize
 from scipy.stats import binned_statistic as binning
 from statsmodels.nonparametric.kde import KDEUnivariate as KDE
 from tqdm import tqdm
-import enum
 import itertools
 
 # Plotting:
@@ -29,6 +28,7 @@ from matplotlib.ticker import MultipleLocator, ScalarFormatter
 import seaborn as sns
 
 # Local packages:
+from .status import STATUS
 from .quality import DatavalQualityFlags
 from .utilities import mad, CounterFilter, find_lightcurve_files # rms_timescale, sphere_distance
 from .noise_model import phot_noise
@@ -38,22 +38,8 @@ from .waittime import plot_waittime
 from .haloswitch import plot_haloswitch
 
 #--------------------------------------------------------------------------------------------------
-class STATUS(enum.IntEnum):
-	"""
-	Status indicator of the status of the correction.
-	"""
-	UNKNOWN = 0 #: The status is unknown. The actual calculation has not started yet.
-	STARTED = 6 #: The calculation has started, but not yet finished.
-	OK = 1      #: Everything has gone well.
-	ERROR = 2   #: Encountered a catastrophic error that I could not recover from.
-	WARNING = 3 #: Something is a bit fishy. Maybe we should try again with a different algorithm?
-	ABORT = 4   #: The calculation was aborted.
-	SKIPPED = 5 #: The target was skipped because the algorithm found that to be the best solution.
-
-#--------------------------------------------------------------------------------------------------
 class DataValidation(object):
 
-	#----------------------------------------------------------------------------------------------
 	def __init__(self, input_folders, output_folder=None, corr=False, validate=True,
 		colorbysector=False, ext='png', showplots=False, sysnoise=0):
 		"""
