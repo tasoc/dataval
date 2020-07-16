@@ -108,6 +108,19 @@ class DataValidation(object):
 			if self.corr and not self.corrections_done:
 				raise ValueError("Can not run dataval on corr when corrections have not been run")
 
+			# Add method_used to the diagnostics table if it doesn't exist:
+			self.cursor.execute("PRAGMA table_info(diagnostics)")
+			if 'method_used' not in [r['name'] for r in self.cursor.fetchall()]:
+				# Since this one is NOT NULL, we have to do some magic to fill out the
+				# new column after creation, by finding keywords in other columns.
+				# This can be a pretty slow process, but it only has to be done once.
+				self.logger.debug("Adding method_used column to diagnostics")
+				self.cursor.execute("ALTER TABLE diagnostics ADD COLUMN method_used TEXT NOT NULL DEFAULT 'aperture';")
+				for m in ('aperture', 'halo', 'psf', 'linpsf'):
+					self.cursor.execute("UPDATE diagnostics SET method_used=? WHERE priority IN (SELECT priority FROM todolist WHERE method=?);", [m, m])
+				self.cursor.execute("UPDATE diagnostics SET method_used='halo' WHERE method_used='aperture' AND errors LIKE '%Automatically switched to Halo photometry%';")
+				self.conn.commit()
+
 			# Get the corrector that was run on this TODO-file, if the corr_settings table is available:
 			if self.corr:
 				self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='corr_settings';")
@@ -656,7 +669,7 @@ class DataValidation(object):
 		# Search database for all targets processed with aperture photometry:
 		star_vals = self.search_database(
 			select=['todolist.priority','todolist.sector','todolist.datasource','todolist.tmag','contamination'],
-			search="(method IS NULL or method='aperture')")
+			search="method_used='aperture'")
 
 		rgba_color = 'k'
 		if self.color_by_sector:
