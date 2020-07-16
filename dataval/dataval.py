@@ -32,6 +32,7 @@ from .status import STATUS
 from .quality import DatavalQualityFlags
 from .utilities import mad, CounterFilter, find_lightcurve_files # rms_timescale, sphere_distance
 from .noise_model import phot_noise
+from .version import get_version
 
 # Data Validation methods in separate sub-packages:
 from .cleanup import cleanup
@@ -166,6 +167,7 @@ class DataValidation(object):
 			self.conn.commit()
 
 			# Fill out the table with zero dataval and NULL in approved:
+			logger.info("Initializing datavalidation table...")
 			self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority) SELECT priority FROM todolist;")
 			self.conn.commit()
 
@@ -186,6 +188,9 @@ class DataValidation(object):
 		# being passed through the logger. Can be used to count the number of errors/warnings:
 		self._counterfilter = CounterFilter()
 		logger.addFilter(self._counterfilter)
+
+		# Log the version of the data validation being run:
+		logger.info("Data Validation version: %s", get_version())
 
 		# Write to log if we are saving or not:
 		if self.doval:
