@@ -76,10 +76,10 @@ def main():
 		validate=args.validate, colorbysector=args.colorbysector,
 		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise) as dval:
 
-		if 'basic' in args.method:
-			dval.basic()
 		if 'cleanup' in args.method:
 			dval.cleanup()
+		if 'basic' in args.method:
+			dval.basic()
 		if 'mag2flux' in args.method:
 			dval.plot_mag2flux()
 		if 'pixvsmag' in args.method:

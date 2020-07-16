@@ -349,9 +349,11 @@ class DataValidation(object):
 		logger = logging.getLogger(__name__)
 		logger.info('--------------------------------------------------------')
 
+		# Run the cleanup as the first, since this may actually change things:
+		self.cleanup()
+
 		# Run all the validation subroutines:
 		self.basic()
-		self.cleanup()
 		self.plot_mag2flux()
 		self.plot_pixinaperture()
 		self.plot_contam()
