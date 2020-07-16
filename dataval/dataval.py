@@ -34,6 +34,7 @@ from .utilities import mad, CounterFilter, find_lightcurve_files # rms_timescale
 from .noise_model import phot_noise
 
 # Data Validation methods in separate sub-packages:
+from .cleanup import cleanup
 from .waittime import plot_waittime
 from .haloswitch import plot_haloswitch
 
@@ -352,6 +353,7 @@ class DataValidation(object):
 		self.plot_mag_dist()
 		self.plot_waittime()
 		self.plot_haloswitch()
+		self.cleanup()
 
 		# All the data validation flags are now saved in the database table, so let's combine
 		# them and mark which targets should be approved:
@@ -1867,6 +1869,10 @@ class DataValidation(object):
 			plt.show()
 		else:
 			plt.close(fig)
+
+	#----------------------------------------------------------------------------------------------
+	def cleanup(self):
+		cleanup(self)
 
 	#----------------------------------------------------------------------------------------------
 	def plot_waittime(self):

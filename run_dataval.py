@@ -14,11 +14,28 @@ import dataval
 
 #--------------------------------------------------------------------------------------------------
 def main():
+
+	# All available methods:
+	methods = [
+		'basic',
+		'cleanup',
+		'pixvsmag',
+		'contam',
+		'mag2flux',
+		'stamp',
+		'noise',
+		'noise_compare',
+		'magdist',
+		'waittime',
+		'haloswitch',
+		'sumimage'
+	]
+
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run Data Validation pipeline.')
 	parser.add_argument('-c', '--corrected', help='Use corrected or raw values.', action='store_true')
 	parser.add_argument('-v', '--validate', help='Store validation.', action='store_true')
-	parser.add_argument('-m', '--method', help='Corrector method to run.', action='append', default=[], choices=('basic', 'pixvsmag', 'contam', 'mag2flux', 'stamp', 'noise', 'noise_compare', 'magdist', 'waittime', 'haloswitch', 'sumimage'))
+	parser.add_argument('-m', '--method', help='Corrector method to run.', action='append', default=[], choices=methods)
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 
@@ -60,6 +77,8 @@ def main():
 
 		if 'basic' in args.method:
 			dval.basic()
+		if 'cleanup' in args.method:
+			dval.cleanup()
 		if 'mag2flux' in args.method:
 			dval.plot_mag2flux()
 		if 'pixvsmag' in args.method:
