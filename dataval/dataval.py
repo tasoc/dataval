@@ -577,7 +577,8 @@ class DataValidation(object):
 		# Patterns can contain wildcards (% or _):
 		specific_errors = [
 			'FileNotFoundError',
-			'sqlite3.%'
+			'sqlite3.%',
+			'TargetNotFoundError' # custom "error" set in photometry.TaskManager.save_result
 		]
 
 		logger.info("Checking for specific errors...")
