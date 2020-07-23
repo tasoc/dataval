@@ -6,7 +6,6 @@ Handling of TESS data quality flags.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
 import numpy as np
 
 #------------------------------------------------------------------------------
@@ -25,8 +24,8 @@ class QualityFlagsBase(object):
 
 		Returns:
 			list of str: List of human-readable strings giving a short
-			             description of the quality flags raised.
-						 Returns an empty list if no flags raised.
+				description of the quality flags raised.
+				Returns an empty list if no flags raised.
 		"""
 		result = []
 		for flag in cls.STRINGS.keys():
@@ -80,13 +79,14 @@ class DatavalQualityFlags(QualityFlagsBase):
 	SmallStamp = 128
 	LowPTP = 256
 	LowRMS = 512
-	ContaminationOne = 1024
+	InvalidContamination = 1024
+	ContaminationOne = InvalidContamination # Alias for older name
 	ContaminationHigh = 2048
 	InvalidFlux = 4096
 	InvalidNoise = 8192
 
 	# Default bitmask
-	DEFAULT_BITMASK = (InvalidFlux | ContaminationOne | SmallMask | LargeMask | InvalidNoise)
+	DEFAULT_BITMASK = (InvalidFlux | InvalidContamination | SmallMask | LargeMask | InvalidNoise)
 
 	# Pretty string descriptions for each flag
 	STRINGS = {
@@ -100,7 +100,7 @@ class DatavalQualityFlags(QualityFlagsBase):
 		SmallStamp: "Smaller stamp than default",
 		LowPTP: "PTP lower than theoretical",
 		LowRMS: "RMS lower than theoretical",
-		ContaminationOne: "Contamination over 1",
+		InvalidContamination: "Invalid contamination",
 		ContaminationHigh: "Contamination high",
 		InvalidFlux: "Invalid mean flux (not finite or negative)"
 	}

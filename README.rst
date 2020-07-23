@@ -1,15 +1,20 @@
-**********************
-Data validation module
-**********************
+********************************
+The TASOC Data Validation module
+********************************
 .. image:: https://travis-ci.org/tasoc/dataval.svg?branch=devel
     :target: https://travis-ci.org/tasoc/dataval
+.. image:: https://img.shields.io/codecov/c/github/tasoc/dataval/devel
+    :target: https://codecov.io/github/tasoc/dataval
+.. image:: https://hitsofcode.com/github/tasoc/dataval?branch=devel
+    :alt: Hits-of-Code
+    :target: https://hitsofcode.com/view/github/tasoc/dataval?branch=devel
 .. image:: https://img.shields.io/github/license/tasoc/dataval.svg
     :alt: license
     :target: https://github.com/tasoc/dataval/blob/devel/LICENSE
 
 This module provides the data-validation setup for the TESS Asteroseismic Science Operations Center (TASOC) pipeline.
 
-The code is available through our GitHub organization (https://github.com/tasoc/photometry) and full documentation for this code can be found on https://tasoc.dk/code/.
+The code is available through our GitHub organization (https://github.com/tasoc/dataval) and full documentation for this code can be found on https://tasoc.dk/code/.
 
 Installation instructions
 =========================

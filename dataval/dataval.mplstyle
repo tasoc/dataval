@@ -1,0 +1,26 @@
+font.family      : serif
+text.usetex      : False
+mathtext.fontset : dejavuserif
+
+savefig.bbox     : tight
+
+axes.labelsize   : 16
+axes.labelpad    : 10
+
+legend.fontsize  : 12
+
+xtick.direction  : out
+xtick.minor.visible : True
+xtick.labelsize  : 15
+xtick.major.size : 5
+xtick.major.pad  : 6
+xtick.minor.size : 3
+xtick.minor.pad  : 5
+
+ytick.direction  : out
+ytick.minor.visible : True
+ytick.labelsize  : 15
+ytick.major.size : 5
+ytick.major.pad  : 6
+ytick.minor.size : 3
+ytick.minor.pad  : 5
