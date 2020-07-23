@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Tests of DataValidation.
+Tests of DataValidation command-line interface.
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
