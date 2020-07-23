@@ -3,6 +3,11 @@ The TASOC Data Validation module
 ********************************
 .. image:: https://travis-ci.org/tasoc/dataval.svg?branch=devel
     :target: https://travis-ci.org/tasoc/dataval
+.. image:: https://img.shields.io/codecov/c/github/tasoc/dataval/devel
+    :target: https://codecov.io/github/tasoc/dataval
+.. image:: https://hitsofcode.com/github/tasoc/dataval?branch=devel
+    :alt: Hits-of-Code
+    :target: https://hitsofcode.com/view/github/tasoc/dataval?branch=devel
 .. image:: https://img.shields.io/github/license/tasoc/dataval.svg
     :alt: license
     :target: https://github.com/tasoc/dataval/blob/devel/LICENSE
