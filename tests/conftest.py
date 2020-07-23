@@ -26,6 +26,7 @@ def SHARED_INPUT_DIR():
 		tmp = os.path.join(my_tmpdir, 'input')
 		shutil.copytree(INPUT_DIR, tmp)
 		yield tmp
+		shutil.rmtree(tmp)
 
 #--------------------------------------------------------------------------------------------------
 @pytest.fixture(scope='function')
@@ -38,6 +39,7 @@ def PRIVATE_INPUT_DIR():
 		tmp = os.path.join(my_tmpdir, 'input')
 		shutil.copytree(INPUT_DIR, tmp)
 		yield tmp
+		shutil.rmtree(tmp)
 
 #--------------------------------------------------------------------------------------------------
 @pytest.fixture(scope='function')
