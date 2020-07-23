@@ -29,7 +29,7 @@ def test_dataval(PRIVATE_INPUT_DIR, inp, corr):
 	# On this input file it should be possible to run with both
 	with DataValidation([test_dir], corr=corr) as dataval:
 		# Run validation:
-		dataval.Validations()
+		dataval.validate()
 
 		# Count the number of stars in to TODOLIST:
 		dataval.cursor.execute("SELECT COUNT(*) FROM todolist;")

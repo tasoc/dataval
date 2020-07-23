@@ -20,9 +20,9 @@ def main():
 		'basic',
 		'cleanup',
 		'pixvsmag',
+		'stampsize',
 		'contam',
 		'mag2flux',
-		'stamp',
 		'noise',
 		'noise_compare',
 		'magdist',
@@ -81,11 +81,11 @@ def main():
 		if 'basic' in args.method:
 			dval.basic()
 		if 'mag2flux' in args.method:
-			dval.plot_mag2flux()
+			dval.mag2flux()
 		if 'pixvsmag' in args.method:
-			dval.plot_pixinaperture()
-		if 'stamp' in args.method:
-			dval.plot_stamp()
+			dval.pixinaperture()
+		if 'stampsize' in args.method:
+			dval.stampsize()
 		if 'magdist' in args.method:
 			dval.plot_mag_dist()
 		if 'noise' in args.method:
@@ -93,13 +93,13 @@ def main():
 		if 'noise_compare' in args.method:
 			dval.compare_noise()
 		if 'contam' in args.method:
-			dval.plot_contam()
+			dval.contam()
 		if 'magdistoverlap' in args.method:
 			dval.plot_mag_dist_overlap()
 		if 'waittime' in args.method:
-			dval.plot_waittime()
+			dval.waittime()
 		if 'haloswitch' in args.method:
-			dval.plot_haloswitch()
+			dval.haloswitch()
 		if 'camera_overlap' in args.method:
 			dval.camera_overlap()
 
@@ -109,7 +109,7 @@ def main():
 
 		# Run validation
 		if not args.method:
-			dval.Validations()
+			dval.validate()
 
 		# Get the number of logs (errors, warnings, info) issued during the validations:
 		logcounts = dval.logcounts

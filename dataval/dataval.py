@@ -37,8 +37,8 @@ from .version import get_version
 # Data Validation methods in separate sub-packages:
 from .cleanup import cleanup
 from .camera_overlap import camera_overlap
-from .waittime import plot_waittime
-from .haloswitch import plot_haloswitch
+from .waittime import waittime
+from .haloswitch import haloswitch
 
 #--------------------------------------------------------------------------------------------------
 class DataValidation(object):
@@ -342,7 +342,7 @@ class DataValidation(object):
 			logger.info("Nothing to update.")
 
 	#----------------------------------------------------------------------------------------------
-	def Validations(self):
+	def validate(self):
 		"""
 		Run all validations and write out summary.
 
@@ -357,14 +357,14 @@ class DataValidation(object):
 
 		# Run all the validation subroutines:
 		self.basic()
-		self.plot_mag2flux()
-		self.plot_pixinaperture()
-		self.plot_contam()
+		self.mag2flux()
+		self.pixinaperture()
+		self.stampsize()
+		self.contam()
 		self.plot_noise()
-		self.plot_stamp()
 		self.plot_mag_dist()
-		self.plot_waittime()
-		self.plot_haloswitch()
+		self.waittime()
+		self.haloswitch()
 		self.camera_overlap()
 
 		# All the data validation flags are now saved in the database table, so let's combine
@@ -665,7 +665,7 @@ class DataValidation(object):
 			logger.error("%d leftover lightcurves.", leftover_lightcurves)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_contam(self):
+	def contam(self):
 		"""
 		Function to plot the contamination against the stellar TESS magnitudes
 
@@ -1161,7 +1161,7 @@ class DataValidation(object):
 		self.update_dataval(pri, dv)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_pixinaperture(self):
+	def pixinaperture(self):
 		"""
 		Function to plot number of pixels in determined apertures against the stellar
 		TESS magnitudes.
@@ -1433,7 +1433,7 @@ class DataValidation(object):
 		self.update_dataval(pri, dv)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_mag2flux(self):
+	def mag2flux(self):
 		"""
 		Function to plot flux values from apertures against the stellar TESS magnitudes,
 		and determine coefficient describing the relation
@@ -1578,7 +1578,7 @@ class DataValidation(object):
 		self.update_dataval(pri, dv)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_stamp(self):
+	def stampsize(self):
 		"""
 		Function to plot width and height of pixel stamps against the stellar TESS magnitudes
 
@@ -1892,9 +1892,9 @@ class DataValidation(object):
 		camera_overlap(self)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_waittime(self):
-		plot_waittime(self)
+	def waittime(self):
+		waittime(self)
 
 	#----------------------------------------------------------------------------------------------
-	def plot_haloswitch(self):
-		plot_haloswitch(self)
+	def haloswitch(self):
+		haloswitch(self)

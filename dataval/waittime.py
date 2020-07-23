@@ -13,7 +13,7 @@ from astropy.table import Table
 from .plots import plt
 
 #--------------------------------------------------------------------------------------------------
-def plot_waittime(dval):
+def waittime(dval):
 	"""
 	Visualize the worker wait-time during the processing.
 

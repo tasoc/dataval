@@ -13,7 +13,7 @@ from .plots import plt
 from .utilities import mag2flux
 
 #--------------------------------------------------------------------------------------------------
-def plot_haloswitch(dval):
+def haloswitch(dval):
 	"""
 	Visualize the diagnostics used to automatically switch to Halo photometry.
 
