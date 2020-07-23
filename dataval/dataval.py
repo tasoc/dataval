@@ -25,7 +25,6 @@ import matplotlib.colors as colors
 import matplotlib.cm as cmx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import MultipleLocator, ScalarFormatter
-import seaborn as sns
 
 # Local packages:
 from .status import STATUS
@@ -1065,7 +1064,18 @@ class DataValidation(object):
 
 		# Plot theoretical lines
 		mags = np.linspace(self.tmag_limits[0], self.tmag_limits[1], 200)
-		cols = sns.color_palette("colorblind", 4)
+
+		# Colors for lines:
+		# Define the colors directly here to avoid having to import
+		# the entire seaborn library, but they come from the seaborn
+		# 'colorblind' palette:
+		#     cols = seaborn.color_palette("colorblind", 4)
+		cols = [
+			(0.00392156862745098, 0.45098039215686275, 0.6980392156862745),
+			(0.8705882352941177, 0.5607843137254902, 0.0196078431372549),
+			(0.00784313725490196, 0.6196078431372549, 0.45098039215686275),
+			(0.8352941176470589, 0.3686274509803922, 0.0)
+		]
 
 		# Expected *1-hour* RMS noise ffi
 		# TODO: Update elat+elon based on observing sector?
