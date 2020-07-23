@@ -1655,12 +1655,11 @@ class DataValidation(object):
 		scalarMap = cmx.ScalarMappable(norm=normalize2, cmap=plt.get_cmap('Set1'))
 		for jj in range(0, int(np.max(resize))):
 			rgba_color = scalarMap.to_rgba(jj)
-			try:
-				kde1 = KDE(et[ds][(resize[ds] == jj) & (et[ds] < 50)])
+			kde_data = et[ds][(resize[ds] == jj) & (et[ds] < 50)]
+			if len(kde_data):
+				kde1 = KDE(kde_data)
 				kde1.fit(gridsize=1000)
 				ax21.plot(kde1.support, kde1.density, color=rgba_color)
-			except:
-				pass
 
 		kde1 = KDE(et[ds & (et < 50)])
 		kde1.fit(gridsize=1000)

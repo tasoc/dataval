@@ -53,6 +53,6 @@ def cleanup(dval):
 				# Delete the file on disk:
 				if os.path.isfile(fpath):
 					os.remove(fpath)
-			except:
+			except: # noqa: E722, pragma: no cover
 				dval.conn.rollback()
 				raise
