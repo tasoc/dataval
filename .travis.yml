@@ -22,6 +22,17 @@ jobs:
     - name: "Python 3.8 on Linux"
       python: "3.8"
 
+    - name: "Python 3.7 on Mac"
+      os: osx
+      osx_image: xcode11.2 # Python 3.7.4 running on macOS 10.14.4
+      language: shell
+      before_install:
+        - brew install git-lfs
+        - python3 --version
+        - git lfs install
+        - git lfs pull
+      env: PYTHON="python3" PIP="sudo pip3"
+
     - name: "Python 3.6 on Windows"
       os: windows
       language: shell  # 'language: python' is an error on Travis CI Windows
@@ -69,6 +80,7 @@ jobs:
   allow_failures:
     - name: "Flake8"
     - os: windows
+    - os: osx
 
 # commands to install dependencies
 install:
@@ -76,7 +88,7 @@ install:
   - $PIP install -r requirements.txt
   - $PIP install codecov pytest-cov
 script:
-  - $PYTHON -m pytest --cov=dataval/
+  - $PYTHON -m pytest --cov=./
 after_success:
   - $PYTHON -m codecov
 

@@ -11,7 +11,6 @@ import os.path
 import tempfile
 import shutil
 import sys
-import time
 
 if sys.path[0] != os.path.abspath(os.path.join(os.path.dirname(__file__), '..')):
 	sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -27,8 +26,6 @@ def SHARED_INPUT_DIR():
 		tmp = os.path.join(my_tmpdir, 'input')
 		shutil.copytree(INPUT_DIR, tmp)
 		yield tmp
-		time.sleep(1.0)
-		shutil.rmtree(tmp)
 
 #--------------------------------------------------------------------------------------------------
 @pytest.fixture(scope='function')
@@ -41,8 +38,6 @@ def PRIVATE_INPUT_DIR():
 		tmp = os.path.join(my_tmpdir, 'input')
 		shutil.copytree(INPUT_DIR, tmp)
 		yield tmp
-		time.sleep(1.0)
-		shutil.rmtree(tmp)
 
 #--------------------------------------------------------------------------------------------------
 @pytest.fixture(scope='function')
