@@ -3,6 +3,12 @@ cache: pip
 os: linux
 dist: xenial
 
+# Since the different OS can't agree what the executables are called,
+# we will use environment variables to store the names:
+env:
+  global:
+    - PYTHON="python" PIP="pip"
+
 # We are specifying the build matrix manually, since there is too little overlap
 # between the different builds:
 jobs:
@@ -23,7 +29,8 @@ jobs:
         - choco install python --version 3.6.8
         - python --version
         - git lfs pull
-      env: PATH=/c/Python36:/c/Python36/Scripts:$PATH
+      env:
+        - PATH=/c/Python36:/c/Python36/Scripts:$PATH
 
     - name: "Python 3.7 on Windows"
       os: windows
@@ -32,7 +39,8 @@ jobs:
         - choco install python --version 3.7.4
         - python --version
         - git lfs pull
-      env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
+      env:
+        - PATH=/c/Python37:/c/Python37/Scripts:$PATH
 
     - name: "Python 3.8 on Windows"
       os: windows
@@ -52,6 +60,7 @@ jobs:
         - pip install flake8
       script:
         - flake8
+      after_success: skip
 
   # Allow some newer versions of Python to fail for now
   # This will be changed once the required packages starts
@@ -63,13 +72,13 @@ jobs:
 
 # commands to install dependencies
 install:
-  - python -m pip install --upgrade pip
-  - pip install -r requirements.txt
-  - pip install codecov pytest-cov
+  - $PYTHON -m pip install --upgrade pip
+  - $PIP install -r requirements.txt
+  - $PIP install codecov pytest-cov
 script:
-  - pytest --cov=dataval/
+  - $PYTHON -m pytest --cov=dataval/
 after_success:
-  - codecov
+  - $PYTHON -m codecov
 
 branches:
   only:
