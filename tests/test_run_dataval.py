@@ -50,7 +50,7 @@ def test_run_dataval(PRIVATE_INPUT_DIR, inp, corr, save):
 	test_dir = os.path.join(PRIVATE_INPUT_DIR, inp, 'todo.sqlite')
 
 	params = '--quiet {corr:s} {validate:s} "{input_dir:s}"'.format(
-		corr='--corr' if corr else '',
+		corr='--corrected' if corr else '',
 		validate='--validate' if save else '',
 		input_dir=test_dir
 	)
