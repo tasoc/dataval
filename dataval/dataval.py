@@ -577,7 +577,8 @@ class DataValidation(object):
 		specific_errors = [
 			'FileNotFoundError',
 			'sqlite3.%',
-			'TargetNotFoundError' # custom "error" set in photometry.TaskManager.save_result
+			'TargetNotFoundError', # custom "error" set in photometry.TaskManager.save_result
+			'TypeError'
 		]
 
 		logger.info("Checking for specific errors...")
