@@ -37,7 +37,7 @@ def camera_overlap(dval):
 
 	# Check for duplicate lightcurves:
 	# In later versions of the pipeline this is impossible, but check it anyway
-	dval.cursor.execute("SELECT * FROM diagnostics GROUP BY lightcurve HAVING COUNT(*) > 1;")
+	dval.cursor.execute("SELECT * FROM diagnostics WHERE lightcurve IS NOT NULL GROUP BY lightcurve HAVING COUNT(*) > 1;")
 	results = dval.cursor.fetchall()
 	if len(results) > 0:
 		logger.error("  Duplicate raw lightcurved detected: %d", len(results))
@@ -47,7 +47,7 @@ def camera_overlap(dval):
 	if dval.corr:
 		# Check for duplicate corrected lightcurves:
 		# In later versions of the pipeline this is impossible, but check it anyway
-		dval.cursor.execute("SELECT * FROM diagnostics_corr GROUP BY lightcurve HAVING COUNT(*) > 1;")
+		dval.cursor.execute("SELECT * FROM diagnostics_corr WHERE lightcurve IS NOT NULL GROUP BY lightcurve HAVING COUNT(*) > 1;")
 		results = dval.cursor.fetchall()
 		if len(results) > 0:
 			logger.error("  Duplicate corrected lightcurved detected: %d", len(results))
