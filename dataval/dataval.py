@@ -111,6 +111,7 @@ class DataValidation(object):
 			self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
 			self.corrections_done = bool(self.cursor.fetchone()[0] == 1)
 			if self.corr and not self.corrections_done:
+				self.close()
 				raise ValueError("Can not run dataval on corr when corrections have not been run")
 
 			# Add method_used to the diagnostics table if it doesn't exist:
