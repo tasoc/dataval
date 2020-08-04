@@ -60,7 +60,7 @@ class DataValidation(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 
 		# Store inputs:
 		self.input_folders = input_folders
