@@ -236,7 +236,7 @@ class DataValidation(object):
 
 		# Close the logging FileHandler:
 		if hasattr(self, '_filehandler'):
-			logger = logging.getLogger(__name__)
+			logger = logging.getLogger('dataval')
 			self._filehandler.close()
 			logger.removeHandler(self._filehandler)
 
