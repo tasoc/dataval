@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Tests of plots
@@ -10,11 +10,11 @@ import pytest
 import numpy as np
 from scipy.stats import multivariate_normal
 import conftest # noqa: F401
-from dataval.plots import plt, plot_image, plot_image_fit_residuals
+from dataval.plots import plt, plot_image, plot_image_fit_residuals, plots_interactive
 
 kwargs = {'baseline_dir': 'baseline_images'}
 
-#-------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 #@pytest.mark.mpl_image_compare(**kwargs)
 def test_plot_image():
 
@@ -32,12 +32,12 @@ def test_plot_image():
 	plot_image(gauss, ax=ax2, scale='sqrt', title='Sqrt')
 	ax2.plot(mu[1], mu[0], 'r+')
 	ax3 = fig.add_subplot(133)
-	plot_image(gauss, ax=ax3, scale='log', title='Log', cmap='Reds', make_cbar=True)
+	plot_image(gauss, ax=ax3, scale='log', title='Log', cmap='Reds', cbar='right')
 	ax3.plot(mu[1], mu[0], 'r+')
 
 	return fig
 
-#-------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 def test_plot_image_invalid():
 
 	mu = [3.5, 3]
@@ -59,11 +59,11 @@ def test_plot_image_invalid():
 
 	# Run with all-NaN image:
 	gauss[:, :] = np.NaN
-	assert plot_image(gauss, ax=ax1) is None
+	plot_image(gauss, ax=ax1)
 
 	plt.close(fig)
 
-#-------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 #@pytest.mark.mpl_image_compare(**kwargs)
 def test_plot_image_grid():
 
@@ -81,7 +81,7 @@ def test_plot_image_grid():
 	ax.grid(True)
 	return fig
 
-#-------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 #@pytest.mark.mpl_image_compare(**kwargs)
 def test_plot_image_grid_offset():
 
@@ -130,11 +130,7 @@ def test_plot_image_data_change():
 
 #-------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	plt.switch_backend('TkAgg')
+	plots_interactive()
 	plt.close('all')
-	test_plot_image()
-	test_plot_image_invalid()
-	test_plot_image_grid()
-	test_plot_image_grid_offset()
-	test_plot_image_data_change()
+	pytest.main([__file__])
 	plt.show()
