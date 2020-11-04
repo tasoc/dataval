@@ -40,14 +40,14 @@ def capture_run_release(params):
 	return out, err, exitcode
 
 #--------------------------------------------------------------------------------------------------
-def test_run_release_wrong_file(PRIVATE_INPUT_DIR):
+def test_run_release_wrong_file(SHARED_INPUT_DIR):
 	"""
 	Try to run package release on different input.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	input_file = os.path.join(PRIVATE_INPUT_DIR, 'ready_for_release', 'todo-does-not-exist.sqlite')
+	input_file = os.path.join(SHARED_INPUT_DIR, 'ready_for_release', 'todo-does-not-exist.sqlite')
 	params = '--debug "{input_file:s}"'.format(input_file=input_file)
 	out, err, exitcode = capture_run_release(params)
 	assert exitcode == 2
