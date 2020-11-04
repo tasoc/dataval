@@ -9,7 +9,6 @@ Tests of DataValidation command-line interface.
 import pytest
 import os.path
 import sys
-import shlex
 import subprocess
 import sqlite3
 from contextlib import closing
@@ -20,10 +19,8 @@ from dataval.utilities import get_filehash
 #--------------------------------------------------------------------------------------------------
 def capture_run_release(params):
 
-	command = '"%s" run_package_release.py %s' % (sys.executable, params.strip())
-	print(command)
-
-	cmd = shlex.split(command)
+	cmd = [sys.executable, 'run_package_release.py'] + params
+	print(cmd)
 	proc = subprocess.Popen(cmd,
 		cwd=os.path.join(os.path.dirname(__file__), '..'),
 		stdout=subprocess.PIPE,
@@ -48,8 +45,7 @@ def test_run_release_wrong_file(SHARED_INPUT_DIR):
 	"""
 
 	input_file = os.path.join(SHARED_INPUT_DIR, 'ready_for_release', 'todo-does-not-exist.sqlite')
-	params = '--debug "{input_file:s}"'.format(input_file=input_file)
-	out, err, exitcode = capture_run_release(params)
+	out, err, exitcode = capture_run_release(['--debug', input_file])
 	assert exitcode == 2
 	assert 'Input file does not exist' in out
 
@@ -79,9 +75,7 @@ def test_run_release(PRIVATE_INPUT_DIR, corrector):
 	input_file = os.path.join(PRIVATE_INPUT_DIR, 'ready_for_release', 'todo-{0:s}.sqlite'.format(corrector))
 	print(input_file)
 
-	params = '--jobs=1 --version=5 "{input_file:s}"'.format(
-		input_file=input_file
-	)
+	params = ['--jobs=1', '--version=5', input_file]
 	out, err, exitcode = capture_run_release(params)
 	assert exitcode == 0
 
@@ -148,10 +142,7 @@ def test_run_release_wrong_db(PRIVATE_INPUT_DIR, changes, expect_returncode, exp
 		cursor.execute(changes)
 		conn.commit()
 
-	params = '--quiet --version=5 "{input_file:s}"'.format(
-		input_file=input_file
-	)
-	out, err, exitcode = capture_run_release(params)
+	out, err, exitcode = capture_run_release(['--quiet', '--version=5', input_file])
 	assert exitcode == expect_returncode
 	assert expect_msg in out or expect_msg in err
 
