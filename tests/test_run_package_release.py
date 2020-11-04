@@ -65,7 +65,7 @@ def test_run_release(PRIVATE_INPUT_DIR, corrector):
 	input_file = os.path.join(PRIVATE_INPUT_DIR, 'ready_for_release', 'todo-{0:s}.sqlite'.format(corrector))
 	print(input_file)
 
-	params = '--quiet --jobs=1 "{input_file:s}"'.format(
+	params = '--jobs=1 "{input_file:s}"'.format(
 		input_file=input_file
 	)
 	out, err, exitcode = capture_run_release(params)
@@ -100,8 +100,46 @@ def test_run_release(PRIVATE_INPUT_DIR, corrector):
 				assert hdr['TICID'] == row['starid']
 				assert hdr['CAMERA'] == row['camera']
 				assert hdr['CCD'] == row['ccd']
+				assert hdr['SECTOR'] == row['sector']
 
 		cursor.close()
+
+	# Re-running should not process anything:
+	out, err, exitcode = capture_run_release(params)
+	assert exitcode == 0
+	assert 'Nothing to process' in out
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize("changes,expect_returncode,expect_msg", [
+	["UPDATE corr_settings SET corrector='nonsense';", 2, 'Invalid corrector value'],
+	["UPDATE diagnostics_corr SET lightcurve='does-not-exists.fits.gz';", 2, 'File not found'],
+	["UPDATE todolist SET starid=-1 WHERE priority=1220;", 1, 'STARID'],
+	["UPDATE todolist SET sector=-1 WHERE priority=1220;", 1, 'SECTOR'],
+	["UPDATE todolist SET camera=-1 WHERE priority=1220;", 1, 'CAMERA'],
+	["UPDATE todolist SET ccd=-1 WHERE priority=1220;", 1, 'CCD'],
+])
+def test_run_release_wrong_db(PRIVATE_INPUT_DIR, changes, expect_returncode, expect_msg):
+	"""
+	Try to run package release on different input.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+
+	input_file = os.path.join(PRIVATE_INPUT_DIR, 'ready_for_release', 'todo-cbv.sqlite')
+	print(input_file)
+
+	with closing(sqlite3.connect(input_file)) as conn:
+		conn.row_factory = sqlite3.Row
+		cursor = conn.cursor()
+		cursor.execute(changes)
+		conn.commit()
+
+	params = '--quiet --jobs=1 "{input_file:s}"'.format(
+		input_file=input_file
+	)
+	out, err, exitcode = capture_run_release(params)
+	assert exitcode == expect_returncode
+	assert expect_msg in out or expect_msg in err
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

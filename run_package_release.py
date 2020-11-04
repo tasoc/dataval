@@ -176,6 +176,7 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None):
 	return {
 		'priority': row['priority'],
 		'starid': row['starid'],
+		'sector': row['sector'],
 		'camera': row['camera'],
 		'ccd': row['ccd'],
 		'cadence': cadence,
@@ -281,7 +282,7 @@ def main():
 
 	fix_file_wrapper = functools.partial(fix_file,
 		input_folder=input_folder,
-		check_corrector=corrector,
+		check_corrector=corrector[:3], # NOTE: Ensemble is onle "ens" in filenames
 		force_version=force_version)
 
 	release_db = os.path.join(input_folder, 'release-{0:s}.sqlite'.format(corrector))
@@ -297,6 +298,7 @@ def main():
 			priority INTEGER NOT NULL PRIMARY KEY,
 			lightcurve TEXT NOT NULL,
 			starid INTEGER NOT NULL,
+			sector INTEGER NOT NULL,
 			camera INTEGER NOT NULL,
 			ccd INTEGER NOT NULL,
 			cadence INTEGER NOT NULL,
@@ -330,10 +332,11 @@ def main():
 				inserted = 0
 				for info in tqdm(m(fix_file_wrapper, not_yet_processed), total=numfiles, **tqdm_settings):
 					logger.debug(info)
-					cursor.execute("INSERT INTO release (priority, lightcurve, starid, camera, ccd, cadence, filesize, filehash, datarel, dataval) VALUES (?,?,?,?,?,?,?,?,?,?);", [
+					cursor.execute("INSERT INTO release (priority, lightcurve, starid, sector, camera, ccd, cadence, filesize, filehash, datarel, dataval) VALUES (?,?,?,?,?,?,?,?,?,?,?);", [
 						info['priority'],
 						info['lightcurve'],
 						info['starid'],
+						info['sector'],
 						info['camera'],
 						info['ccd'],
 						info['cadence'],
