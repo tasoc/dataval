@@ -190,14 +190,13 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None):
 
 #--------------------------------------------------------------------------------------------------
 def main():
-	multiprocessing.freeze_support() # for Windows support
-
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Create movies of TESS cameras.')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing release file.', action='store_true')
 	parser.add_argument('-j', '--jobs', type=int, default=0, help="Number of parallel jobs.")
+	parser.add_argument('--version', type=int, default=None, help="Check that files are of this version.")
 	parser.add_argument('todofile', type=str, help="TODO-file.")
 	args = parser.parse_args()
 
@@ -226,12 +225,11 @@ def main():
 	}
 
 	# Parse input:
+	force_version = args.version
 	input_file = args.todofile
 	if not os.path.isfile(input_file):
 		logger.error("Input file does not exist: %s", input_file)
 		return 2
-
-	force_version = 5
 
 	# Decide on the number of parallel jobs to start:
 	threads = args.jobs
@@ -366,5 +364,7 @@ def main():
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
+	multiprocessing.freeze_support() # for Windows support
+
 	returncode = main()
 	sys.exit(returncode)
