@@ -201,7 +201,7 @@ class CounterFilter(logging.Filter):
 		super().__init__(*args, **kwargs)
 		self.counter = defaultdict(int)
 
-	def filter(self, record):
+	def filter(self, record): # noqa: A003
 		self.counter[record.levelname] += 1
 		return True
 

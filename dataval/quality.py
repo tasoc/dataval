@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Handling of TESS data quality flags.
@@ -33,7 +33,7 @@ class QualityFlagsBase(object):
 				result.append(cls.STRINGS[flag])
 		return result
 
-	@classmethod
+	@classmethod # noqa: A003
 	def filter(cls, quality, flags=None):
 		"""
 		Filter quality flags against a specific set of flags.
