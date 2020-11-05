@@ -11,7 +11,7 @@ Module Overview
 	:maxdepth: 4
 
 	dataval
-   
+
 
 Command-line Utilities
 ======================
@@ -20,3 +20,4 @@ Command-line Utilities
 	:maxdepth: 4
 
 	run_dataval
+	run_package_release
