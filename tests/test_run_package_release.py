@@ -141,6 +141,7 @@ def test_run_release_wrong_db(PRIVATE_INPUT_DIR, changes, expect_returncode, exp
 		cursor = conn.cursor()
 		cursor.execute(changes)
 		conn.commit()
+		cursor.close()
 
 	out, err, exitcode = capture_run_release(['--quiet', '--version=5', input_file])
 	assert exitcode == expect_returncode
