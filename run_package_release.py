@@ -155,16 +155,18 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None):
 			if check_fits_changes(fname_original, fname, allow_header_value_changes=['DATAVAL']):
 				os.remove(fname_original)
 			else:
-				logger.error("Nope! %s", fname)
+				logger.error("File check failed: %s", fname)
 				if os.path.exists(fname):
 					os.remove(fname)
 				os.rename(fname_original, fname)
+				raise Exception("File check failed: %s" % fname)
 		except: # noqa: E722
+			logger.exception("Whoops: %s", fname)
 			if os.path.exists(fname_original):
 				if os.path.exists(fname):
 					os.remove(fname)
 				os.rename(fname_original, fname)
-			logger.exception("Whoops: %s", fname)
+			raise
 
 	elif os.path.exists(fname_original):
 		os.remove(fname_original)

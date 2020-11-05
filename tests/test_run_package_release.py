@@ -50,8 +50,9 @@ def test_run_release_wrong_file(SHARED_INPUT_DIR):
 	assert 'Input file does not exist' in out
 
 #--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize("jobs", [1, 0])
 @pytest.mark.parametrize("corrector", ['cbv', ]) # 'ensemble'
-def test_run_release(PRIVATE_INPUT_DIR, corrector):
+def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 	"""
 	Try to run package release on different input.
 
@@ -75,7 +76,7 @@ def test_run_release(PRIVATE_INPUT_DIR, corrector):
 	input_file = os.path.join(PRIVATE_INPUT_DIR, 'ready_for_release', 'todo-{0:s}.sqlite'.format(corrector))
 	print(input_file)
 
-	params = ['--jobs=1', '--version=5', input_file]
+	params = ['--jobs={0:d}'.format(jobs), '--version=5', input_file]
 	out, err, exitcode = capture_run_release(params)
 	assert exitcode == 0
 
@@ -118,6 +119,7 @@ def test_run_release(PRIVATE_INPUT_DIR, corrector):
 	assert 'Nothing to process' in out
 
 #--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize("jobs", [1, 0])
 @pytest.mark.parametrize("changes,expect_returncode,expect_msg", [
 	["UPDATE corr_settings SET corrector='nonsense';", 2, 'Invalid corrector value'],
 	["UPDATE diagnostics_corr SET lightcurve='does-not-exists.fits.gz';", 2, 'File not found'],
@@ -126,7 +128,7 @@ def test_run_release(PRIVATE_INPUT_DIR, corrector):
 	["UPDATE todolist SET camera=-1 WHERE priority=1220;", 1, 'CAMERA'],
 	["UPDATE todolist SET ccd=-1 WHERE priority=1220;", 1, 'CCD'],
 ])
-def test_run_release_wrong_db(PRIVATE_INPUT_DIR, changes, expect_returncode, expect_msg):
+def test_run_release_wrong_db(PRIVATE_INPUT_DIR, jobs, changes, expect_returncode, expect_msg):
 	"""
 	Try to run package release on different input.
 
@@ -143,7 +145,7 @@ def test_run_release_wrong_db(PRIVATE_INPUT_DIR, changes, expect_returncode, exp
 		conn.commit()
 		cursor.close()
 
-	out, err, exitcode = capture_run_release(['--quiet', '--version=5', input_file])
+	out, err, exitcode = capture_run_release(['--quiet', '--jobs={0:d}'.format(jobs), '--version=5', input_file])
 	assert exitcode == expect_returncode
 	assert expect_msg in out or expect_msg in err
 

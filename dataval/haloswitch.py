@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Data validation of automatic Halo photometry switching.
@@ -55,7 +55,8 @@ def haloswitch(dval):
 				'edge_flux > 0',
 				constraint_cadence,
 				"(todolist.method IS NULL OR todolist.method != 'halo')" # Don't include things already processed with Halo
-			])
+			]
+		)
 		if not star_vals:
 			continue
 
