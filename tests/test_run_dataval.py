@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Tests of DataValidation command-line interface.
@@ -55,8 +55,7 @@ def test_run_dataval(PRIVATE_INPUT_DIR, inp, corr, save):
 		input_dir=test_dir
 	)
 	out, err, exitcode = capture_run_dataval(params)
-
-	#assert exitcode == 0
+	assert exitcode == 0
 	#assert False
 
 #--------------------------------------------------------------------------------------------------

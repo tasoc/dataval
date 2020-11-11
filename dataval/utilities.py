@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Collection of utility functions that can be used throughout
@@ -12,9 +12,11 @@ import pickle
 import gzip
 import os
 import fnmatch
+import hashlib
 from bottleneck import nanmedian, nanmean, allnan
 from scipy.stats import binned_statistic
 import logging
+import tqdm
 from collections import defaultdict
 
 # Constants:
@@ -173,6 +175,23 @@ def find_lightcurve_files(rootdir, pattern='tess*-tasoc_lc.fits.gz'):
 			yield os.path.join(root, filename)
 
 #--------------------------------------------------------------------------------------------------
+def get_filehash(fname):
+	"""Calculate SHA1-hash of file."""
+	buf = 65536
+	s = hashlib.sha1()
+	with open(fname, 'rb') as fid:
+		while True:
+			data = fid.read(buf)
+			if not data:
+				break
+			s.update(data)
+
+	sha1sum = s.hexdigest().lower()
+	if len(sha1sum) != 40:
+		raise Exception("Invalid file hash")
+	return sha1sum
+
+#--------------------------------------------------------------------------------------------------
 class CounterFilter(logging.Filter):
 	"""
 	A logging filter which counts the number of log records in each level.
@@ -182,6 +201,21 @@ class CounterFilter(logging.Filter):
 		super().__init__(*args, **kwargs)
 		self.counter = defaultdict(int)
 
-	def filter(self, record):
+	def filter(self, record): # noqa: A003
 		self.counter[record.levelname] += 1
 		return True
+
+#--------------------------------------------------------------------------------------------------
+class TqdmLoggingHandler(logging.Handler):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+
+	def emit(self, record):
+		try:
+			msg = self.format(record)
+			tqdm.tqdm.write(msg)
+			self.flush()
+		except (KeyboardInterrupt, SystemExit):
+			raise
+		except: # noqa: E722
+			self.handleError(record)

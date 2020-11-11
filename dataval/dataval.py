@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Data Validation module for TASOC Pipeline.
@@ -20,7 +20,7 @@ from tqdm import tqdm
 import itertools
 
 # Plotting:
-from .plots import plt, matplotlib as mpl
+from .plots import plt, matplotlib as mpl, plots_interactive
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -207,7 +207,7 @@ class DataValidation(object):
 
 		# Plot settings:
 		if self.show:
-			plt.switch_backend('TKAgg')
+			plots_interactive()
 		mpl.style.use(os.path.join(os.path.dirname(__file__), 'dataval.mplstyle'))
 		mpl.rcParams['savefig.format'] = self.extension
 
