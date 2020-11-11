@@ -127,6 +127,9 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 	["UPDATE todolist SET sector=-1 WHERE priority=1220;", 1, 'SECTOR'],
 	["UPDATE todolist SET camera=-1 WHERE priority=1220;", 1, 'CAMERA'],
 	["UPDATE todolist SET ccd=-1 WHERE priority=1220;", 1, 'CCD'],
+	["DROP TABLE diagnostics_corr;", 2, 'DIAGNOSTICS_CORR table does not exist'],
+	["DROP TABLE datavalidation_corr;", 2, 'DATAVALIDATION_CORR table does not exist'],
+	["DELETE FROM datavalidation_corr WHERE priority=1220;", 2, 'DATAVALIDATION_CORR table seems incomplete'],
 ])
 def test_run_release_wrong_db(PRIVATE_INPUT_DIR, jobs, changes, expect_returncode, expect_msg):
 	"""

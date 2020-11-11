@@ -247,6 +247,25 @@ def main():
 		cursor = conn.cursor()
 		cursor.execute("SELECT * FROM corr_settings;")
 		corr_settings = dict(cursor.fetchone())
+
+		# Check that diagnostics_corr exists:
+		cursor.execute("SELECT COUNT(*) AS antal FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
+		if cursor.fetchone()['antal'] != 1:
+			logger.error("DIAGNOSTICS_CORR table does not exist")
+			return 2
+
+		# Check that datavalidation_corr exists:
+		cursor.execute("SELECT COUNT(*) AS antal FROM sqlite_master WHERE type='table' AND name='datavalidation_corr';")
+		if cursor.fetchone()['antal'] != 1:
+			logger.error("DATAVALIDATION_CORR table does not exist")
+			return 2
+
+		# Check that there is a datavalidation entry for all todolist entries:
+		cursor.execute("SELECT COUNT(*) AS antal FROM todolist LEFT JOIN datavalidation_corr ON todolist.priority=datavalidation_corr.priority WHERE datavalidation_corr.priority IS NULL;")
+		if cursor.fetchone()['antal'] > 0:
+			logger.error("DATAVALIDATION_CORR table seems incomplete")
+			return 2
+
 		cursor.execute("""
 		SELECT
 			todolist.priority,
@@ -282,7 +301,7 @@ def main():
 
 	fix_file_wrapper = functools.partial(fix_file,
 		input_folder=input_folder,
-		check_corrector=corrector[:3], # NOTE: Ensemble is onle "ens" in filenames
+		check_corrector=corrector[:3], # NOTE: Ensemble is only "ens" in filenames
 		force_version=force_version)
 
 	release_db = os.path.join(input_folder, 'release-{0:s}.sqlite'.format(corrector))
