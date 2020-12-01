@@ -10,16 +10,18 @@ files which are ready to be released.
 import argparse
 import sys
 import logging
+import warnings
 import re
 import os
 import shutil
 from astropy.io import fits
+from astropy.wcs import WCS, FITSFixedWarning
 import sqlite3
 from contextlib import closing
 import functools
 import multiprocessing
 from tqdm import tqdm
-from dataval.utilities import get_filehash, TqdmLoggingHandler, CounterFilter
+from dataval.utilities import find_tpf_files, get_filehash, TqdmLoggingHandler, CounterFilter
 
 #--------------------------------------------------------------------------------------------------
 _regex_clean = re.compile(r'^\s*No differences found', re.IGNORECASE | re.MULTILINE)
@@ -80,7 +82,7 @@ def check_fits_changes(fname, fname_modified, allow_header_value_changes=None):
 	return everything_ok
 
 #--------------------------------------------------------------------------------------------------
-def fix_file(row, input_folder=None, check_corrector=None, force_version=None):
+def fix_file(row, input_folder=None, check_corrector=None, force_version=None, tpf_rootdir=None):
 
 	logger = logging.getLogger(__name__)
 	fname = os.path.join(input_folder, row['lightcurve'])
@@ -124,14 +126,43 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None):
 
 	# Do we really need to modify the FITS file?
 	modification_needed = True # FORCE modification check!
+	fix_wcs = False
 
 	if dataval > 0:
 		modification_needed = True
 
+	if cadence == 120 and version <= 5:
+		modification_needed = True
+		fix_wcs = True
+
+	# Find the starid of the TPF which was used to create this lightcurve:
+	if row['datasource'] == 'tpf':
+		dependency = row['starid']
+	elif row['datasource'].startswith('tpf:'):
+		dependency = int(row['datasource'][4:])
+	else:
+		dependency = None
+
 	# Damn, it looks like a modification is needed:
+	allow_change = []
 	if modification_needed:
 		logger.debug("Opening FITS file: %s", fname)
 		modification_needed = False
+
+		if fix_wcs:
+			if tpf_rootdir is None:
+				raise Exception("You need to provide a TPF_ROOTDIR")
+			# Find out what the
+			if dependency is None:
+				raise Exception("We can't fix WCSs of FFI targets!")
+			# Find the original TPF file and extract the WCS from its headers:
+			tpf_file = find_tpf_files(tpf_rootdir, starid=dependency, sector=sector, camera=camera, ccd=ccd, cadence=cadence)
+			if len(tpf_file) != 1:
+				raise Exception("Could not find TPF file: starid=%d, sector=%d" % (dependency, sector))
+			# Extract the FITS header with the correct WCS:
+			with warnings.catch_warnings():
+				warnings.filterwarnings('ignore', category=FITSFixedWarning)
+				wcs_header = WCS(header=fits.getheader(tpf_file[0], extname='APERTURE'), relax=True).to_header(relax=True)
 
 		shutil.copy(fname, fname_original)
 		with fits.open(fname_original, mode='readonly', memmap=True) as hdu:
@@ -141,18 +172,26 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None):
 			current_dataval = prihdr.get('DATAVAL')
 			if current_dataval != dataval:
 				modification_needed = True
+				allow_change += ['DATAVAL']
 				if current_dataval is None:
 					# Insert DATAVAL keyword just before CHECKSUM:
 					prihdr.insert('CHECKSUM', ('DATAVAL', dataval, 'Data validation flags'))
 				else:
 					prihdr['DATAVAL'] = dataval
 
+			if fix_wcs:
+				logger.info("%s: Changing WCS", fname)
+				modification_needed = True
+				allow_change += ['CRPIX1', 'CRPIX2']
+				hdu['APERTURE'].header.update(wcs_header)
+				hdu['SUMIMAGE'].header.update(wcs_header)
+
 			if modification_needed:
 				hdu.writeto(fname, checksum=True, overwrite=True)
 
 	if modification_needed:
 		try:
-			if check_fits_changes(fname_original, fname, allow_header_value_changes=['DATAVAL']):
+			if check_fits_changes(fname_original, fname, allow_header_value_changes=allow_change):
 				os.remove(fname_original)
 			else:
 				logger.error("File check failed: %s", fname)
@@ -187,7 +226,8 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None):
 		'datarel': datarel,
 		'version': version,
 		'filesize': filesize,
-		'filehash': filehash
+		'filehash': filehash,
+		'dependency': dependency
 	}
 
 #--------------------------------------------------------------------------------------------------
@@ -199,6 +239,7 @@ def main():
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing release file.', action='store_true')
 	parser.add_argument('-j', '--jobs', type=int, default=0, help="Number of parallel jobs.")
 	parser.add_argument('--version', type=int, default=None, help="Check that files are of this version.")
+	parser.add_argument('--tpf', type=str, default=None, help="Rootdir to search for TPF files.")
 	parser.add_argument('todofile', type=str, help="TODO-file.")
 	args = parser.parse_args()
 
@@ -229,8 +270,18 @@ def main():
 	# Parse input:
 	force_version = args.version
 	input_file = args.todofile
+	tpf_rootdir = args.tpf
 	if not os.path.isfile(input_file):
 		logger.error("Input file does not exist: %s", input_file)
+		return 2
+	if tpf_rootdir is not None and not os.path.isdir(tpf_rootdir):
+		logger.error("TPF_ROOTDIR does not exist: %s", tpf_rootdir)
+		return 2
+
+	# There was a known bug in the processing of versions <=5, so require that TPF rootdir is
+	# provided for those versions:
+	if force_version <= 5 and tpf_rootdir is None:
+		logger.error("You should provide a TPF_ROOTDIR")
 		return 2
 
 	# Decide on the number of parallel jobs to start:
@@ -273,6 +324,7 @@ def main():
 			todolist.camera,
 			todolist.ccd,
 			todolist.sector,
+			todolist.datasource,
 			diagnostics_corr.lightcurve,
 			datavalidation_corr.dataval
 		FROM todolist
@@ -302,7 +354,8 @@ def main():
 	fix_file_wrapper = functools.partial(fix_file,
 		input_folder=input_folder,
 		check_corrector=corrector[:3], # NOTE: Ensemble is only "ens" in filenames
-		force_version=force_version)
+		force_version=force_version,
+		tpf_rootdir=tpf_rootdir)
 
 	release_db = os.path.join(input_folder, 'release-{0:s}.sqlite'.format(corrector))
 	logger.info("Release file: %s", release_db)
@@ -324,7 +377,8 @@ def main():
 			filesize INTEGER NOT NULL,
 			filehash TEXT NOT NULL,
 			datarel INTEGER NOT NULL,
-			dataval INTEGER NOT NULL
+			dataval INTEGER NOT NULL,
+			dependency INTEGER
 		);""")
 		conn.commit()
 
@@ -351,7 +405,7 @@ def main():
 				inserted = 0
 				for info in tqdm(m(fix_file_wrapper, not_yet_processed), total=numfiles, **tqdm_settings):
 					logger.debug(info)
-					cursor.execute("INSERT INTO release (priority, lightcurve, starid, sector, camera, ccd, cadence, filesize, filehash, datarel, dataval) VALUES (?,?,?,?,?,?,?,?,?,?,?);", [
+					cursor.execute("INSERT INTO release (priority, lightcurve, starid, sector, camera, ccd, cadence, filesize, filehash, datarel, dataval, dependency) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", [
 						info['priority'],
 						info['lightcurve'],
 						info['starid'],
@@ -362,7 +416,8 @@ def main():
 						info['filesize'],
 						info['filehash'],
 						info['datarel'],
-						info['dataval']
+						info['dataval'],
+						info['dependency']
 					])
 
 					inserted += 1
