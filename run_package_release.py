@@ -21,6 +21,7 @@ from contextlib import closing
 import functools
 import multiprocessing
 from tqdm import tqdm
+from dataval import __version__
 from dataval.utilities import find_tpf_files, get_filehash, TqdmLoggingHandler, CounterFilter
 
 #--------------------------------------------------------------------------------------------------
@@ -363,6 +364,7 @@ def main():
 		os.remove(release_db)
 
 	with closing(sqlite3.connect(release_db)) as conn:
+		conn.row_factory = sqlite3.Row
 		cursor = conn.cursor()
 		cursor.execute("PRAGMA locking_mode=EXCLUSIVE;")
 		cursor.execute("PRAGMA journal_mode=TRUNCATE;")
@@ -380,7 +382,30 @@ def main():
 			dataval INTEGER NOT NULL,
 			dependency INTEGER
 		);""")
+		# Create the settings table if it doesn't exist:
+		cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='settings';")
+		if cursor.fetchone()[0] == 0:
+			cursor.execute("""CREATE TABLE settings (
+				dataval_version TEXT NOT NULL,
+				corrector TEXT NOT NULL,
+				version INTEGER
+			);""")
+			cursor.execute("INSERT INTO settings (dataval_version, corrector, version) VALUES (?,?,?);", [
+				__version__,
+				corrector,
+				force_version
+			])
 		conn.commit()
+
+		# Ensure that we are not running an existing file with new settings:
+		cursor.execute("SELECT * FROM settings LIMIT 1;")
+		settings = cursor.fetchone()
+		if settings['corrector'] != corrector:
+			logger.error("Inconsistent CORRECTOR provided")
+			return 2
+		if force_version is not None and settings['version'] != force_version:
+			logger.error("Inconsistent VERSION provided")
+			return 2
 
 		cursor.execute("SELECT priority FROM release;")
 		already_processed = set([row[0] for row in cursor.fetchall()])

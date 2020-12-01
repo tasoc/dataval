@@ -17,6 +17,7 @@ import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS, FITSFixedWarning
 import conftest # noqa: F401
+from dataval import __version__
 from dataval.utilities import get_filehash, find_tpf_files
 
 #--------------------------------------------------------------------------------------------------
@@ -91,6 +92,12 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 		conn.row_factory = sqlite3.Row
 		cursor = conn.cursor()
 
+		cursor.execute("SELECT * FROM settings;")
+		row = cursor.fetchone()
+		assert row['dataval_version'] == __version__
+		assert row['corrector'] == corrector
+		assert row['version'] == 5
+
 		cursor.execute("SELECT COUNT(*) FROM release;")
 		antal = cursor.fetchone()[0]
 		assert antal == 19
@@ -164,6 +171,12 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 	out, err, exitcode = capture_run_release(params)
 	assert exitcode == 0
 	assert 'Nothing to process' in out
+
+	# Re-running with different VERSION should trigger error:
+	params = ['--jobs={0:d}'.format(jobs), '--version=17', '--tpf=' + tpf_rootdir, input_file]
+	out, err, exitcode = capture_run_release(params)
+	assert exitcode == 2
+	assert 'Inconsistent VERSION provided' in out
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize("jobs", [1, 0])
