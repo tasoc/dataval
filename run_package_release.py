@@ -453,6 +453,7 @@ def main():
 			conn.commit()
 
 		cursor.execute("PRAGMA journal_mode=DELETE;")
+		conn.commit()
 		cursor.close()
 
 	# Check the number of errors or warnings issued, and convert these to a return-code:
