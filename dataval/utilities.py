@@ -13,8 +13,10 @@ import gzip
 import os
 import fnmatch
 import hashlib
+import re
 from bottleneck import nanmedian, nanmean, allnan
 from scipy.stats import binned_statistic
+from astropy.io import fits
 import logging
 import tqdm
 from collections import defaultdict
@@ -64,6 +66,79 @@ def loadPickle(fname):
 
 	with o(fname, 'rb') as fid:
 		return pickle.load(fid)
+
+#--------------------------------------------------------------------------------------------------
+def find_tpf_files(rootdir, starid=None, sector=None, camera=None, ccd=None, cadence=None, findmax=None):
+	"""
+	Search directory recursively for TESS Target Pixel Files.
+
+	Parameters:
+		rootdir (string): Directory to search recursively for TESS TPF files.
+		starid (integer or None, optional): Only return files from the given TIC number.
+			If ``None``, files from all TIC numbers are returned.
+		sector (integer or None, optional): Only return files from the given sector.
+			If ``None``, files from all sectors are returned.
+		camera (integer or None, optional): Only return files from the given camera number (1-4).
+			If ``None``, files from all cameras are returned.
+		ccd (integer or None, optional): Only return files from the given CCD number (1-4).
+			If ``None``, files from all CCDs are returned.
+		findmax (integer or None, optional): Maximum number of files to return.
+			If ``None``, return all files.
+
+	Note:
+		Filtering on camera and/or ccd will cause the program to read the headers
+		of the files in order to determine the camera and ccd from which they came.
+		This can significantly slow down the query.
+
+	Returns:
+		list: List of full paths to TPF FITS files found in directory. The list will
+			be sorted according to the filename of the files, e.g. primarily by time.
+	"""
+
+	logger = logging.getLogger(__name__)
+
+	# Create the filename pattern to search for:
+	sector_str = r'\d{4}' if sector is None else '{0:04d}'.format(sector)
+	starid_str = r'\d+' if starid is None else '{0:016d}'.format(starid)
+	suffix = {None: 'tp(-fast)?', 120: 'tp', 20: 'tp-fast'}[cadence]
+	re_pattern = r'^tess\d+-s' + sector_str + '-' + starid_str + r'-\d{4}-[xsab]_' + suffix + r'\.fits(\.gz)?$'
+	regex = re.compile(re_pattern)
+
+	# Pattern used for TESS Alert data:
+	sector_str = '??' if sector is None else '{0:02d}'.format(sector)
+	starid_str = '*' if starid is None else '{0:011d}'.format(starid)
+	filename_pattern2 = 'hlsp_tess-data-alerts_tess_phot_{starid:s}-s{sector:s}_tess_v?_tp.fits*'.format(
+		sector=sector_str,
+		starid=starid_str
+	)
+
+	logger.debug("Searching for TPFs in '%s' using pattern '%s'", rootdir, re_pattern)
+	logger.debug("Searching for TPFs in '%s' using pattern '%s'", rootdir, filename_pattern2)
+
+	# Do a recursive search in the directory, finding all files that match the pattern:
+	breakout = False
+	matches = []
+	for root, dirnames, filenames in os.walk(rootdir, followlinks=True):
+		for filename in filenames:
+			if regex.match(filename) or fnmatch.fnmatch(filename, filename_pattern2):
+				fpath = os.path.join(root, filename)
+				if camera is not None and fits.getval(fpath, 'CAMERA', ext=0) != camera:
+					continue
+
+				if ccd is not None and fits.getval(fpath, 'CCD', ext=0) != ccd:
+					continue
+
+				matches.append(fpath)
+				if findmax is not None and len(matches) >= findmax:
+					breakout = True
+					break
+		if breakout:
+			break
+
+	# Sort the list of files by thir filename:
+	matches.sort(key=lambda x: os.path.basename(x))
+
+	return matches
 
 #------------------------------------------------------------------------------
 def sphere_distance(ra1, dec1, ra2, dec2):
