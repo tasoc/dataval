@@ -23,64 +23,11 @@ import multiprocessing
 from tqdm import tqdm
 from dataval import __version__
 from dataval.utilities import find_tpf_files, get_filehash, TqdmLoggingHandler, CounterFilter
+from dataval.release import check_fits_changes
 
 #--------------------------------------------------------------------------------------------------
-_regex_clean = re.compile(r'^\s*No differences found', re.IGNORECASE | re.MULTILINE)
-_regex_check_data1 = re.compile(r"^\s*Data contains differences:", re.IGNORECASE | re.MULTILINE)
-_regex_check_data2 = re.compile(r"^\s*(\d+) different pixels found", re.IGNORECASE | re.MULTILINE)
-_regex_check_header1 = re.compile(r"^\s*Keyword ([\w\-]+)\s+has different (values|comments):", re.IGNORECASE | re.MULTILINE)
-_regex_check_header2 = re.compile(r"^\s*Extra keyword '([^']+)' in a:", re.IGNORECASE | re.MULTILINE)
-
 regex_filename = re.compile(r'^tess(\d+)-s(\d+)-(\d)-(\d)-c(\d+)-dr(\d+)-v(\d+)-tasoc-(cbv|ens)_lc\.fits\.gz$')
 regex_fileend = re.compile(r'\.fits\.gz$')
-
-#--------------------------------------------------------------------------------------------------
-def check_fits_changes(fname, fname_modified, allow_header_value_changes=None):
-
-	logger = logging.getLogger(__name__)
-
-	diff = fits.FITSDiff(fname, fname_modified)
-
-	if diff.identical:
-		logger.error("%s: Nothing has changed?", fname)
-		everything_ok = False
-
-	report = diff.report()
-	logger.debug(report)
-	everything_ok = True
-
-	# Do various checks on the output to ensure that only what we expect to change has changed:
-	if _regex_check_data1.search(report):
-		logger.error("%s: Data has been changed!", fname)
-		everything_ok = False
-
-	m = _regex_check_data2.search(report)
-	if m:
-		logger.error("%s: Data has been changed! %s pixels are different.", fname, m.group(1))
-		everything_ok = False
-
-	# Something should have changed!
-	m = _regex_clean.search(report)
-	if m:
-		logger.error("%s: Nothing has changed?", fname)
-		everything_ok = False
-
-	if allow_header_value_changes is None:
-		allow_header_value_changes = ['CHECKSUM', 'DATASUM']
-	else:
-		allow_header_value_changes = ['CHECKSUM', 'DATASUM'] + allow_header_value_changes
-
-	for m in _regex_check_header1.finditer(report):
-		if not m.group(1) in allow_header_value_changes:
-			logger.error("%s: Keyword with different %s: %s", fname, m.group(2), m.group(1))
-			everything_ok = False
-
-	for m in _regex_check_header2.finditer(report):
-		logger.error("%s: Extra keyword: %s", fname, m.group(1))
-		everything_ok = False
-
-	# If we have made it this far, things should be okay:
-	return everything_ok
 
 #--------------------------------------------------------------------------------------------------
 def fix_file(row, input_folder=None, check_corrector=None, force_version=None, tpf_rootdir=None):
