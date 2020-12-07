@@ -20,7 +20,7 @@ def check_fits_changes(fname, fname_modified, allow_header_value_changes=None):
 
 	Parameters:
 		fname (str, fits.HDUList): Original FITS file to check against.
-		fname_modified (str, fits.HDUList): Modified FITS file to check. 
+		fname_modified (str, fits.HDUList): Modified FITS file to check.
 		allow_header_value_changes (list): List of header keywords allowed to change.
 
 	Returns:
