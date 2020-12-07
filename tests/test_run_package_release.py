@@ -57,7 +57,7 @@ def test_run_release_wrong_file(SHARED_INPUT_DIR):
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize("jobs", [1, 0])
-@pytest.mark.parametrize("corrector", ['cbv', ]) # 'ensemble'
+@pytest.mark.parametrize("corrector", ['cbv', 'ensemble'])
 def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 	"""
 	Try to run package release on different input.
@@ -102,7 +102,10 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 
 		cursor.execute("SELECT COUNT(*) FROM release;")
 		antal = cursor.fetchone()[0]
-		assert antal == 19
+		if corrector == 'cbv':
+			assert antal == 19
+		else:
+			assert antal == 12
 
 		cursor.execute("SELECT * FROM release;")
 		for row in cursor.fetchall():
@@ -135,6 +138,11 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 
 				assert row['cadence'] == int(np.round(hdu[1].header['TIMEDEL']*86400))
 
+				# Check the fix of invalid header in ENSEMBLE extension:
+				if corrector == 'ensemble':
+					assert hdu['ENSEMBLE'].header['TDISP2'] != 'E'
+
+				# Check the modification of the WCS solution in 120s data:
 				if row['cadence'] == 120:
 					tpf_file = find_tpf_files(tpf_rootdir,
 						starid=row['dependency'],

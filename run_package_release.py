@@ -127,6 +127,13 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 				else:
 					prihdr['DATAVAL'] = dataval
 
+			if corrector == 'ens' and version <= 5:
+				if hdu['ENSEMBLE'].header.get('TDISP2') == 'E':
+					logger.info("%s: Changing ENSEMBLE/TDISP2 header", fname)
+					modification_needed = True
+					allow_change += ['TDISP2']
+					hdu['ENSEMBLE'].header['TDISP2'] = 'E26.17'
+
 			if fix_wcs:
 				logger.info("%s: Changing WCS", fname)
 				modification_needed = True
@@ -246,6 +253,11 @@ def main():
 		cursor = conn.cursor()
 		cursor.execute("SELECT * FROM corr_settings;")
 		corr_settings = dict(cursor.fetchone())
+		corrector = corr_settings['corrector']
+
+		if corrector not in ('cbv', 'ensemble'):
+			logger.error("Invalid corrector value: %s", corrector)
+			return 2
 
 		# Check that diagnostics_corr exists:
 		cursor.execute("SELECT COUNT(*) AS antal FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
@@ -265,6 +277,12 @@ def main():
 			logger.error("DATAVALIDATION_CORR table seems incomplete")
 			return 2
 
+		# We are not releasing TPF-files from the Ensemble method:
+		additional_constrainits = ''
+		if corrector == 'ensemble':
+			additional_constrainits = " AND todolist.datasource='ffi'"
+
+		# Gather full list of all files to be released:
 		cursor.execute("""
 		SELECT
 			todolist.priority,
@@ -279,17 +297,12 @@ def main():
 			INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
 			INNER JOIN datavalidation_corr ON todolist.priority=datavalidation_corr.priority
 		WHERE
-			datavalidation_corr.approved=1;""")
+			datavalidation_corr.approved=1""" + additional_constrainits + ";")
 		files_to_release = [dict(row) for row in cursor.fetchall()]
 		cursor.close()
 
 	# Extract information needed below:
 	input_folder = os.path.dirname(input_file)
-	corrector = corr_settings['corrector']
-
-	if corrector not in ('cbv', 'ensemble'):
-		logger.error("Invalid corrector value: %s", corrector)
-		return 2
 
 	# Do a simple check that all the files exists:
 	logger.info("Checking file existance...")
