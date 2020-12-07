@@ -23,64 +23,11 @@ import multiprocessing
 from tqdm import tqdm
 from dataval import __version__
 from dataval.utilities import find_tpf_files, get_filehash, TqdmLoggingHandler, CounterFilter
+from dataval.release import check_fits_changes
 
 #--------------------------------------------------------------------------------------------------
-_regex_clean = re.compile(r'^\s*No differences found', re.IGNORECASE | re.MULTILINE)
-_regex_check_data1 = re.compile(r"^\s*Data contains differences:", re.IGNORECASE | re.MULTILINE)
-_regex_check_data2 = re.compile(r"^\s*(\d+) different pixels found", re.IGNORECASE | re.MULTILINE)
-_regex_check_header1 = re.compile(r"^\s*Keyword ([\w\-]+)\s+has different (values|comments):", re.IGNORECASE | re.MULTILINE)
-_regex_check_header2 = re.compile(r"^\s*Extra keyword '([^']+)' in a:", re.IGNORECASE | re.MULTILINE)
-
 regex_filename = re.compile(r'^tess(\d+)-s(\d+)-(\d)-(\d)-c(\d+)-dr(\d+)-v(\d+)-tasoc-(cbv|ens)_lc\.fits\.gz$')
 regex_fileend = re.compile(r'\.fits\.gz$')
-
-#--------------------------------------------------------------------------------------------------
-def check_fits_changes(fname, fname_modified, allow_header_value_changes=None):
-
-	logger = logging.getLogger(__name__)
-
-	diff = fits.FITSDiff(fname, fname_modified)
-
-	if diff.identical:
-		logger.error("%s: Nothing has changed?", fname)
-		everything_ok = False
-
-	report = diff.report()
-	logger.debug(report)
-	everything_ok = True
-
-	# Do various checks on the output to ensure that only what we expect to change has changed:
-	if _regex_check_data1.search(report):
-		logger.error("%s: Data has been changed!", fname)
-		everything_ok = False
-
-	m = _regex_check_data2.search(report)
-	if m:
-		logger.error("%s: Data has been changed! %s pixels are different.", fname, m.group(1))
-		everything_ok = False
-
-	# Something should have changed!
-	m = _regex_clean.search(report)
-	if m:
-		logger.error("%s: Nothing has changed?", fname)
-		everything_ok = False
-
-	if allow_header_value_changes is None:
-		allow_header_value_changes = ['CHECKSUM', 'DATASUM']
-	else:
-		allow_header_value_changes = ['CHECKSUM', 'DATASUM'] + allow_header_value_changes
-
-	for m in _regex_check_header1.finditer(report):
-		if not m.group(1) in allow_header_value_changes:
-			logger.error("%s: Keyword with different %s: %s", fname, m.group(2), m.group(1))
-			everything_ok = False
-
-	for m in _regex_check_header2.finditer(report):
-		logger.error("%s: Extra keyword: %s", fname, m.group(1))
-		everything_ok = False
-
-	# If we have made it this far, things should be okay:
-	return everything_ok
 
 #--------------------------------------------------------------------------------------------------
 def fix_file(row, input_folder=None, check_corrector=None, force_version=None, tpf_rootdir=None):
@@ -179,6 +126,13 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 					prihdr.insert('CHECKSUM', ('DATAVAL', dataval, 'Data validation flags'))
 				else:
 					prihdr['DATAVAL'] = dataval
+
+			if corrector == 'ens' and version <= 5:
+				if hdu['ENSEMBLE'].header.get('TDISP2') == 'E':
+					logger.info("%s: Changing ENSEMBLE/TDISP2 header", fname)
+					modification_needed = True
+					allow_change += ['TDISP2']
+					hdu['ENSEMBLE'].header['TDISP2'] = 'E26.17'
 
 			if fix_wcs:
 				logger.info("%s: Changing WCS", fname)
@@ -299,6 +253,11 @@ def main():
 		cursor = conn.cursor()
 		cursor.execute("SELECT * FROM corr_settings;")
 		corr_settings = dict(cursor.fetchone())
+		corrector = corr_settings['corrector']
+
+		if corrector not in ('cbv', 'ensemble'):
+			logger.error("Invalid corrector value: %s", corrector)
+			return 2
 
 		# Check that diagnostics_corr exists:
 		cursor.execute("SELECT COUNT(*) AS antal FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
@@ -318,6 +277,12 @@ def main():
 			logger.error("DATAVALIDATION_CORR table seems incomplete")
 			return 2
 
+		# We are not releasing TPF-files from the Ensemble method:
+		additional_constrainits = ''
+		if corrector == 'ensemble':
+			additional_constrainits = " AND todolist.datasource='ffi'"
+
+		# Gather full list of all files to be released:
 		cursor.execute("""
 		SELECT
 			todolist.priority,
@@ -332,17 +297,12 @@ def main():
 			INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
 			INNER JOIN datavalidation_corr ON todolist.priority=datavalidation_corr.priority
 		WHERE
-			datavalidation_corr.approved=1;""")
+			datavalidation_corr.approved=1""" + additional_constrainits + ";")
 		files_to_release = [dict(row) for row in cursor.fetchall()]
 		cursor.close()
 
 	# Extract information needed below:
 	input_folder = os.path.dirname(input_file)
-	corrector = corr_settings['corrector']
-
-	if corrector not in ('cbv', 'ensemble'):
-		logger.error("Invalid corrector value: %s", corrector)
-		return 2
 
 	# Do a simple check that all the files exists:
 	logger.info("Checking file existance...")
@@ -453,6 +413,7 @@ def main():
 			conn.commit()
 
 		cursor.execute("PRAGMA journal_mode=DELETE;")
+		conn.commit()
 		cursor.close()
 
 	# Check the number of errors or warnings issued, and convert these to a return-code:
