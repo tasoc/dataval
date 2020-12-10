@@ -18,7 +18,7 @@ import multiprocessing
 from tqdm import tqdm
 from dataval import __version__
 from dataval.utilities import TqdmLoggingHandler, CounterFilter
-from dataval.release import fix_file
+from dataval.release import fix_file, regex_fileend
 
 #--------------------------------------------------------------------------------------------------
 def main():
@@ -140,13 +140,25 @@ def main():
 	input_folder = os.path.dirname(input_file)
 
 	# Do a simple check that all the files exists:
-	logger.info("Checking file existance...")
+	logger.info("Checking file existence...")
+	file_check_problem = False
 	for row in tqdm(files_to_release, **tqdm_settings):
 		fname = os.path.join(input_folder, row['lightcurve'])
+		fname_original = regex_fileend.sub('.original.fits.gz', fname)
 		if not os.path.isfile(fname):
 			logger.error("File not found: %s", fname)
-			return 2
+			file_check_problem = True
+		elif os.path.getsize(fname) <= 0:
+			logger.error("File has zero size: %s", fname)
+			file_check_problem = True
+		if os.path.exists(fname_original):
+			logger.error("ORIGINAL file exists: %s", fname_original)
+			file_check_problem = True
 
+	if file_check_problem:
+		return 2
+
+	# Create wrapper function for multiprocessing, with all keywords defined:
 	fix_file_wrapper = functools.partial(fix_file,
 		input_folder=input_folder,
 		check_corrector=corrector[:3], # NOTE: Ensemble is only "ens" in filenames
