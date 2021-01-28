@@ -11,6 +11,7 @@ import argparse
 import sys
 import logging
 import os
+import glob
 import sqlite3
 from contextlib import closing
 import functools
@@ -18,7 +19,7 @@ import multiprocessing
 from tqdm import tqdm
 from dataval import __version__
 from dataval.utilities import TqdmLoggingHandler, CounterFilter
-from dataval.release import fix_file, regex_fileend
+from dataval.release import fix_file, regex_fileend, process_cbv
 
 #--------------------------------------------------------------------------------------------------
 def main():
@@ -126,6 +127,7 @@ def main():
 			todolist.ccd,
 			todolist.sector,
 			todolist.datasource,
+			todolist.cbv_area,
 			diagnostics_corr.lightcurve,
 			datavalidation_corr.dataval
 		FROM todolist
@@ -187,8 +189,11 @@ def main():
 			filehash TEXT NOT NULL,
 			datarel INTEGER NOT NULL,
 			dataval INTEGER NOT NULL,
-			dependency INTEGER
+			cbv_area INTEGER NOT NULL,
+			dependency_tpf INTEGER,
+			dependency_lc TEXT
 		);""")
+
 		# Create the settings table if it doesn't exist:
 		cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='settings';")
 		if cursor.fetchone()[0] == 0:
@@ -202,6 +207,22 @@ def main():
 				corrector,
 				force_version
 			])
+
+		# For CBV corrected data, create a separate table for the CBV files:
+		if corrector == 'cbv':
+			cursor.execute("DROP TABLE IF EXISTS release_cbv;")
+			cursor.execute("""CREATE TABLE release_cbv (
+				path TEXT NOT NULL PRIMARY KEY,
+				sector INTEGER NOT NULL,
+				camera INTEGER NOT NULL,
+				ccd INTEGER NOT NULL,
+				cbv_area INTEGER NOT NULL,
+				cadence INTEGER NOT NULL,
+				datarel INTEGER NOT NULL,
+				filesize INTEGER NOT NULL,
+				filehash TEXT NOT NULL
+			);""")
+
 		conn.commit()
 
 		# Ensure that we are not running an existing file with new settings:
@@ -214,6 +235,31 @@ def main():
 			logger.error("Inconsistent VERSION provided")
 			return 2
 
+		# For CBV corrected data, first we find all the CBV files, add these to their own
+		# release table, and keep a record of which ones were found, so we can check below
+		# if all the lightcurves can be associated with a single CBV file:
+		cbvs = []
+		if corrector == 'cbv':
+			cbv_files = glob.glob(os.path.join(input_folder, 'cbv-prepare', '*-tasoc_cbv.fits.gz'))
+			for fname in cbv_files:
+				info = process_cbv(fname, input_folder, force_version=force_version)
+				logger.debug(info)
+				cursor.execute("INSERT INTO release_cbv (path, sector, camera, ccd, cbv_area, cadence, datarel, filesize, filehash) VALUES (?,?,?,?,?,?,?,?,?);", [
+					info['path'],
+					info['sector'],
+					info['camera'],
+					info['ccd'],
+					info['cbv_area'],
+					info['cadence'],
+					info['datarel'],
+					info['filesize'],
+					info['filehash']
+				])
+				cbvs.append((info['sector'], info['cadence'], info['cbv_area']))
+			cbvs = set(cbvs)
+			print(cbvs)
+
+		# Figure out which files needs to be processed:
 		cursor.execute("SELECT priority FROM release;")
 		already_processed = set([row[0] for row in cursor.fetchall()])
 		not_yet_processed = []
@@ -237,19 +283,30 @@ def main():
 				inserted = 0
 				for info in tqdm(m(fix_file_wrapper, not_yet_processed), total=numfiles, **tqdm_settings):
 					logger.debug(info)
-					cursor.execute("INSERT INTO release (priority, lightcurve, starid, sector, camera, ccd, cadence, filesize, filehash, datarel, dataval, dependency) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", [
+
+					# For CBV corrected data, check that the corresponding CBV was also found:
+					if corrector == 'cbv' and (info['sector'], info['cadence'], info['cbv_area']) not in cbvs:
+						raise Exception("CBV not found")
+
+					dependency_lc = info['dependency_lc']
+					if dependency_lc is not None:
+						dependency_lc = ','.join([str(t) for t in info['dependency_lc']])
+
+					cursor.execute("INSERT INTO release (priority, lightcurve, starid, sector, camera, ccd, cbv_area, cadence, filesize, filehash, datarel, dataval, dependency_tpf, dependency_lc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);", [
 						info['priority'],
 						info['lightcurve'],
 						info['starid'],
 						info['sector'],
 						info['camera'],
 						info['ccd'],
+						info['cbv_area'],
 						info['cadence'],
 						info['filesize'],
 						info['filehash'],
 						info['datarel'],
 						info['dataval'],
-						info['dependency']
+						info['dependency_tpf'],
+						dependency_lc
 					])
 
 					inserted += 1

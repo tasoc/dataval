@@ -107,6 +107,28 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 		else:
 			assert antal == 12
 
+		if corrector == 'cbv':
+			cursor.execute("SELECT * FROM release_cbv ORDER BY cadence DESC;")
+			cbvs = cursor.fetchall()
+			assert len(cbvs) == 2
+			row = dict(cbvs[0])
+			assert row['path'] == 'cbv-prepare/tess-s0006-c1800-a114-v5-tasoc_cbv.fits.gz'
+			assert row['sector'] == 6
+			assert row['camera'] == 1
+			assert row['ccd'] == 1
+			assert row['cadence'] == 1800
+			assert row['cbv_area'] == 114
+			assert row['datarel'] == 8
+
+			row = dict(cbvs[1])
+			assert row['path'] == 'cbv-prepare/tess-s0006-c0120-a114-v5-tasoc_cbv.fits.gz'
+			assert row['sector'] == 6
+			assert row['camera'] == 1
+			assert row['ccd'] == 1
+			assert row['cadence'] == 120
+			assert row['cbv_area'] == 114
+			assert row['datarel'] == 8
+
 		cursor.execute("SELECT * FROM release;")
 		for row in cursor.fetchall():
 			fpath = os.path.join(PRIVATE_INPUT_DIR, 'ready_for_release', row['lightcurve'])
@@ -119,13 +141,13 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 
 			# Test the dependency:
 			if row['cadence'] > 200:
-				assert row['dependency'] is None
+				assert row['dependency_tpf'] is None
 			else:
-				assert row['dependency'] is not None
+				assert row['dependency_tpf'] is not None
 				if row['starid'] == 4256961: # This is a secondary target
-					assert row['dependency'] == 4255638
+					assert row['dependency_tpf'] == 4255638
 				else: # These are "main" targets:
-					assert row['dependency'] == row['starid']
+					assert row['dependency_tpf'] == row['starid']
 
 			with fits.open(fpath, mode='readonly', memmap=True) as hdu:
 				hdr = hdu[0].header
@@ -140,12 +162,20 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 
 				# Check the fix of invalid header in ENSEMBLE extension:
 				if corrector == 'ensemble':
+					# Check the fix of invalid header in ENSEMBLE extension:
 					assert hdu['ENSEMBLE'].header['TDISP2'] != 'E'
+
+					# Check that the stars used to build ensemble were stored:
+					dependency_lc = set([int(t) for t in row['dependency_lc'].split(',')])
+					assert set(hdu['ENSEMBLE'].data['TIC']) == dependency_lc
+
+				elif corrector == 'cbv':
+					assert hdu[1].header['CBV_AREA'] == row['cbv_area']
 
 				# Check the modification of the WCS solution in 120s data:
 				if row['cadence'] == 120:
 					tpf_file = find_tpf_files(tpf_rootdir,
-						starid=row['dependency'],
+						starid=row['dependency_tpf'],
 						sector=row['sector'],
 						camera=row['camera'],
 						ccd=row['ccd'],
