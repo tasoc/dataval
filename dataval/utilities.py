@@ -68,21 +68,24 @@ def loadPickle(fname):
 		return pickle.load(fid)
 
 #--------------------------------------------------------------------------------------------------
-def find_tpf_files(rootdir, starid=None, sector=None, camera=None, ccd=None, cadence=None, findmax=None):
+def find_tpf_files(rootdir, starid=None, sector=None, camera=None, ccd=None, cadence=None,
+	findmax=None):
 	"""
 	Search directory recursively for TESS Target Pixel Files.
 
 	Parameters:
-		rootdir (string): Directory to search recursively for TESS TPF files.
-		starid (integer or None, optional): Only return files from the given TIC number.
+		rootdir (str): Directory to search recursively for TESS TPF files.
+		starid (int, optional): Only return files from the given TIC number.
 			If ``None``, files from all TIC numbers are returned.
-		sector (integer or None, optional): Only return files from the given sector.
+		sector (int, optional): Only return files from the given sector.
 			If ``None``, files from all sectors are returned.
-		camera (integer or None, optional): Only return files from the given camera number (1-4).
+		camera (int or None, optional): Only return files from the given camera number (1-4).
 			If ``None``, files from all cameras are returned.
-		ccd (integer or None, optional): Only return files from the given CCD number (1-4).
+		ccd (int, optional): Only return files from the given CCD number (1-4).
 			If ``None``, files from all CCDs are returned.
-		findmax (integer or None, optional): Maximum number of files to return.
+		cadence (int, optional): Only return files from the given cadence (20 or 120).
+			If ``None``, files from all cadences are returned.
+		findmax (int, optional): Maximum number of files to return.
 			If ``None``, return all files.
 
 	Note:

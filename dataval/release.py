@@ -6,14 +6,62 @@ Utility functions for data release creation.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
+import numpy as np
 import logging
 import warnings
 import re
 import os
 import shutil
+import tempfile
+import contextlib
 from astropy.io import fits
 from astropy.wcs import WCS, FITSFixedWarning
 from .utilities import find_tpf_files, get_filehash
+
+#--------------------------------------------------------------------------------------------------
+@contextlib.contextmanager
+def temporary_filename(**kwargs):
+	"""
+	Context that introduces a temporary file.
+
+	Creates a temporary file, yields its name, and upon context exit, deletes it.
+	(In contrast, tempfile.NamedTemporaryFile() provides a 'file' object and
+	deletes the file as soon as that file object is closed, so the temporary file
+	cannot be safely re-opened by another library or process.)
+
+	Yields:
+		The name of the temporary file.
+	"""
+	if 'delete' in kwargs:
+		raise ValueError("DELETE keyword can not be used")
+	try:
+		f = tempfile.NamedTemporaryFile(delete=False, **kwargs)
+		tmp_name = f.name
+		f.close()
+		yield tmp_name
+	finally:
+		if os.path.exists(tmp_name):
+			os.remove(tmp_name)
+
+#--------------------------------------------------------------------------------------------------
+def atomic_copy(src, dst):
+	"""
+	Copy file (using shutil.copy2), but with higher likelihood of being an atomic operation.
+
+	This is done by first copying to a temp file and then renaming this file to the final name.
+	This is only atmic on POSIX systems.
+	"""
+	if os.path.exists(dst):
+		raise FileExistsError(dst)
+
+	with temporary_filename(dir=os.path.dirname(dst), suffix='.tmp') as tmp:
+		try:
+			shutil.copy2(src, tmp)
+			os.rename(tmp, dst)
+		except: # noqa: E722
+			if os.path.exists(dst):
+				os.remove(dst)
+			raise
 
 #--------------------------------------------------------------------------------------------------
 def check_fits_changes(fname, fname_modified, allow_header_value_changes=None):
@@ -170,27 +218,34 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 		raise Exception("CORRECTOR")
 
 	# Do we really need to modify the FITS file?
-	modification_needed = True # FORCE modification check!
+	openfile_needed = True # FORCE modification check!
 	fix_wcs = False
 
 	if dataval > 0:
-		modification_needed = True
+		openfile_needed = True
 
 	if cadence == 120 and version <= 5:
-		modification_needed = True
+		openfile_needed = True
 		fix_wcs = True
+
+	# We need to open the ensemble files to find the lightcurve dependencies:
+	if corrector == 'ens':
+		openfile_needed = True
 
 	# Find the starid of the TPF which was used to create this lightcurve:
 	if row['datasource'] == 'tpf':
-		dependency = row['starid']
+		dependency_tpf = row['starid']
 	elif row['datasource'].startswith('tpf:'):
-		dependency = int(row['datasource'][4:])
+		dependency_tpf = int(row['datasource'][4:])
 	else:
-		dependency = None
+		dependency_tpf = None
+
+	# Placeholder for dependencies between lightcurves:
+	dependency_lc = None
 
 	# Damn, it looks like a modification is needed:
 	allow_change = []
-	if modification_needed:
+	if openfile_needed:
 		logger.debug("Opening FITS file: %s", fname)
 		modification_needed = False
 
@@ -198,18 +253,18 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 			if tpf_rootdir is None:
 				raise Exception("You need to provide a TPF_ROOTDIR")
 			# Find out what the
-			if dependency is None:
+			if dependency_tpf is None:
 				raise Exception("We can't fix WCSs of FFI targets!")
 			# Find the original TPF file and extract the WCS from its headers:
-			tpf_file = find_tpf_files(tpf_rootdir, starid=dependency, sector=sector, camera=camera, ccd=ccd, cadence=cadence)
+			tpf_file = find_tpf_files(tpf_rootdir, starid=dependency_tpf, sector=sector, camera=camera, ccd=ccd, cadence=cadence)
 			if len(tpf_file) != 1:
-				raise Exception("Could not find TPF file: starid=%d, sector=%d" % (dependency, sector))
+				raise Exception("Could not find TPF file: starid=%d, sector=%d" % (dependency_tpf, sector))
 			# Extract the FITS header with the correct WCS:
 			with warnings.catch_warnings():
 				warnings.filterwarnings('ignore', category=FITSFixedWarning)
 				wcs_header = WCS(header=fits.getheader(tpf_file[0], extname='APERTURE'), relax=True).to_header(relax=True)
 
-		shutil.copy(fname, fname_original)
+		atomic_copy(fname, fname_original)
 		with fits.open(fname_original, mode='readonly', memmap=True) as hdu:
 			prihdr = hdu[0].header
 
@@ -230,6 +285,10 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 					modification_needed = True
 					allow_change += ['TDISP2']
 					hdu['ENSEMBLE'].header['TDISP2'] = 'E26.17'
+
+			if corrector == 'ens':
+				# Pick out the list of TIC-IDs used to build ensemble:
+				dependency_lc = list(hdu['ENSEMBLE'].data['TIC'])
 
 			if fix_wcs:
 				logger.info("%s: Changing WCS", fname)
@@ -269,6 +328,7 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 		'sector': row['sector'],
 		'camera': row['camera'],
 		'ccd': row['ccd'],
+		'cbv_area': row['cbv_area'],
 		'cadence': cadence,
 		'lightcurve': row['lightcurve'],
 		'dataval': dataval,
@@ -276,5 +336,71 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 		'version': version,
 		'filesize': filesize,
 		'filehash': filehash,
-		'dependency': dependency
+		'dependency_tpf': dependency_tpf,
+		'dependency_lc': dependency_lc
+	}
+
+#--------------------------------------------------------------------------------------------------
+def process_cbv(fname, input_folder, force_version=None):
+
+	m = re.match(r'^tess-s(\d{4})-c(\d{4})-a(\d{3})-v(\d+)-tasoc_cbv\.fits\.gz$', os.path.basename(fname))
+	if m is None:
+		raise Exception("CBV file does not have the correct file name format!")
+	fname_sector = int(m.group(1))
+	fname_cadence = int(m.group(2))
+	fname_cbvarea = int(m.group(3))
+	fname_camera = int(m.group(3)[0])
+	fname_ccd = int(m.group(3)[1])
+	fname_version = int(m.group(4))
+
+	# Open the FITS file and check the headers:
+	with fits.open(fname, mode='readonly', memmap=True) as hdu:
+		hdr = hdu[0].header
+		sector = hdr['SECTOR']
+		camera = hdr['CAMERA']
+		ccd = hdr['CCD']
+		data_rel = hdr['DATA_REL']
+		version = hdr['VERSION']
+		cbv_area = hdr['CBV_AREA']
+		cadence = hdr['CADENCE']
+
+		time = np.asarray(hdu[1].data['TIME'])
+		cadence_time = int(np.round(86400*np.median(np.diff(time))))
+
+	# Check that the filename and headers are consistent:
+	if sector != fname_sector:
+		raise Exception("SECTOR does not match filename.")
+	if camera != fname_camera:
+		raise Exception("CAMERA does not match filename.")
+	if ccd != fname_ccd:
+		raise Exception("CCD does not match filename.")
+	if cadence != fname_cadence:
+		raise Exception("CADENCE does not match filename.")
+	if cadence != cadence_time:
+		raise Exception("CADENCE does not match TIME.")
+	if cbv_area != fname_cbvarea:
+		raise Exception("CBV_AREA does not match filename.")
+	if version != fname_version:
+		raise Exception("VERSION does not match filename.")
+
+	if force_version is not None and version != force_version:
+		raise Exception("Version mismatch!")
+
+	path = os.path.relpath(fname, input_folder).replace('\\', '/')
+
+	# Extract information from final file:
+	filesize = os.path.getsize(fname)
+	filehash = get_filehash(fname)
+
+	return {
+		'path': path,
+		'sector': sector,
+		'camera': camera,
+		'ccd': ccd,
+		'cbv_area': cbv_area,
+		'cadence': cadence,
+		'datarel': data_rel,
+		'version': version,
+		'filesize': filesize,
+		'filehash': filehash
 	}
