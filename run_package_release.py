@@ -10,226 +10,16 @@ files which are ready to be released.
 import argparse
 import sys
 import logging
-import warnings
-import re
 import os
-import shutil
-from astropy.io import fits
-from astropy.wcs import WCS, FITSFixedWarning
+import glob
 import sqlite3
 from contextlib import closing
 import functools
 import multiprocessing
 from tqdm import tqdm
 from dataval import __version__
-from dataval.utilities import find_tpf_files, get_filehash, TqdmLoggingHandler, CounterFilter
-
-#--------------------------------------------------------------------------------------------------
-_regex_clean = re.compile(r'^\s*No differences found', re.IGNORECASE | re.MULTILINE)
-_regex_check_data1 = re.compile(r"^\s*Data contains differences:", re.IGNORECASE | re.MULTILINE)
-_regex_check_data2 = re.compile(r"^\s*(\d+) different pixels found", re.IGNORECASE | re.MULTILINE)
-_regex_check_header1 = re.compile(r"^\s*Keyword ([\w\-]+)\s+has different (values|comments):", re.IGNORECASE | re.MULTILINE)
-_regex_check_header2 = re.compile(r"^\s*Extra keyword '([^']+)' in a:", re.IGNORECASE | re.MULTILINE)
-
-regex_filename = re.compile(r'^tess(\d+)-s(\d+)-(\d)-(\d)-c(\d+)-dr(\d+)-v(\d+)-tasoc-(cbv|ens)_lc\.fits\.gz$')
-regex_fileend = re.compile(r'\.fits\.gz$')
-
-#--------------------------------------------------------------------------------------------------
-def check_fits_changes(fname, fname_modified, allow_header_value_changes=None):
-
-	logger = logging.getLogger(__name__)
-
-	diff = fits.FITSDiff(fname, fname_modified)
-
-	if diff.identical:
-		logger.error("%s: Nothing has changed?", fname)
-		everything_ok = False
-
-	report = diff.report()
-	logger.debug(report)
-	everything_ok = True
-
-	# Do various checks on the output to ensure that only what we expect to change has changed:
-	if _regex_check_data1.search(report):
-		logger.error("%s: Data has been changed!", fname)
-		everything_ok = False
-
-	m = _regex_check_data2.search(report)
-	if m:
-		logger.error("%s: Data has been changed! %s pixels are different.", fname, m.group(1))
-		everything_ok = False
-
-	# Something should have changed!
-	m = _regex_clean.search(report)
-	if m:
-		logger.error("%s: Nothing has changed?", fname)
-		everything_ok = False
-
-	if allow_header_value_changes is None:
-		allow_header_value_changes = ['CHECKSUM', 'DATASUM']
-	else:
-		allow_header_value_changes = ['CHECKSUM', 'DATASUM'] + allow_header_value_changes
-
-	for m in _regex_check_header1.finditer(report):
-		if not m.group(1) in allow_header_value_changes:
-			logger.error("%s: Keyword with different %s: %s", fname, m.group(2), m.group(1))
-			everything_ok = False
-
-	for m in _regex_check_header2.finditer(report):
-		logger.error("%s: Extra keyword: %s", fname, m.group(1))
-		everything_ok = False
-
-	# If we have made it this far, things should be okay:
-	return everything_ok
-
-#--------------------------------------------------------------------------------------------------
-def fix_file(row, input_folder=None, check_corrector=None, force_version=None, tpf_rootdir=None):
-
-	logger = logging.getLogger(__name__)
-	fname = os.path.join(input_folder, row['lightcurve'])
-
-	fname_original = regex_fileend.sub('.original.fits.gz', fname)
-	if os.path.exists(fname_original):
-		raise Exception("ORIGINAL exists: %s" % fname_original)
-
-	dataval = int(row['dataval'])
-	modification_needed = False
-
-	m = regex_filename.match(os.path.basename(fname))
-	if not m:
-		raise Exception("RegEx doesn't match!")
-
-	starid = int(m.group(1))
-	sector = int(m.group(2))
-	camera = int(m.group(3))
-	ccd = int(m.group(4))
-	cadence = int(m.group(5))
-	datarel = int(m.group(6))
-	version = int(m.group(7))
-	corrector = m.group(8)
-
-	# Basic checks:
-	if starid != row['starid']:
-		raise Exception("STARID")
-	if sector != row['sector']:
-		raise Exception("SECTOR")
-	if camera != row['camera']:
-		raise Exception("CAMERA")
-	if ccd != row['ccd']:
-		raise Exception("CCD")
-	#if cadence != row['cadence']:
-	#	raise Exception("CADENCE")
-	if force_version is not None and version != force_version:
-		#modification_needed = True
-		raise Exception("Version mismatch!")
-	if corrector != check_corrector:
-		raise Exception("CORRECTOR")
-
-	# Do we really need to modify the FITS file?
-	modification_needed = True # FORCE modification check!
-	fix_wcs = False
-
-	if dataval > 0:
-		modification_needed = True
-
-	if cadence == 120 and version <= 5:
-		modification_needed = True
-		fix_wcs = True
-
-	# Find the starid of the TPF which was used to create this lightcurve:
-	if row['datasource'] == 'tpf':
-		dependency = row['starid']
-	elif row['datasource'].startswith('tpf:'):
-		dependency = int(row['datasource'][4:])
-	else:
-		dependency = None
-
-	# Damn, it looks like a modification is needed:
-	allow_change = []
-	if modification_needed:
-		logger.debug("Opening FITS file: %s", fname)
-		modification_needed = False
-
-		if fix_wcs:
-			if tpf_rootdir is None:
-				raise Exception("You need to provide a TPF_ROOTDIR")
-			# Find out what the
-			if dependency is None:
-				raise Exception("We can't fix WCSs of FFI targets!")
-			# Find the original TPF file and extract the WCS from its headers:
-			tpf_file = find_tpf_files(tpf_rootdir, starid=dependency, sector=sector, camera=camera, ccd=ccd, cadence=cadence)
-			if len(tpf_file) != 1:
-				raise Exception("Could not find TPF file: starid=%d, sector=%d" % (dependency, sector))
-			# Extract the FITS header with the correct WCS:
-			with warnings.catch_warnings():
-				warnings.filterwarnings('ignore', category=FITSFixedWarning)
-				wcs_header = WCS(header=fits.getheader(tpf_file[0], extname='APERTURE'), relax=True).to_header(relax=True)
-
-		shutil.copy(fname, fname_original)
-		with fits.open(fname_original, mode='readonly', memmap=True) as hdu:
-			prihdr = hdu[0].header
-
-			# Check if the current DATAVAL matches what it should be:
-			current_dataval = prihdr.get('DATAVAL')
-			if current_dataval != dataval:
-				modification_needed = True
-				allow_change += ['DATAVAL']
-				if current_dataval is None:
-					# Insert DATAVAL keyword just before CHECKSUM:
-					prihdr.insert('CHECKSUM', ('DATAVAL', dataval, 'Data validation flags'))
-				else:
-					prihdr['DATAVAL'] = dataval
-
-			if fix_wcs:
-				logger.info("%s: Changing WCS", fname)
-				modification_needed = True
-				allow_change += ['CRPIX1', 'CRPIX2']
-				hdu['APERTURE'].header.update(wcs_header)
-				hdu['SUMIMAGE'].header.update(wcs_header)
-
-			if modification_needed:
-				hdu.writeto(fname, checksum=True, overwrite=True)
-
-	if modification_needed:
-		try:
-			if check_fits_changes(fname_original, fname, allow_header_value_changes=allow_change):
-				os.remove(fname_original)
-			else:
-				logger.error("File check failed: %s", fname)
-				if os.path.exists(fname):
-					os.remove(fname)
-				os.rename(fname_original, fname)
-				raise Exception("File check failed: %s" % fname)
-		except: # noqa: E722
-			logger.exception("Whoops: %s", fname)
-			if os.path.exists(fname_original):
-				if os.path.exists(fname):
-					os.remove(fname)
-				os.rename(fname_original, fname)
-			raise
-
-	elif os.path.exists(fname_original):
-		os.remove(fname_original)
-
-	# Extract information from final file:
-	filesize = os.path.getsize(fname)
-	filehash = get_filehash(fname)
-
-	return {
-		'priority': row['priority'],
-		'starid': row['starid'],
-		'sector': row['sector'],
-		'camera': row['camera'],
-		'ccd': row['ccd'],
-		'cadence': cadence,
-		'lightcurve': row['lightcurve'],
-		'dataval': dataval,
-		'datarel': datarel,
-		'version': version,
-		'filesize': filesize,
-		'filehash': filehash,
-		'dependency': dependency
-	}
+from dataval.utilities import TqdmLoggingHandler, CounterFilter
+from dataval.release import fix_file, regex_fileend, process_cbv
 
 #--------------------------------------------------------------------------------------------------
 def main():
@@ -299,6 +89,11 @@ def main():
 		cursor = conn.cursor()
 		cursor.execute("SELECT * FROM corr_settings;")
 		corr_settings = dict(cursor.fetchone())
+		corrector = corr_settings['corrector']
+
+		if corrector not in ('cbv', 'ensemble'):
+			logger.error("Invalid corrector value: %s", corrector)
+			return 2
 
 		# Check that diagnostics_corr exists:
 		cursor.execute("SELECT COUNT(*) AS antal FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
@@ -318,6 +113,12 @@ def main():
 			logger.error("DATAVALIDATION_CORR table seems incomplete")
 			return 2
 
+		# We are not releasing TPF-files from the Ensemble method:
+		additional_constrainits = ''
+		if corrector == 'ensemble':
+			additional_constrainits = " AND todolist.datasource='ffi'"
+
+		# Gather full list of all files to be released:
 		cursor.execute("""
 		SELECT
 			todolist.priority,
@@ -326,32 +127,40 @@ def main():
 			todolist.ccd,
 			todolist.sector,
 			todolist.datasource,
+			todolist.cbv_area,
 			diagnostics_corr.lightcurve,
 			datavalidation_corr.dataval
 		FROM todolist
 			INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
 			INNER JOIN datavalidation_corr ON todolist.priority=datavalidation_corr.priority
 		WHERE
-			datavalidation_corr.approved=1;""")
+			datavalidation_corr.approved=1""" + additional_constrainits + ";")
 		files_to_release = [dict(row) for row in cursor.fetchall()]
 		cursor.close()
 
 	# Extract information needed below:
 	input_folder = os.path.dirname(input_file)
-	corrector = corr_settings['corrector']
-
-	if corrector not in ('cbv', 'ensemble'):
-		logger.error("Invalid corrector value: %s", corrector)
-		return 2
 
 	# Do a simple check that all the files exists:
-	logger.info("Checking file existance...")
+	logger.info("Checking file existence...")
+	file_check_problem = False
 	for row in tqdm(files_to_release, **tqdm_settings):
 		fname = os.path.join(input_folder, row['lightcurve'])
+		fname_original = regex_fileend.sub('.original.fits.gz', fname)
 		if not os.path.isfile(fname):
 			logger.error("File not found: %s", fname)
-			return 2
+			file_check_problem = True
+		elif os.path.getsize(fname) <= 0:
+			logger.error("File has zero size: %s", fname)
+			file_check_problem = True
+		if os.path.exists(fname_original):
+			logger.error("ORIGINAL file exists: %s", fname_original)
+			file_check_problem = True
 
+	if file_check_problem:
+		return 2
+
+	# Create wrapper function for multiprocessing, with all keywords defined:
 	fix_file_wrapper = functools.partial(fix_file,
 		input_folder=input_folder,
 		check_corrector=corrector[:3], # NOTE: Ensemble is only "ens" in filenames
@@ -380,8 +189,11 @@ def main():
 			filehash TEXT NOT NULL,
 			datarel INTEGER NOT NULL,
 			dataval INTEGER NOT NULL,
-			dependency INTEGER
+			cbv_area INTEGER NOT NULL,
+			dependency_tpf INTEGER,
+			dependency_lc TEXT
 		);""")
+
 		# Create the settings table if it doesn't exist:
 		cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='settings';")
 		if cursor.fetchone()[0] == 0:
@@ -395,6 +207,22 @@ def main():
 				corrector,
 				force_version
 			])
+
+		# For CBV corrected data, create a separate table for the CBV files:
+		if corrector == 'cbv':
+			cursor.execute("DROP TABLE IF EXISTS release_cbv;")
+			cursor.execute("""CREATE TABLE release_cbv (
+				path TEXT NOT NULL PRIMARY KEY,
+				sector INTEGER NOT NULL,
+				camera INTEGER NOT NULL,
+				ccd INTEGER NOT NULL,
+				cbv_area INTEGER NOT NULL,
+				cadence INTEGER NOT NULL,
+				datarel INTEGER NOT NULL,
+				filesize INTEGER NOT NULL,
+				filehash TEXT NOT NULL
+			);""")
+
 		conn.commit()
 
 		# Ensure that we are not running an existing file with new settings:
@@ -407,6 +235,31 @@ def main():
 			logger.error("Inconsistent VERSION provided")
 			return 2
 
+		# For CBV corrected data, first we find all the CBV files, add these to their own
+		# release table, and keep a record of which ones were found, so we can check below
+		# if all the lightcurves can be associated with a single CBV file:
+		cbvs = []
+		if corrector == 'cbv':
+			cbv_files = glob.glob(os.path.join(input_folder, 'cbv-prepare', '*-tasoc_cbv.fits.gz'))
+			for fname in cbv_files:
+				info = process_cbv(fname, input_folder, force_version=force_version)
+				logger.debug(info)
+				cursor.execute("INSERT INTO release_cbv (path, sector, camera, ccd, cbv_area, cadence, datarel, filesize, filehash) VALUES (?,?,?,?,?,?,?,?,?);", [
+					info['path'],
+					info['sector'],
+					info['camera'],
+					info['ccd'],
+					info['cbv_area'],
+					info['cadence'],
+					info['datarel'],
+					info['filesize'],
+					info['filehash']
+				])
+				cbvs.append((info['sector'], info['cadence'], info['cbv_area']))
+			cbvs = set(cbvs)
+			print(cbvs)
+
+		# Figure out which files needs to be processed:
 		cursor.execute("SELECT priority FROM release;")
 		already_processed = set([row[0] for row in cursor.fetchall()])
 		not_yet_processed = []
@@ -430,19 +283,30 @@ def main():
 				inserted = 0
 				for info in tqdm(m(fix_file_wrapper, not_yet_processed), total=numfiles, **tqdm_settings):
 					logger.debug(info)
-					cursor.execute("INSERT INTO release (priority, lightcurve, starid, sector, camera, ccd, cadence, filesize, filehash, datarel, dataval, dependency) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", [
+
+					# For CBV corrected data, check that the corresponding CBV was also found:
+					if corrector == 'cbv' and (info['sector'], info['cadence'], info['cbv_area']) not in cbvs:
+						raise Exception("CBV not found")
+
+					dependency_lc = info['dependency_lc']
+					if dependency_lc is not None:
+						dependency_lc = ','.join([str(t) for t in info['dependency_lc']])
+
+					cursor.execute("INSERT INTO release (priority, lightcurve, starid, sector, camera, ccd, cbv_area, cadence, filesize, filehash, datarel, dataval, dependency_tpf, dependency_lc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);", [
 						info['priority'],
 						info['lightcurve'],
 						info['starid'],
 						info['sector'],
 						info['camera'],
 						info['ccd'],
+						info['cbv_area'],
 						info['cadence'],
 						info['filesize'],
 						info['filehash'],
 						info['datarel'],
 						info['dataval'],
-						info['dependency']
+						info['dependency_tpf'],
+						dependency_lc
 					])
 
 					inserted += 1
@@ -453,6 +317,7 @@ def main():
 			conn.commit()
 
 		cursor.execute("PRAGMA journal_mode=DELETE;")
+		conn.commit()
 		cursor.close()
 
 	# Check the number of errors or warnings issued, and convert these to a return-code:

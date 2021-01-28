@@ -12,6 +12,7 @@ import sys
 import subprocess
 import sqlite3
 import warnings
+import logging
 from contextlib import closing
 import numpy as np
 from astropy.io import fits
@@ -19,6 +20,7 @@ from astropy.wcs import WCS, FITSFixedWarning
 import conftest # noqa: F401
 from dataval import __version__
 from dataval.utilities import get_filehash, find_tpf_files
+from dataval.release import check_fits_changes
 
 #--------------------------------------------------------------------------------------------------
 def capture_run_release(params):
@@ -55,7 +57,7 @@ def test_run_release_wrong_file(SHARED_INPUT_DIR):
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize("jobs", [1, 0])
-@pytest.mark.parametrize("corrector", ['cbv', ]) # 'ensemble'
+@pytest.mark.parametrize("corrector", ['cbv', 'ensemble'])
 def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 	"""
 	Try to run package release on different input.
@@ -100,7 +102,32 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 
 		cursor.execute("SELECT COUNT(*) FROM release;")
 		antal = cursor.fetchone()[0]
-		assert antal == 19
+		if corrector == 'cbv':
+			assert antal == 19
+		else:
+			assert antal == 12
+
+		if corrector == 'cbv':
+			cursor.execute("SELECT * FROM release_cbv ORDER BY cadence DESC;")
+			cbvs = cursor.fetchall()
+			assert len(cbvs) == 2
+			row = dict(cbvs[0])
+			assert row['path'] == 'cbv-prepare/tess-s0006-c1800-a114-v5-tasoc_cbv.fits.gz'
+			assert row['sector'] == 6
+			assert row['camera'] == 1
+			assert row['ccd'] == 1
+			assert row['cadence'] == 1800
+			assert row['cbv_area'] == 114
+			assert row['datarel'] == 8
+
+			row = dict(cbvs[1])
+			assert row['path'] == 'cbv-prepare/tess-s0006-c0120-a114-v5-tasoc_cbv.fits.gz'
+			assert row['sector'] == 6
+			assert row['camera'] == 1
+			assert row['ccd'] == 1
+			assert row['cadence'] == 120
+			assert row['cbv_area'] == 114
+			assert row['datarel'] == 8
 
 		cursor.execute("SELECT * FROM release;")
 		for row in cursor.fetchall():
@@ -114,13 +141,13 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 
 			# Test the dependency:
 			if row['cadence'] > 200:
-				assert row['dependency'] is None
+				assert row['dependency_tpf'] is None
 			else:
-				assert row['dependency'] is not None
+				assert row['dependency_tpf'] is not None
 				if row['starid'] == 4256961: # This is a secondary target
-					assert row['dependency'] == 4255638
+					assert row['dependency_tpf'] == 4255638
 				else: # These are "main" targets:
-					assert row['dependency'] == row['starid']
+					assert row['dependency_tpf'] == row['starid']
 
 			with fits.open(fpath, mode='readonly', memmap=True) as hdu:
 				hdr = hdu[0].header
@@ -133,9 +160,22 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 
 				assert row['cadence'] == int(np.round(hdu[1].header['TIMEDEL']*86400))
 
+				# Check the fix of invalid header in ENSEMBLE extension:
+				if corrector == 'ensemble':
+					# Check the fix of invalid header in ENSEMBLE extension:
+					assert hdu['ENSEMBLE'].header['TDISP2'] != 'E'
+
+					# Check that the stars used to build ensemble were stored:
+					dependency_lc = set([int(t) for t in row['dependency_lc'].split(',')])
+					assert set(hdu['ENSEMBLE'].data['TIC']) == dependency_lc
+
+				elif corrector == 'cbv':
+					assert hdu[1].header['CBV_AREA'] == row['cbv_area']
+
+				# Check the modification of the WCS solution in 120s data:
 				if row['cadence'] == 120:
 					tpf_file = find_tpf_files(tpf_rootdir,
-						starid=row['dependency'],
+						starid=row['dependency_tpf'],
 						sector=row['sector'],
 						camera=row['camera'],
 						ccd=row['ccd'],
@@ -218,6 +258,109 @@ def test_run_release_wrong_db(PRIVATE_INPUT_DIR, jobs, changes, expect_returncod
 	])
 	assert exitcode == expect_returncode
 	assert expect_msg in out or expect_msg in err
+
+#--------------------------------------------------------------------------------------------------
+def test_check_fits_changes(caplog, PRIVATE_INPUT_DIR):
+
+	# Let's not
+	caplog.set_level(logging.ERROR)
+
+	# A random lightcurve file to use for testing:
+	fname = os.path.join(PRIVATE_INPUT_DIR, 'ready_for_release', 'ffi', '00004',
+		'tess00004207261-s006-1-1-c1800-dr08-v05-tasoc-ens_lc.fits.gz')
+
+	# When nothing changes, it should be an error:
+	caplog.clear()
+	assert not check_fits_changes(fname, fname)
+	assert 'Nothing has changed' in caplog.text
+
+	# When nothing changes, it should be an error, with HDUs:
+	caplog.clear()
+	with fits.open(fname, mode='readonly') as hdu:
+		assert not check_fits_changes(hdu, hdu)
+	assert 'Nothing has changed' in caplog.text
+
+	# Delete a HDU:
+	with fits.open(fname, mode='readonly') as hdu:
+		del hdu[2]
+		caplog.clear()
+		assert not check_fits_changes(fname, hdu)
+		assert 'Different number of HDUs' in caplog.text
+		caplog.clear()
+		assert not check_fits_changes(hdu, fname)
+		assert 'Different number of HDUs' in caplog.text
+
+	# Delte a single header keyword:
+	caplog.clear()
+	with fits.open(fname, mode='readonly') as hdu:
+		del hdu['LIGHTCURVE'].header['TIMEDEL']
+		assert not check_fits_changes(fname, hdu) # Missing HDU in modified file
+		assert not check_fits_changes(hdu, fname) # Extra HDU in modified file
+		# Modified header, it is allowed to change, but not to be missing:
+		assert not check_fits_changes(fname, hdu, allow_header_value_changes=['TIMEDEL'])
+
+	# Insert an extra/new keyword:
+	caplog.clear()
+	with fits.open(fname, mode='readonly') as hdu:
+		hdu['LIGHTCURVE'].header['NEWKEY'] = 3.14
+		assert not check_fits_changes(fname, hdu) # Key keyword in modified file
+		# Modified header, and it is allowed to change:
+		assert check_fits_changes(fname, hdu, allow_header_value_changes=['NEWKEY'])
+
+	# Change a single header keyword value:
+	caplog.clear()
+	with fits.open(fname, mode='readonly') as hdu:
+		hdu['LIGHTCURVE'].header['TIMEDEL'] += 3.14
+		assert not check_fits_changes(fname, hdu) # Modified header in modified file
+		# Modified header, and it is allowed to change:
+		assert check_fits_changes(fname, hdu, allow_header_value_changes=['TIMEDEL'])
+
+	# Change a single header keyword comments:
+	caplog.clear()
+	with fits.open(fname, mode='readonly') as hdu:
+		hdu['LIGHTCURVE'].header.comments['TIMEDEL'] = 'completey wrong'
+		assert not check_fits_changes(fname, hdu) # Modified header in modified file
+		# Modified header, and it is allowed to change:
+		assert check_fits_changes(fname, hdu, allow_header_value_changes=['TIMEDEL'])
+
+	# Delete a table column:
+	#caplog.clear()
+	#with fits.open(fname, mode='readonly') as hdu:
+	#	del hdu['LIGHTCURVE'].data['TIMECORR']
+	#	assert not check_fits_changes(fname, hdu) # Modified table in modified file
+	#	assert not check_fits_changes(hdu, fname) # Modified table in original file
+
+	# Change special Table keywords:
+	caplog.clear()
+	with fits.open(fname, mode='readonly') as hdu:
+		hdu['ENSEMBLE'].header['TDISP2'] = 'E10.4'
+		assert not check_fits_changes(fname, hdu) # Modified header in modified file
+		assert 'Table header with different values' in caplog.text
+		# Modified header, and it is allowed to change:
+		assert check_fits_changes(fname, hdu, allow_header_value_changes=['TDISP2'])
+
+	# Change special Table keywords:
+	caplog.clear()
+	with fits.open(fname, mode='readonly') as hdu:
+		hdu['LIGHTCURVE'].header['TUNIT2'] = 'bananas'
+		assert not check_fits_changes(fname, hdu) # Modified header in modified file
+		assert 'Table header with different values' in caplog.text
+		# Modified header, and it is allowed to change:
+		assert check_fits_changes(fname, hdu, allow_header_value_changes=['TUNIT2'])
+
+	# Modified data in table:
+	caplog.clear()
+	with fits.open(fname, mode='readonly') as hdu:
+		hdu['LIGHTCURVE'].data['FLUX_RAW'][33] = 1.233556
+		assert not check_fits_changes(fname, hdu) # Modified data in modified file
+		assert 'Data has been changed' in caplog.text
+
+	# Modified data in image:
+	caplog.clear()
+	with fits.open(fname, mode='readonly') as hdu:
+		hdu['SUMIMAGE'].data[0, 0] = 1.233556
+		assert not check_fits_changes(fname, hdu) # Modified data in modified file
+		assert 'Data has been changed' in caplog.text
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
