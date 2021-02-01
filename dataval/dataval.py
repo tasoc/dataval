@@ -600,7 +600,9 @@ class DataValidation(object):
 		with open(missing_phot_lightcurves_list, 'w') as fid:
 			self.cursor.execute("SELECT todolist.priority,lightcurve FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status IN (1,3);")
 			for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
-				if row['lightcurve'] is None or not os.path.isfile(os.path.join(rootdir, row['lightcurve'])):
+				if row['lightcurve'] is None or \
+					not os.path.isfile(os.path.join(rootdir, row['lightcurve'])) or \
+					os.path.getsize(os.path.join(rootdir, row['lightcurve'])) == 0:
 					missing_phot_lightcurves += 1
 					fid.write("{priority:6d}  {lightcurve:s}\n".format(**row))
 
@@ -618,7 +620,9 @@ class DataValidation(object):
 			with open(missing_corr_lightcurves_list, 'w') as fid:
 				self.cursor.execute("SELECT todolist.priority,diagnostics_corr.lightcurve FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE corr_status IN (1,3);")
 				for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
-					if row['lightcurve'] is None or not os.path.isfile(os.path.join(rootdir, row['lightcurve'])):
+					if row['lightcurve'] is None or \
+						not os.path.isfile(os.path.join(rootdir, row['lightcurve'])) or \
+						os.path.getsize(os.path.join(rootdir, row['lightcurve'])) == 0:
 						missing_corr_lightcurves += 1
 						fid.write("{priority:6d}  {lightcurve:s}\n".format(**row))
 
