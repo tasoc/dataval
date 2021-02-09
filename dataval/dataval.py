@@ -458,7 +458,7 @@ class DataValidation(object):
 
 		logger = logging.getLogger(__name__)
 		logger.info('Testing basics...')
-		tqdm_settings = {'disable': not logger.isEnabledFor(logging.INFO)}
+		tqdm_settings = {'disable': None if logger.isEnabledFor(logging.INFO) else True}
 
 		# Status that we should check for in the database. They should not be present if the
 		# processing was completed correctly:
@@ -635,7 +635,7 @@ class DataValidation(object):
 		# Checking for leftover lightcurve files:
 		logger.info("Checking for any leftover orphaned lightcurve files...")
 		leftover_lightcurves = 0
-		leftover_lightcurves_list = os.path.join(self.outfolder, 'leftover_lightcurves.txt')
+		leftover_lightcurves_list = os.path.join(self.outfolder, 'orphaned_lightcurves.txt')
 		with open(leftover_lightcurves_list, 'w') as fid:
 			logger.info("  Checking for orphaned raw lightcurves...")
 			for fname in tqdm(find_lightcurve_files(rootdir, 'tess*-tasoc_lc.fits.gz'), **tqdm_settings):
@@ -664,10 +664,10 @@ class DataValidation(object):
 						fid.write(relpath + "\n")
 
 		if leftover_lightcurves == 0:
-			logger.info("No leftover lightcurves.")
+			logger.info("No orphaned lightcurves.")
 			os.remove(leftover_lightcurves_list)
 		else:
-			logger.error("%d leftover lightcurves.", leftover_lightcurves)
+			logger.error("%d orphaned lightcurves.", leftover_lightcurves)
 
 	#----------------------------------------------------------------------------------------------
 	def contam(self):
