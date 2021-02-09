@@ -8,32 +8,7 @@ Tests of DataValidation command-line interface.
 
 import pytest
 import os.path
-import sys
-import shlex
-import subprocess
-import conftest # noqa: F401
-
-#--------------------------------------------------------------------------------------------------
-def capture_run_dataval(params):
-
-	command = '"%s" run_dataval.py %s' % (sys.executable, params.strip())
-	print(command)
-
-	cmd = shlex.split(command)
-	proc = subprocess.Popen(cmd,
-		cwd=os.path.join(os.path.dirname(__file__), '..'),
-		stdout=subprocess.PIPE,
-		stderr=subprocess.PIPE,
-		universal_newlines=True
-	)
-	out, err = proc.communicate()
-	exitcode = proc.returncode
-	proc.kill()
-
-	print("ExitCode: %d" % exitcode)
-	print("StdOut:\n%s" % out)
-	print("StdErr:\n%s" % err)
-	return out, err, exitcode
+from conftest import capture_run_cli
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize("inp,corr,save", [
@@ -49,13 +24,16 @@ def test_run_dataval(PRIVATE_INPUT_DIR, inp, corr, save):
 
 	test_dir = os.path.join(PRIVATE_INPUT_DIR, inp, 'todo.sqlite')
 
-	params = '--quiet {corr:s} {validate:s} "{input_dir:s}"'.format(
-		corr='--corrected' if corr else '',
-		validate='--validate' if save else '',
-		input_dir=test_dir
-	)
-	out, err, exitcode = capture_run_dataval(params)
-	assert exitcode == 0
+	params = ['--quiet']
+	if corr:
+		params.append('--corrected')
+	if save:
+		params.append('--validate')
+	params.append(test_dir)
+	print(params)
+
+	out, err, exitcode = capture_run_cli('run_dataval.py', params)
+	assert exitcode == 4 # Since the files are missing, this should result in error-state
 	#assert False
 
 #--------------------------------------------------------------------------------------------------

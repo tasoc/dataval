@@ -23,7 +23,7 @@ def haloswitch(dval):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	logger = logging.getLogger(__name__)
+	logger = logging.getLogger('dataval')
 	logger.info("Running halo-switch diagnostics...")
 
 	# Check if the edge_flux column is in the database

@@ -55,7 +55,7 @@ def main():
 	logger.addFilter(_counterfilter)
 
 	tqdm_settings = {
-		'disable': not logger.isEnabledFor(logging.INFO)
+		'disable': None if logger.isEnabledFor(logging.INFO) else True
 	}
 
 	# Parse input:

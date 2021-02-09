@@ -8,8 +8,6 @@ Tests of PACKAGE command-line interface.
 
 import pytest
 import os.path
-import sys
-import subprocess
 import sqlite3
 import warnings
 import logging
@@ -17,30 +15,10 @@ from contextlib import closing
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS, FITSFixedWarning
-import conftest # noqa: F401
+from conftest import capture_run_cli
 from dataval import __version__
 from dataval.utilities import get_filehash, find_tpf_files
 from dataval.release import check_fits_changes
-
-#--------------------------------------------------------------------------------------------------
-def capture_run_release(params):
-
-	cmd = [sys.executable, 'run_package_release.py'] + params
-	print(cmd)
-	proc = subprocess.Popen(cmd,
-		cwd=os.path.join(os.path.dirname(__file__), '..'),
-		stdout=subprocess.PIPE,
-		stderr=subprocess.PIPE,
-		universal_newlines=True
-	)
-	out, err = proc.communicate()
-	exitcode = proc.returncode
-	proc.kill()
-
-	print("ExitCode: %d" % exitcode)
-	print("StdOut:\n%s" % out)
-	print("StdErr:\n%s" % err)
-	return out, err, exitcode
 
 #--------------------------------------------------------------------------------------------------
 def test_run_release_wrong_file(SHARED_INPUT_DIR):
@@ -51,7 +29,7 @@ def test_run_release_wrong_file(SHARED_INPUT_DIR):
 	"""
 
 	input_file = os.path.join(SHARED_INPUT_DIR, 'ready_for_release', 'todo-does-not-exist.sqlite')
-	out, err, exitcode = capture_run_release(['--debug', input_file])
+	out, err, exitcode = capture_run_cli('run_package_release.py', ['--debug', input_file])
 	assert exitcode == 2
 	assert 'Input file does not exist' in out
 
@@ -83,7 +61,7 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 	tpf_rootdir = os.path.dirname(input_file)
 
 	params = ['--jobs={0:d}'.format(jobs), '--version=5', '--tpf=' + tpf_rootdir, input_file]
-	out, err, exitcode = capture_run_release(params)
+	out, err, exitcode = capture_run_cli('run_package_release.py', params)
 	assert exitcode == 0
 
 	# It should have created a release file:
@@ -138,6 +116,7 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 			assert os.path.isfile(fpath), "File does not exist"
 			assert get_filehash(fpath) == row['filehash']
 			assert os.path.getsize(fpath) == row['filesize']
+			assert row['filesize'] > 0
 
 			# Test the dependency:
 			if row['cadence'] > 200:
@@ -208,13 +187,13 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 		cursor.close()
 
 	# Re-running should not process anything:
-	out, err, exitcode = capture_run_release(params)
+	out, err, exitcode = capture_run_cli('run_package_release.py', params)
 	assert exitcode == 0
 	assert 'Nothing to process' in out
 
 	# Re-running with different VERSION should trigger error:
 	params = ['--jobs={0:d}'.format(jobs), '--version=17', '--tpf=' + tpf_rootdir, input_file]
-	out, err, exitcode = capture_run_release(params)
+	out, err, exitcode = capture_run_cli('run_package_release.py', params)
 	assert exitcode == 2
 	assert 'Inconsistent VERSION provided' in out
 
@@ -249,7 +228,7 @@ def test_run_release_wrong_db(PRIVATE_INPUT_DIR, jobs, changes, expect_returncod
 		conn.commit()
 		cursor.close()
 
-	out, err, exitcode = capture_run_release([
+	out, err, exitcode = capture_run_cli('run_package_release.py', [
 		'--quiet',
 		'--jobs={0:d}'.format(jobs),
 		'--version=5',
