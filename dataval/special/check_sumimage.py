@@ -23,7 +23,7 @@ def check_sumimage(dval, warn_abs=5, warn_rel=0.05):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	logger = logging.getLogger(__name__)
+	logger = logging.getLogger('dataval')
 	logger.info("Checking sumimages...")
 
 	# Settings for tqdm:

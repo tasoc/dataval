@@ -267,7 +267,7 @@ class DataValidation(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 
 		# Which columns to select from the tables:
 		if select is None:
@@ -330,7 +330,7 @@ class DataValidation(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 
 		values = np.asarray(values, dtype='int32')
 		v = [(int(val), int(pri)) for pri, val in zip(priorities, values) if val != 0]
@@ -349,7 +349,7 @@ class DataValidation(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('--------------------------------------------------------')
 
 		# Run the cleanup as the first, since this may actually change things:
@@ -456,7 +456,7 @@ class DataValidation(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('Testing basics...')
 		tqdm_settings = {'disable': None if logger.isEnabledFor(logging.INFO) else True}
 
@@ -678,7 +678,7 @@ class DataValidation(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('Plotting Contamination vs. Magnitude...')
 
 		fig = plt.figure(figsize=(10, 5))
@@ -789,7 +789,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('Plotting Noise Comparison...')
 
 		if not self.corrections_done:
@@ -1014,7 +1014,7 @@ class DataValidation(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('Plotting Noise vs. Magnitude...')
 
 		fig1 = plt.figure(figsize=(15, 5))
@@ -1185,7 +1185,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('Plotting Pixels in aperture vs. Magnitude...')
 
 		fig = plt.figure(figsize=(15, 5))
@@ -1457,7 +1457,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('Plotting Magnitude to Flux conversion...')
 
 		fig = plt.figure(figsize=(15, 5))
@@ -1601,7 +1601,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('Plotting Stamp sizes...')
 
 		fig1 = plt.figure(figsize=(15, 10))
@@ -1753,7 +1753,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('Plotting Magnitude distribution...')
 
 		fig = plt.figure(figsize=(10,5))
@@ -1805,7 +1805,7 @@ class DataValidation(object):
 		.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
+		logger = logging.getLogger('dataval')
 		logger.info('Plotting Magnitude distribution...')
 
 		fig = plt.figure(figsize=(10,5))
