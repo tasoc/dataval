@@ -23,7 +23,7 @@ def camera_overlap(dval):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	logger = logging.getLogger(__name__)
+	logger = logging.getLogger('dataval')
 	logger.info("Checking for overlapping camera problems...")
 
 	# If something overlaps in sector, starid and datasource,

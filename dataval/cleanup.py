@@ -25,7 +25,7 @@ def cleanup(dval):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	logger = logging.getLogger(__name__)
+	logger = logging.getLogger('dataval')
 	logger.info("Running cleanup...")
 	tqdm_settings = {'disable': not logger.isEnabledFor(logging.INFO)}
 

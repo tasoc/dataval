@@ -20,7 +20,7 @@ def waittime(dval):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	logger = logging.getLogger(__name__)
+	logger = logging.getLogger('dataval')
 	logger.info("Running waittime diagnostics...")
 
 	run_tables = ['diagnostics']
