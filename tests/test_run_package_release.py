@@ -138,6 +138,7 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 			assert os.path.isfile(fpath), "File does not exist"
 			assert get_filehash(fpath) == row['filehash']
 			assert os.path.getsize(fpath) == row['filesize']
+			assert row['filesize'] > 0
 
 			# Test the dependency:
 			if row['cadence'] > 200:

@@ -322,6 +322,10 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 	filesize = os.path.getsize(fname)
 	filehash = get_filehash(fname)
 
+	# Check that filesize is not zero:
+	if filesize == 0:
+		raise Exception("File has zero size: %s", fname)
+
 	return {
 		'priority': row['priority'],
 		'starid': row['starid'],
@@ -391,6 +395,10 @@ def process_cbv(fname, input_folder, force_version=None):
 	# Extract information from final file:
 	filesize = os.path.getsize(fname)
 	filehash = get_filehash(fname)
+
+	# Check that filesize is not zero:
+	if filesize == 0:
+		raise Exception("File has zero size: %s", fname)
 
 	return {
 		'path': path,
