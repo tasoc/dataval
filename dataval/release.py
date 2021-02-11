@@ -108,7 +108,10 @@ def check_fits_changes(fname, fname_modified, allow_header_value_changes=None):
 		return False
 
 	everything_ok = True
-	for k, d in diff.diff_hdus:
+	for dh in diff.diff_hdus:
+		# Historically this has changed in astropy, from containing two to four entries,
+		# which is the reason for unpacking like this:
+		d = dh[1]
 		# Headers:
 		hdr = d.diff_headers
 		if not hdr.identical:
