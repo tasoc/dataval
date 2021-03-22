@@ -21,7 +21,7 @@ import astropy.visualization as viz
 plt.switch_backend('Agg')
 
 #--------------------------------------------------------------------------------------------------
-def plots_interactive(backend=('Qt5Agg', 'MacOSX', 'Qt4Agg', 'Qt5Cairo', 'TkAgg')):
+def plots_interactive(backend=('Qt5Agg', 'MacOSX', 'Qt4Agg', 'GTK3Agg', 'Qt5Cairo', 'GTK3Cairo', 'TkAgg')):
 	"""
 	Change plotting to using an interactive backend.
 
@@ -316,3 +316,52 @@ def plot_image_fit_residuals(fig, image, fit, residuals=None, percentile=95.0):
 	plt.subplots_adjust(wspace=0.4, hspace=0.4)
 
 	return [ax1, ax2, ax3]
+
+#--------------------------------------------------------------------------------------------------
+def colorbar(im, ax=None, loc='right', pad=None, size='5%', label=None, ticks=None, ticklabels=None):
+
+	if ax is None:
+		ax = im.axes
+	fig = ax.figure
+	divider = make_axes_locatable(ax)
+	if loc == 'top':
+		pad = 0.05 if pad is None else pad
+		cax = divider.append_axes('top', size=size, pad=pad)
+		orientation = 'horizontal'
+	elif loc == 'bottom':
+		pad = 0.35 if pad is None else pad
+		cax = divider.append_axes('bottom', size=size, pad=pad)
+		orientation = 'horizontal'
+	elif loc == 'left':
+		pad = 0.35 if pad is None else pad
+		cax = divider.append_axes('left', size=size, pad=pad)
+		orientation = 'vertical'
+	else:
+		pad = 0.05 if pad is None else pad
+		cax = divider.append_axes('right', size=size, pad=pad)
+		orientation = 'vertical'
+
+	cb = fig.colorbar(im, cax=cax, orientation=orientation)
+
+	if loc == 'top':
+		cax.xaxis.set_ticks_position('top')
+		cax.xaxis.set_label_position('top')
+	elif loc == 'left':
+		cax.yaxis.set_ticks_position('left')
+		cax.yaxis.set_label_position('left')
+
+	if label is not None:
+		cb.set_label(label)
+	if ticks is not None:
+		cb.set_ticks(ticks)
+	if ticklabels is not None:
+		cb.set_ticklabels(ticklabels)
+
+	#cax.yaxis.set_major_locator(matplotlib.ticker.AutoLocator())
+	#cax.yaxis.set_minor_locator(matplotlib.ticker.AutoLocator())
+	cax.tick_params(which='both', direction='out', pad=5)
+
+	cb.set_alpha(1)
+	cb.draw_all()
+
+	return cb

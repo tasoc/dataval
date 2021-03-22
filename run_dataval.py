@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Run TASOC Data Validation Pipeline.
@@ -11,6 +11,7 @@ import argparse
 import logging
 import sys
 import dataval
+from dataval.plots import plt
 
 #--------------------------------------------------------------------------------------------------
 def main():
@@ -26,6 +27,7 @@ def main():
 		'noise',
 		'noise_compare',
 		'magdist',
+		'calctime',
 		'waittime',
 		'haloswitch',
 		'sumimage',
@@ -76,6 +78,7 @@ def main():
 		validate=args.validate, colorbysector=args.colorbysector,
 		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise) as dval:
 
+		# Run specific methods:
 		if 'cleanup' in args.method:
 			dval.cleanup()
 		if 'basic' in args.method:
@@ -87,15 +90,18 @@ def main():
 		if 'stampsize' in args.method:
 			dval.stampsize()
 		if 'magdist' in args.method:
-			dval.plot_mag_dist()
+			dval.mag_dist()
 		if 'noise' in args.method:
-			dval.plot_noise()
+			dval.noise_metrics()
 		if 'noise_compare' in args.method:
 			dval.compare_noise()
 		if 'contam' in args.method:
 			dval.contam()
 		if 'magdistoverlap' in args.method:
 			dval.plot_mag_dist_overlap()
+		if 'calctime' in args.method:
+			dval.calctime()
+			dval.calctime_corrections()
 		if 'waittime' in args.method:
 			dval.waittime()
 		if 'haloswitch' in args.method:
@@ -113,6 +119,10 @@ def main():
 
 		# Get the number of logs (errors, warnings, info) issued during the validations:
 		logcounts = dval.logcounts
+
+		# If we were asked to show, actully show figures:
+		if dval.show:
+			plt.show(block=True)
 
 	# Check the number of errors or warnings issued, and convert these to a return-code:
 	if logcounts.get('ERROR', 0) > 0 or logcounts.get('CRITICAL', 0) > 0:
