@@ -37,11 +37,9 @@ def check_sumimage(dval, warn_abs=5, warn_rel=0.05):
 	else:
 		files = dval.search_database(select=['todolist.priority', 'diagnostics.lightcurve'])
 
-	rootdir = dval.input_folders[0]
-
 	missing_files = False
 	for row in tqdm(files, **tqdm_settings):
-		fpath = os.path.join(rootdir, row['lightcurve'])
+		fpath = os.path.join(dval.input_folder, row['lightcurve'])
 		logger.debug("Checking file: %s", fpath)
 
 		if not os.path.isfile(fpath):
