@@ -1,8 +1,8 @@
 ********************************
 The TASOC Data Validation module
 ********************************
-.. image:: https://travis-ci.org/tasoc/dataval.svg?branch=devel
-    :target: https://travis-ci.org/tasoc/dataval
+.. image:: https://github.com/tasoc/dataval/actions/workflows/tests.yml/badge.svg?branch=devel
+    :target: https://github.com/tasoc/dataval/actions/workflows/tests.yml
 .. image:: https://img.shields.io/codecov/c/github/tasoc/dataval/devel
     :target: https://codecov.io/github/tasoc/dataval
 .. image:: https://hitsofcode.com/github/tasoc/dataval?branch=devel
