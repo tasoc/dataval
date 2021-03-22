@@ -124,7 +124,7 @@ def noise_metrics(dval):
 			axx.set_xlabel('TESS magnitude')
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
-			axx.set_yscale('log', nonposy='clip') # nonpositive='clip'
+			axx.set_yscale('log')
 			#axx.legend(loc='upper left')
 
 		colorbar(im1, ax=ax1, label='Contamination')
@@ -295,20 +295,20 @@ def compare_noise(dval):
 	idx_lc = (source == 'ffi')
 	idx_sc = (source != 'ffi')
 
-#		ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
-#		ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='2-min cadence')
+	#ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
+	#ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='2-min cadence')
 
 	ax11.scatter(tmags[idx_lc], rms[idx_lc], marker='o', c=contam[idx_lc], alpha=0.1, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 	ax12.scatter(tmags[idx_sc], rms[idx_sc], marker='o', c=contam[idx_sc], alpha=0.1, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
 
-#		ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
-#		ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='2-min cadence')
+	#ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='30-min cadence')
+	#ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', facecolors=rgba_color, edgecolor=rgba_color, alpha=0.1, label='2-min cadence')
 
 	ax21.scatter(tmags[idx_lc], ptp[idx_lc], marker='o', c=contam[idx_lc], alpha=0.1, label='30-min cadence', cmap=plt.get_cmap('PuOr'))
 	ax22.scatter(tmags[idx_sc], ptp[idx_sc], marker='o', c=contam[idx_sc], alpha=0.1, label='2-min cadence', cmap=plt.get_cmap('PuOr'))
 
-#		ax11.scatter(tmags2[(source2=='ffi')], rms2[(source2=='ffi')], marker='o', facecolors='r', edgecolor='r', alpha=0.1, label='30-min cadence')
-#		ax21.scatter(tmags2[(source2=='ffi')], ptp2[(source2=='ffi')], marker='o', facecolors='r', edgecolor='r', alpha=0.1, label='30-min cadence')
+	#ax11.scatter(tmags2[(source2=='ffi')], rms2[(source2=='ffi')], marker='o', facecolors='r', edgecolor='r', alpha=0.1, label='30-min cadence')
+	#ax21.scatter(tmags2[(source2=='ffi')], ptp2[(source2=='ffi')], marker='o', facecolors='r', edgecolor='r', alpha=0.1, label='30-min cadence')
 
 	# Plot theoretical lines
 	mags = np.linspace(dval.tmag_limits[0], dval.tmag_limits[1], 200)
@@ -359,8 +359,8 @@ def compare_noise(dval):
 		axx.set_xlabel('TESS magnitude')
 		axx.xaxis.set_major_locator(MultipleLocator(2))
 		axx.xaxis.set_minor_locator(MultipleLocator(1))
-		axx.set_yscale("log", nonposy='clip')
-#			axx.legend(loc='upper left')
+		axx.set_yscale('log')
+		#axx.legend(loc='upper left')
 
 	ax31.set_xlim(dval.tmag_limits)
 	ax32.set_xlim(dval.tmag_limits)
@@ -369,7 +369,7 @@ def compare_noise(dval):
 	fig1.savefig(os.path.join(dval.outfolder, 'rms_comp'))
 	fig2.savefig(os.path.join(dval.outfolder, 'ptp_comp'))
 	fig3.savefig(os.path.join(dval.outfolder, 'comp'))
-	if dval.show:
-		plt.show()
-	else:
-		plt.close('all')
+	if not dval.show:
+		plt.close(fig1)
+		plt.close(fig2)
+		plt.close(fig3)

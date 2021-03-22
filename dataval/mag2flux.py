@@ -125,7 +125,7 @@ def mag2flux(dval):
 		ax1.plot(mags, 10**(-0.4*(mags - cc.x)), color='k', ls='--')
 		ax1.plot(mags, min_bound(mags), 'r-')
 
-		ax1.set_yscale('log', nonposy='clip')
+		ax1.set_yscale('log')
 		ax1.set_xlim(dval.tmag_limits[1], dval.tmag_limits[0])
 		ax1.set_xlabel('TESS magnitude')
 		ax1.set_ylabel('Median flux')

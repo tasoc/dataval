@@ -248,7 +248,7 @@ def pixinaperture(dval):
 		ax1.xaxis.set_minor_locator(MultipleLocator(xtick_major/2))
 		ytick_major = np.median(np.diff(ax1.get_yticks()))
 		ax1.yaxis.set_minor_locator(MultipleLocator(ytick_major/2))
-		ax1.set_yscale('log', nonposy='clip')
+		ax1.set_yscale('log')
 		#ax1.yaxis.set_major_formatter(ScalarFormatter())
 		#axx.legend(loc='upper right')
 
