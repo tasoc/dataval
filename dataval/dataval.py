@@ -11,7 +11,6 @@ import os
 import logging
 import numpy as np
 import sqlite3
-from scipy.stats import binned_statistic as binning
 from tqdm import tqdm
 import itertools
 
@@ -40,13 +39,13 @@ from .version import get_version
 #--------------------------------------------------------------------------------------------------
 class DataValidation(object):
 
-	def __init__(self, input_folders, output_folder=None, corr=False, validate=True,
-		colorbysector=False, ext='png', showplots=False, sysnoise=0):
+	def __init__(self, todo_file, output_folder=None, corr=False, validate=True,
+		colorbysector=False, ext='png', showplots=False, sysnoise=5.0):
 		"""
 		Initialize DataValidation object.
 
 		Parameters:
-			input_folders (list): DESCRIPTION.
+			todo_file (str): DESCRIPTION.
 			output_folder (str, optional): DESCRIPTION. Defaults to None.
 			corr (bool, optional): DESCRIPTION. Defaults to False.
 			validate (bool, optional): DESCRIPTION. Defaults to True.
@@ -61,7 +60,12 @@ class DataValidation(object):
 		logger = logging.getLogger('dataval')
 
 		# Store inputs:
-		self.input_folders = input_folders
+		if os.path.isdir(todo_file):
+			# If it was just a directory, then append the default todo-file:
+			self.input_folder = todo_file
+			todo_file = os.path.join(todo_file, 'todo.sqlite')
+		else:
+			self.input_folder = os.path.dirname(todo_file)
 		self.extension = ext
 		self.show = showplots
 		self.outfolder = output_folder
@@ -87,116 +91,106 @@ class DataValidation(object):
 		else:
 			logfilename = 'dataval_save.log'
 
-		# Load SQLite TODO files:
-		# TODO: How do we handle cases with more than one input?
-		for k, todo_file in enumerate(self.input_folders):
-			# If it was just a directory, then append the default todo-file:
-			if os.path.isdir(todo_file):
-				todo_file = os.path.join(todo_file, 'todo.sqlite')
-			else:
-				self.input_folders[k] = os.path.dirname(todo_file)
+		# Make sure it is an absolute path:
+		todo_file = os.path.abspath(todo_file)
+		logger.info("Loading input data from '%s'", todo_file)
+		if not os.path.isfile(todo_file):
+			raise FileNotFoundError(f"TODO file not found: '{todo_file}'")
 
-			# Make sure it is an absolute path:
-			todo_file = os.path.abspath(todo_file)
+		# Open the SQLite file:
+		self.conn = sqlite3.connect(todo_file)
+		self.conn.row_factory = sqlite3.Row
+		self.cursor = self.conn.cursor()
+		self.cursor.execute("PRAGMA foreign_keys=ON;")
 
-			logger.info("Loading input data from '%s'", todo_file)
-			if not os.path.isfile(todo_file):
-				raise FileNotFoundError("TODO file not found: '%s'" % todo_file)
+		# Check if corrections have been run:
+		self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
+		self.corrections_done = bool(self.cursor.fetchone()[0] == 1)
+		if self.corr and not self.corrections_done:
+			self.close()
+			raise ValueError("Can not run dataval on corr when corrections have not been run")
 
-			# Open the SQLite file:
-			self.conn = sqlite3.connect(todo_file)
-			self.conn.row_factory = sqlite3.Row
-			self.cursor = self.conn.cursor()
-			self.cursor.execute("PRAGMA foreign_keys=ON;")
+		# Add method_used to the diagnostics table if it doesn't exist:
+		self.cursor.execute("PRAGMA table_info(diagnostics)")
+		if 'method_used' not in [r['name'] for r in self.cursor.fetchall()]:
+			# Since this one is NOT NULL, we have to do some magic to fill out the
+			# new column after creation, by finding keywords in other columns.
+			# This can be a pretty slow process, but it only has to be done once.
+			logger.debug("Adding method_used column to diagnostics")
+			self.cursor.execute("ALTER TABLE diagnostics ADD COLUMN method_used TEXT NOT NULL DEFAULT 'aperture';")
+			for m in ('aperture', 'halo', 'psf', 'linpsf'):
+				self.cursor.execute("UPDATE diagnostics SET method_used=? WHERE priority IN (SELECT priority FROM todolist WHERE method=?);", [m, m])
+			self.cursor.execute("UPDATE diagnostics SET method_used='halo' WHERE method_used='aperture' AND errors LIKE '%Automatically switched to Halo photometry%';")
+			self.conn.commit()
 
-			# Check if corrections have been run:
-			self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
-			self.corrections_done = bool(self.cursor.fetchone()[0] == 1)
-			if self.corr and not self.corrections_done:
+		# Add the CADENCE column to todolist, if it doesn't exist:
+		# This is only for backwards compatibility.
+		self.cursor.execute("PRAGMA table_info(todolist)")
+		existing_columns = [r['name'] for r in self.cursor.fetchall()]
+		if 'cadence' not in existing_columns:
+			logger.debug("Adding CADENCE column to todolist")
+			self.cursor.execute("ALTER TABLE todolist ADD COLUMN cadence INTEGER DEFAULT NULL;")
+			self.cursor.execute("UPDATE todolist SET cadence=1800 WHERE datasource='ffi' AND sector < 27;")
+			self.cursor.execute("UPDATE todolist SET cadence=600 WHERE datasource='ffi' AND sector >= 27 AND sector <= 55;")
+			self.cursor.execute("UPDATE todolist SET cadence=120 WHERE datasource!='ffi' AND sector < 27;")
+			self.cursor.execute("SELECT COUNT(*) AS antal FROM todolist WHERE cadence IS NULL;")
+			if self.cursor.fetchone()['antal'] > 0:
 				self.close()
-				raise ValueError("Can not run dataval on corr when corrections have not been run")
-
-			# Add method_used to the diagnostics table if it doesn't exist:
-			self.cursor.execute("PRAGMA table_info(diagnostics)")
-			if 'method_used' not in [r['name'] for r in self.cursor.fetchall()]:
-				# Since this one is NOT NULL, we have to do some magic to fill out the
-				# new column after creation, by finding keywords in other columns.
-				# This can be a pretty slow process, but it only has to be done once.
-				logger.debug("Adding method_used column to diagnostics")
-				self.cursor.execute("ALTER TABLE diagnostics ADD COLUMN method_used TEXT NOT NULL DEFAULT 'aperture';")
-				for m in ('aperture', 'halo', 'psf', 'linpsf'):
-					self.cursor.execute("UPDATE diagnostics SET method_used=? WHERE priority IN (SELECT priority FROM todolist WHERE method=?);", [m, m])
-				self.cursor.execute("UPDATE diagnostics SET method_used='halo' WHERE method_used='aperture' AND errors LIKE '%Automatically switched to Halo photometry%';")
-				self.conn.commit()
-
-			# Add the CADENCE column to todolist, if it doesn't exist:
-			# This is only for backwards compatibility.
-			self.cursor.execute("PRAGMA table_info(todolist)")
-			existing_columns = [r['name'] for r in self.cursor.fetchall()]
-			if 'cadence' not in existing_columns:
-				logger.debug("Adding CADENCE column to todolist")
-				self.cursor.execute("ALTER TABLE todolist ADD COLUMN cadence INTEGER DEFAULT NULL;")
-				self.cursor.execute("UPDATE todolist SET cadence=1800 WHERE datasource='ffi' AND sector < 27;")
-				self.cursor.execute("UPDATE todolist SET cadence=600 WHERE datasource='ffi' AND sector >= 27 AND sector <= 55;")
-				self.cursor.execute("UPDATE todolist SET cadence=120 WHERE datasource!='ffi' AND sector < 27;")
-				self.cursor.execute("SELECT COUNT(*) AS antal FROM todolist WHERE cadence IS NULL;")
-				if self.cursor.fetchone()['antal'] > 0:
-					self.close()
-					raise ValueError("TODO-file does not contain CADENCE information and it could not be determined automatically. Please recreate TODO-file.")
-				self.conn.commit()
-
-			# Get the corrector that was run on this TODO-file, if the corr_settings table is available:
-			if self.corr:
-				self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='corr_settings';")
-				if self.cursor.fetchone()[0] == 1:
-					self.cursor.execute("SELECT corrector FROM corr_settings LIMIT 1;")
-					row = self.cursor.fetchone()
-					if row is not None and row['corrector'] is not None:
-						self.corr_method = row['corrector'].strip()
-						subdir += '-' + row['corrector'].strip()
-
-			# Create table for data-validation:
-			# Depending if we are saving the results or not (self.doval) we are creating
-			# it either as a real table, or as a TEMPORARY table, which will only exist in memory
-			# as long as the database connection is opened.
-			logger.info("Creating datavalidation table...")
-			self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
-			if self.doval:
-				self.cursor.execute("CREATE TABLE IF NOT EXISTS " + self.dataval_table + """ (
-					priority INTEGER PRIMARY KEY ASC NOT NULL,
-					dataval INTEGER NOT NULL DEFAULT 0,
-					approved BOOLEAN,
-					FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
-				);""")
-			else:
-				# Temporary tables can not use foreign keys to real tables, which is why
-				# we are not putting in the same foreign key here.
-				self.cursor.execute("CREATE TEMPORARY TABLE " + self.dataval_table + """ (
-					priority INTEGER PRIMARY KEY ASC NOT NULL,
-					dataval INTEGER NOT NULL DEFAULT 0,
-					approved BOOLEAN
-				);""")
-
-			# Fill out the table with zero dataval and NULL in approved:
-			logger.info("Initializing datavalidation table...")
-			self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority) SELECT priority FROM todolist;")
+				raise ValueError("TODO-file does not contain CADENCE information and it could not be determined automatically. Please recreate TODO-file.")
 			self.conn.commit()
 
-			# Create a couple of indicies on the two columns:
-			logger.info("Creating indicies on datavalidation table...")
-			self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_approved_idx ON " + self.dataval_table + " (approved);")
-			self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_dataval_idx ON " + self.dataval_table + " (dataval);")
-			self.conn.commit()
+		# Get the corrector that was run on this TODO-file, if the corr_settings table is available:
+		if self.corr:
+			self.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='corr_settings';")
+			if self.cursor.fetchone()[0] == 1:
+				self.cursor.execute("SELECT corrector FROM corr_settings LIMIT 1;")
+				row = self.cursor.fetchone()
+				if row is not None and row['corrector'] is not None:
+					self.corr_method = row['corrector'].strip()
+					subdir += '-' + row['corrector'].strip()
 
-			logger.info("Creating lightcurve indicies...")
-			self.cursor.execute("CREATE INDEX IF NOT EXISTS diagnostics_lightcurve_idx ON diagnostics (lightcurve);")
-			if self.corrections_done:
-				self.cursor.execute("CREATE INDEX IF NOT EXISTS diagnostics_corr_lightcurve_idx ON diagnostics_corr (lightcurve);")
-			self.conn.commit()
+		# Create table for data-validation:
+		# Depending if we are saving the results or not (self.doval) we are creating
+		# it either as a real table, or as a TEMPORARY table, which will only exist in memory
+		# as long as the database connection is opened.
+		logger.info("Creating datavalidation table...")
+		self.cursor.execute('DROP TABLE IF EXISTS ' + self.dataval_table + ';')
+		if self.doval:
+			self.cursor.execute("CREATE TABLE IF NOT EXISTS " + self.dataval_table + """ (
+				priority INTEGER PRIMARY KEY ASC NOT NULL,
+				dataval INTEGER NOT NULL DEFAULT 0,
+				approved BOOLEAN,
+				FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
+			);""")
+		else:
+			# Temporary tables can not use foreign keys to real tables, which is why
+			# we are not putting in the same foreign key here.
+			self.cursor.execute("CREATE TEMPORARY TABLE " + self.dataval_table + """ (
+				priority INTEGER PRIMARY KEY ASC NOT NULL,
+				dataval INTEGER NOT NULL DEFAULT 0,
+				approved BOOLEAN
+			);""")
+
+		# Fill out the table with zero dataval and NULL in approved:
+		logger.info("Initializing datavalidation table...")
+		self.cursor.execute("INSERT INTO " + self.dataval_table + " (priority) SELECT priority FROM todolist;")
+		self.conn.commit()
+
+		# Create a couple of indicies on the two columns:
+		logger.info("Creating indicies on datavalidation table...")
+		self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_approved_idx ON " + self.dataval_table + " (approved);")
+		self.cursor.execute("CREATE INDEX IF NOT EXISTS " + self.dataval_table + "_dataval_idx ON " + self.dataval_table + " (dataval);")
+		self.conn.commit()
+
+		logger.info("Creating lightcurve indicies...")
+		self.cursor.execute("CREATE INDEX IF NOT EXISTS diagnostics_lightcurve_idx ON diagnostics (lightcurve);")
+		if self.corrections_done:
+			self.cursor.execute("CREATE INDEX IF NOT EXISTS diagnostics_corr_lightcurve_idx ON diagnostics_corr (lightcurve);")
+		self.conn.commit()
 
 		# Create output directory:
-		if len(self.input_folders) == 1 and self.outfolder is None:
-			self.outfolder = os.path.join(self.input_folders[0], 'data_validation', subdir)
+		if self.outfolder is None:
+			self.outfolder = os.path.join(self.input_folder, 'data_validation', subdir)
 		os.makedirs(self.outfolder, exist_ok=True)
 		logger.info("Putting output data in '%s'", self.outfolder)
 
@@ -623,9 +617,6 @@ class DataValidation(object):
 			logger.log(logging.ERROR if count_specificerror else logging.INFO,
 				"  %s (%s): %d", keyword, tbl, count_specificerror)
 
-		# Root directory for files assocuated with this TODO-file:
-		rootdir = self.input_folders[0]
-
 		# Check if any raw lightcurve files are missing:
 		logger.info("Checking if any raw lightcurve files are missing...")
 		missing_phot_lightcurves = 0
@@ -634,8 +625,8 @@ class DataValidation(object):
 			self.cursor.execute("SELECT todolist.priority,lightcurve FROM todolist LEFT JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status IN (1,3);")
 			for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
 				if row['lightcurve'] is None or \
-					not os.path.isfile(os.path.join(rootdir, row['lightcurve'])) or \
-					os.path.getsize(os.path.join(rootdir, row['lightcurve'])) == 0:
+					not os.path.isfile(os.path.join(self.input_folder, row['lightcurve'])) or \
+					os.path.getsize(os.path.join(self.input_folder, row['lightcurve'])) == 0:
 					missing_phot_lightcurves += 1
 					fid.write("{priority:6d}  {lightcurve:s}\n".format(**row))
 
@@ -654,8 +645,8 @@ class DataValidation(object):
 				self.cursor.execute("SELECT todolist.priority,diagnostics_corr.lightcurve FROM todolist LEFT JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority WHERE corr_status IN (1,3);")
 				for row in tqdm(self.cursor.fetchall(), **tqdm_settings):
 					if row['lightcurve'] is None or \
-						not os.path.isfile(os.path.join(rootdir, row['lightcurve'])) or \
-						os.path.getsize(os.path.join(rootdir, row['lightcurve'])) == 0:
+						not os.path.isfile(os.path.join(self.input_folder, row['lightcurve'])) or \
+						os.path.getsize(os.path.join(self.input_folder, row['lightcurve'])) == 0:
 						missing_corr_lightcurves += 1
 						fid.write("{priority:6d}  {lightcurve:s}\n".format(**row))
 
@@ -671,9 +662,9 @@ class DataValidation(object):
 		leftover_lightcurves_list = os.path.join(self.outfolder, 'orphaned_lightcurves.txt')
 		with open(leftover_lightcurves_list, 'w') as fid:
 			logger.info("  Checking for orphaned raw lightcurves...")
-			for fname in tqdm(find_lightcurve_files(rootdir, 'tess*-tasoc_lc.fits.gz'), **tqdm_settings):
+			for fname in tqdm(find_lightcurve_files(self.input_folder, 'tess*-tasoc_lc.fits.gz'), **tqdm_settings):
 				# Find relative path to find in database:
-				relpath = os.path.relpath(fname, rootdir)
+				relpath = os.path.relpath(fname, self.input_folder)
 				logger.debug("Checking: %s", relpath)
 
 				self.cursor.execute("SELECT * FROM diagnostics WHERE lightcurve=?;", [relpath])
@@ -686,9 +677,9 @@ class DataValidation(object):
 				if self.corr_method is None:
 					logger.error("Correction method not given")
 				fname_filter = {'ensemble': 'ens', 'cbv': 'cbv', 'kasoc_filter': 'kf', None: '*'}[self.corr_method]
-				for fname in tqdm(find_lightcurve_files(rootdir, 'tess*-tasoc-%s_lc.fits.gz' % fname_filter), **tqdm_settings):
+				for fname in tqdm(find_lightcurve_files(self.input_folder, 'tess*-tasoc-%s_lc.fits.gz' % fname_filter), **tqdm_settings):
 					# Find relative path to find in database:
-					relpath = os.path.relpath(fname, rootdir)
+					relpath = os.path.relpath(fname, self.input_folder)
 					logger.debug("Checking: %s", relpath)
 
 					self.cursor.execute("SELECT * FROM diagnostics_corr WHERE lightcurve=?;", [relpath])

@@ -42,21 +42,18 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 
-	parser.add_argument('-o', '--output', type=str, help='Directory in which to place output if several input folders are given.', nargs='?', default=None)
-	parser.add_argument('input_folders', type=str, help='Directory to load from.', nargs='+')
+	parser.add_argument('--output', type=str, help='Directory in which to place output.', nargs='?', default=None)
+	parser.add_argument('todo_file', type=str, help='TODO-file or directory to load from.')
 
 	group = parser.add_argument_group('Plotting settings')
 	group.add_argument('-e', '--ext', help='Extension of plots.', default='png', choices=('png','eps','pdf'))
-	group.add_argument('-s', '--show', help='Show plots.', action='store_true')
+	group.add_argument('-s', '--show', help='Show plots?', action='store_true')
 	group.add_argument('-cbs', '--colorbysector', help='Color by sector.', action='store_true')
 
 	group = parser.add_argument_group('Noise model settings')
 	group.add_argument('-sn', '--sysnoise', type=float, help='Systematic noise level for noise model.', nargs='?', default=5.0)
 
 	args = parser.parse_args()
-
-	if args.output is None and len(args.input_folders) > 1:
-		parser.error("Please specify an output directory!")
 
 	# Set logging level:
 	logging_level = logging.INFO
@@ -74,7 +71,7 @@ def main():
 	logger.setLevel(logging_level)
 
 	# Create DataValidation object:
-	with dataval.DataValidation(args.input_folders, output_folder=args.output, corr=args.corrected,
+	with dataval.DataValidation(args.todo_file, output_folder=args.output, corr=args.corrected,
 		validate=args.validate, colorbysector=args.colorbysector,
 		showplots=args.show, ext=args.ext, sysnoise=args.sysnoise) as dval:
 
