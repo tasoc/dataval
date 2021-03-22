@@ -209,44 +209,14 @@ def plot_image(image, ax=None, scale='log', cmap=None, origin='lower', xlabel=No
 	ax.set_ylim([extent[2], extent[3]])
 
 	if cbar:
-		fig = ax.figure
-		divider = make_axes_locatable(ax)
-		if cbar == 'top':
-			cbar_pad = 0.05 if cbar_pad is None else cbar_pad
-			cax = divider.append_axes('top', size=cbar_size, pad=cbar_pad)
-			orientation = 'horizontal'
-		elif cbar == 'bottom':
-			cbar_pad = 0.35 if cbar_pad is None else cbar_pad
-			cax = divider.append_axes('bottom', size=cbar_size, pad=cbar_pad)
-			orientation = 'horizontal'
-		elif cbar == 'left':
-			cbar_pad = 0.35 if cbar_pad is None else cbar_pad
-			cax = divider.append_axes('left', size=cbar_size, pad=cbar_pad)
-			orientation = 'vertical'
-		else:
-			cbar_pad = 0.05 if cbar_pad is None else cbar_pad
-			cax = divider.append_axes('right', size=cbar_size, pad=cbar_pad)
-			orientation = 'vertical'
-
-		cb = fig.colorbar(im, cax=cax, orientation=orientation)
-
-		if cbar == 'top':
-			cax.xaxis.set_ticks_position('top')
-			cax.xaxis.set_label_position('top')
-		elif cbar == 'left':
-			cax.yaxis.set_ticks_position('left')
-			cax.yaxis.set_label_position('left')
-
-		if clabel is not None:
-			cb.set_label(clabel)
-		if cbar_ticks is not None:
-			cb.set_ticks(cbar_ticks)
-		if cbar_ticklabels is not None:
-			cb.set_ticklabels(cbar_ticklabels)
-
-		#cax.yaxis.set_major_locator(matplotlib.ticker.AutoLocator())
-		#cax.yaxis.set_minor_locator(matplotlib.ticker.AutoLocator())
-		cax.tick_params(which='both', direction='out', pad=5)
+		colorbar(im,
+			ax=ax,
+			loc=cbar,
+			size=cbar_size,
+			pad=cbar_pad,
+			label=clabel,
+			ticks=cbar_ticks,
+			ticklabels=cbar_ticklabels)
 
 	# Settings for ticks:
 	integer_locator = MaxNLocator(nbins=10, integer=True)
@@ -306,7 +276,7 @@ def plot_image_fit_residuals(fig, image, fit, residuals=None, percentile=95.0):
 
 	# Make the common colorbar for image and fit subplots:
 	cbar_ax12 = fig.add_axes([0.125, 0.2, 0.494, 0.03])
-	fig.colorbar(im1, norm=norm, cax=cbar_ax12, orientation='horizontal')
+	fig.colorbar(im1, cax=cbar_ax12, orientation='horizontal')
 
 	# Make the colorbar for the residuals subplot:
 	cbar_ax3 = fig.add_axes([0.7, 0.2, 0.205, 0.03])
@@ -319,10 +289,20 @@ def plot_image_fit_residuals(fig, image, fit, residuals=None, percentile=95.0):
 
 #--------------------------------------------------------------------------------------------------
 def colorbar(im, ax=None, loc='right', pad=None, size='5%', label=None, ticks=None, ticklabels=None):
+	"""
+	Draw colorbar next to the given axes.
+
+	Returns:
+		:class:`matplotlib.colorbar.Colorbar`: Colorbar handle.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
 
 	if ax is None:
-		ax = im.axes
+		ax = plt.gca()
 	fig = ax.figure
+
+	# Create new colorbar axes:
 	divider = make_axes_locatable(ax)
 	if loc == 'top':
 		pad = 0.05 if pad is None else pad
