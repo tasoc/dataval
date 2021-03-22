@@ -118,12 +118,12 @@ def check_fits_changes(fname, fname_modified, allow_header_value_changes=None):
 			if hdr.diff_keywords:
 				# Keywords only in header A:
 				if hdr.diff_keywords[0]:
-					logger.error("%s: %s", fname_str, hdr.diff_keywords[0])
+					logger.error("%s: Extra keyword in original: %s", fname_str, hdr.diff_keywords[0])
 					everything_ok = False
 				# Keywords only in header B:
 				if hdr.diff_keywords[1]:
 					if any([key not in allow_header_value_changes for key in hdr.diff_keywords[1]]):
-						logger.error("%s: %s", fname_str, hdr.diff_keywords[1])
+						logger.error("%s: Extra keyword in modified: %s", fname_str, hdr.diff_keywords[1])
 						everything_ok = False
 
 			for key, val in hdr.diff_keyword_values.items():
@@ -297,11 +297,15 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 				logger.info("%s: Changing WCS", fname)
 				modification_needed = True
 				allow_change += ['CRPIX1', 'CRPIX2']
+				mjdref_remove = ('MJDREF' not in hdu['APERTURE'].header)
 				hdu['APERTURE'].header.update(wcs_header)
 				hdu['SUMIMAGE'].header.update(wcs_header)
+				if mjdref_remove:
+					hdu['APERTURE'].header.remove('MJDREF', ignore_missing=True, remove_all=True)
+					hdu['SUMIMAGE'].header.remove('MJDREF', ignore_missing=True, remove_all=True)
 
 			if modification_needed:
-				hdu.writeto(fname, checksum=True, overwrite=True)
+				hdu.writeto(fname, output_verify='exception', checksum=True, overwrite=True)
 
 	if modification_needed:
 		try:
