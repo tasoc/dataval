@@ -990,7 +990,7 @@ class DataValidation(object):
 			axx.set_xlabel('TESS magnitude')
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
-			axx.set_yscale("log", nonposy='clip')
+			axx.set_yscale("log", nonpositive='clip')
 #			axx.legend(loc='upper left')
 
 		ax31.set_xlim(self.tmag_limits)
@@ -1132,7 +1132,7 @@ class DataValidation(object):
 			axx.set_xlabel('TESS magnitude')
 			axx.xaxis.set_major_locator(MultipleLocator(2))
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
-			axx.set_yscale("log", nonposy='clip')
+			axx.set_yscale("log", nonpositive='clip')
 #			axx.legend(loc='upper left')
 
 		divider = make_axes_locatable(ax11)
@@ -1419,7 +1419,7 @@ class DataValidation(object):
 			axx.xaxis.set_minor_locator(MultipleLocator(xtick_major/2))
 			ytick_major = np.median(np.diff(axx.get_yticks()))
 			axx.yaxis.set_minor_locator(MultipleLocator(ytick_major/2))
-			axx.set_yscale("log", nonposy='clip')
+			axx.set_yscale("log", nonpositive='clip')
 			axx.yaxis.set_major_formatter(ScalarFormatter())
 			#axx.legend(loc='upper right')
 
@@ -1562,7 +1562,7 @@ class DataValidation(object):
 		ax2.plot(mag, 10**(-0.4*(mag - cc2.x)), color='k', ls='--')
 
 		for axx in np.array([ax1, ax2]):
-			axx.set_yscale("log", nonposy='clip')
+			axx.set_yscale("log", nonpositive='clip')
 			axx.set_xlim(self.tmag_limits)
 			axx.set_xlabel('TESS magnitude')
 
