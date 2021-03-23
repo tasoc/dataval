@@ -3,7 +3,13 @@ text.usetex      : False
 mathtext.fontset : dejavuserif
 
 savefig.bbox     : tight
+savefig.pad_inches: 0.1
+savefig.dpi      : 100
 
+figure.figsize   : 9.6, 7.2
+figure.dpi       : 100
+
+axes.titlesize   : 16
 axes.labelsize   : 16
 axes.labelpad    : 10
 
