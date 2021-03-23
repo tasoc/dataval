@@ -28,9 +28,9 @@ def pixinaperture(dval):
 
 	mags = np.linspace(dval.tmag_limits[0], dval.tmag_limits[1], 200)
 
-	norm = Normalize(vmin=0, vmax=1)
-
-	for cadence in dval.cadences:
+	# TODO: Does this need to be separated by cadence as well?
+	#       Are there significant differences beween 120s and 20s mask sizes?
+	for datasource, ds_query in (['ffi', "datasource='ffi'"], ['tpf', "datasource!='ffi'"]):
 
 		fig, ax1 = plt.subplots()
 		fig.subplots_adjust(left=0.1, wspace=0.2, top=0.94, bottom=0.155, right=0.91)
@@ -38,87 +38,54 @@ def pixinaperture(dval):
 		star_vals = dval.search_database(
 			select=[
 				'todolist.priority',
-				'todolist.datasource',
 				'todolist.sector',
 				'todolist.tmag',
 				'diagnostics.mask_size',
 				'diagnostics.contamination',
 				'diagnostics.errors'
 			],
-			search=f'cadence={cadence:d}')
+			search=["method_used='aperture'", ds_query])
 
 		if not star_vals:
 			continue
 
-		#if self.color_by_sector:
-		#	sec = np.array([star['sector'] for star in star_vals], dtype=int)
-		#	sectors = np.array(list(set(sec)))
-		#	if len(sectors)>1:
-		#		norm = colors.Normalize(vmin=1, vmax=len(sectors))
-		#		scalarMap = cmx.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1') )
-		#		rgba_color = np.array([scalarMap.to_rgba(s) for s in sec])
-		#	else:
-		#		rgba_color = 'k'
-		#else:
-		#	rgba_color = 'k'
-
 		pri = np.array([star['priority'] for star in star_vals], dtype='int64')
 		tmags = np.array([star['tmag'] for star in star_vals], dtype='float64')
-		masksizes = np.array([star['mask_size'] for star in star_vals], dtype='float64')
+		masksizes = np.array([star['mask_size'] for star in star_vals], dtype='int32')
 		contam = np.array([star['contamination'] for star in star_vals], dtype='float64')
-
 		minimal_mask_used = np.array([False if star['errors'] is None else ('Using minimum aperture.' in star['errors']) for star in star_vals], dtype='bool')
 
-		#dataval = np.zeros_like(pri, dtype='int32')
-		#if self.doval:
-		#	dataval = np.array([star['dataval'] for star in star_vals], dtype='int32')
-
-		#cats = {}
-		#for cams in list(set(camera)):
-		#	cats[cams] = {}
-		#	for jj in range(4):
-		#		cam_file = os.path.join(self.input_folders[0], 'catalog_camera' + str(int(cams)) +'_ccd' + str(jj+1) + '.sqlite')
-		#		with contextlib.closing(sqlite3.connect(cam_file)) as conn:
-		#		with sqlite3.connect(cam_file) as conn:
-		#			conn.row_factory = sqlite3.Row
-		#			cursor = conn.cursor()
-
-		#			cats[cams][str(jj+1)] = cursor
-
-		#cams_cen = {}
-		#cams_cen['1','ra'] = 324.566998914166
-		#cams_cen['1','decl'] = -33.172999301379
-		#cams_cen['2','ra'] = 338.5766
-		#cams_cen['2','decl'] = -55.0789
-		#cams_cen['3','ra'] = 19.4927
-		#cams_cen['3','decl'] = -71.9781
-		#cams_cen['4','ra'] = 90.0042
-		#cams_cen['4','decl'] = -66.5647
-
-		#dists = np.zeros(len(tics))
-		#for ii, tic in enumerate(tics):
-		#	query = "SELECT ra,decl FROM catalog where starid=%s" %tic
-		#	# Ask the database: status=1
-		#	cc = cats[camera[ii]][str(ccds[ii])]
-		#	cc.execute(query)
-		#	star_vals = cc.fetchone()
-		#	dists[ii] = sphere_distance(star_vals['ra'], star_vals['decl'], cams_cen[camera[ii],'ra'], cams_cen[camera[ii],'decl'])
-
+		# FIXME: Is this even needed anymore?
 		contam[np.isnan(contam)] = 0
 
-		# Get rid of stupid halo targets
-		masksizes[np.isnan(masksizes)] = 0
+		# Decide what to color according to:
+		if dval.color_by_sector:
+			# Color by sector number
+			sec = np.array([star['sector'] for star in star_vals], dtype='int32')
+			sectors = sorted(list(set(sec)))
+			col = sec
+			norm = Normalize(vmin=-0.5, vmax=len(sectors)-0.5)
+			cmap = plt.get_cmap('tab10', len(sectors))
+			#cbar_ticks = np.arange(len(sectors))
+			#cbar_ticklabels = sectors
+			cbar_label = 'Sector'
+		else:
+			col = contam
+			norm = Normalize(vmin=0, vmax=1)
+			cmap = plt.get_cmap('PuOr')
+			cbar_label = 'Contamination'
 
+		# Plot mask-sizes as a function of magnitude:
 		perm = dval.random_state.permutation(len(tmags))
-		im = ax1.scatter(tmags[perm], masksizes[perm], c=contam[perm],
+		im = ax1.scatter(tmags[perm], masksizes[perm], c=col[perm],
 			marker='o',
 			norm=norm,
-			cmap=plt.get_cmap('PuOr'),
+			cmap=cmap,
 			alpha=0.2,
 			rasterized=True)
 
-		# Compute median-bin curve
-		bin_means, bin_edges, binnumber = binned_statistic(tmags, masksizes, statistic='median', bins=15, range=(np.nanmin(tmags),np.nanmax(tmags)))
+		# Compute median-bin curve and plot it on top of the points:
+		bin_means, bin_edges, binnumber = binned_statistic(tmags, masksizes, statistic='median', bins=15)
 		bin_width = (bin_edges[1] - bin_edges[0])
 		bin_centers = bin_edges[1:] - bin_width/2
 		ax1.scatter(bin_centers, bin_means, marker='o', color='r')
@@ -127,7 +94,8 @@ def pixinaperture(dval):
 		#normed1 = masksizes[idx_lc]-pix_vs_mag(tmags[idx_lc])
 
 		#bin_mad, bin_edges, binnumber = binning(tmags[idx_lc], np.abs(normed1), statistic='median', bins=15, range=(np.nanmin(tmags[idx_lc]),np.nanmax(tmags[idx_lc])))
-		#bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
+		#bin_width = (bin_edges[1] - bin_edges[0])
+		#bin_centers = bin_edges[1:] - bin_width/2
 		#bin_var = bin_mad*1.4826
 		#var_vs_mag = INT.InterpolatedUnivariateSpline(bin_centers, bin_var)
 
@@ -137,7 +105,8 @@ def pixinaperture(dval):
 		#plt.figure()
 		#red = masksizes[idx_lc]/pix_vs_mag(tmags[idx_lc])
 		#bin_means, bin_edges, binnumber = binning(contam[idx_lc], red, statistic='median', bins=15, range=(np.nanmin(contam[idx_lc]),1))
-		#bin_width = (bin_edges[1] - bin_edges[0]);		bin_centers = bin_edges[1:] - bin_width/2
+		#bin_width = (bin_edges[1] - bin_edges[0])
+		#bin_centers = bin_edges[1:] - bin_width/2
 		#plt.scatter(contam[idx_lc], red, alpha=0.1, color='k')
 		#plt.scatter(bin_centers, bin_means, color='r')
 
@@ -161,19 +130,18 @@ def pixinaperture(dval):
 
 		# The interpolations are linear *in log space* which is the reason
 		# for the stange lambda wrappers in the following code:
-		if cadence == 1800:
-			# Minimum bound on FFI data
-
+		if datasource == 'ffi':
+			# Minimum bound on FFI data:
 			xmin = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 11.6, 16])
 			ymin = np.array([2600, 846, 526, 319, 238, 159, 118, 62, 44, 32, 23, 15.7, 11.15, 8, 5, 4, 4])
 			min_bound_log = InterpolatedUnivariateSpline(xmin, np.log10(ymin), k=1, ext=3)
 			min_bound = lambda x: 10**(min_bound_log(x)) # noqa: E731
 
+			# Maximum bound on FFI data:
 			xmax = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 12, 12.7, 13.3, 14, 14.5, 15, 16])
 			ymax = np.array([10000, 3200, 2400, 1400, 1200, 900, 800, 470, 260, 200, 170, 130, 120, 100, 94, 86, 76, 67, 59, 54, 50, 50])
 			max_bound_log = InterpolatedUnivariateSpline(xmax, np.log10(ymax), k=1, ext=3)
 			max_bound = lambda x: 10**(max_bound_log(x)) # noqa: E731
-
 		else:
 			# Minimum bound on TPF data
 			xmin = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 11.6, 16, 19])
@@ -214,7 +182,6 @@ def pixinaperture(dval):
 		#ticsl_mm = masksizes[idx_sc][(masksizes[idx_sc]<min_bound_sc(tmags[idx_sc])) & (masksizes[idx_sc]>0) ]
 
 		#print('HIGH')
-
 		#for ii, tic in enumerate(ticsh):
 		#	print(tic, ticsh_m[ii], ticsh_mm[ii])
 
@@ -253,9 +220,11 @@ def pixinaperture(dval):
 		#ax1.yaxis.set_major_formatter(ScalarFormatter())
 		#axx.legend(loc='upper right')
 
-		colorbar(im, ax=ax1, label='Contamination')
+		# Add colorbar:
+		colorbar(im, ax=ax1, label=cbar_label)
 
-		fig.savefig(os.path.join(dval.outfolder, f'pixinaperture_c{cadence:04d}'))
+		# Save figure to file:
+		fig.savefig(os.path.join(dval.outfolder, f'pixinaperture_{datasource:s}'))
 		if not dval.show:
 			plt.close(fig)
 
