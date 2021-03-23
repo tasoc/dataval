@@ -58,7 +58,5 @@ def waittime(dval):
 
 		# Save figure to file and close:
 		fig.savefig(os.path.join(dval.outfolder, 'worker_waittime_' + table))
-		if dval.show:
-			plt.show()
-		else:
+		if not dval.show:
 			plt.close(fig)

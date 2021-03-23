@@ -38,8 +38,7 @@ def haloswitch(dval):
 	haloswitch_flux_limit = 0.01
 
 	# Create figure figure:
-	fig = plt.figure(figsize=(12,8))
-	ax = fig.add_subplot(111)
+	fig, ax = plt.subplots()
 
 	for datasource in ('ffi', 'tpf'):
 		# Get the data from the database:
@@ -83,7 +82,5 @@ def haloswitch(dval):
 
 	# Save figure to file and close:
 	fig.savefig(os.path.join(dval.outfolder, 'haloswitch'))
-	if dval.show:
-		plt.show()
-	else:
+	if not dval.show:
 		plt.close(fig)

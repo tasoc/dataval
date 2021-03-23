@@ -257,7 +257,7 @@ def main():
 				])
 				cbvs.append((info['sector'], info['cadence'], info['cbv_area']))
 			cbvs = set(cbvs)
-			print(cbvs)
+			logger.debug("CBVs: %s", cbvs)
 
 		# Figure out which files needs to be processed:
 		cursor.execute("SELECT priority FROM release;")
