@@ -45,14 +45,14 @@ class DataValidation(object):
 		Initialize DataValidation object.
 
 		Parameters:
-			todo_file (str): DESCRIPTION.
-			output_folder (str, optional): DESCRIPTION. Defaults to None.
-			corr (bool, optional): DESCRIPTION. Defaults to False.
-			validate (bool, optional): DESCRIPTION. Defaults to True.
-			colorbysector (bool, optional): DESCRIPTION. Defaults to False.
-			ext (str, optional): DESCRIPTION. Defaults to 'png'.
-			showplots (bool, optional): DESCRIPTION. Defaults to False.
-			sysnoise (float, optional): DESCRIPTION. Defaults to 0.
+			todo_file (str): TODO-file or directory to load from.
+			output_folder (str): Directory in which to place output.
+			corr (bool): Include corrected data checks. Default is False.
+			validate (bool): Save validation in TODO-file. Default is True.
+			colorbysector (bool): Color relevant plots by sector instead of the defaults.
+			ext (str): File-extension of plots. Default is ``'png'``.
+			showplots (bool): Show plots? Defaults is ``False``.
+			sysnoise (float): Systematic noise level for noise model. Default is 5 ppm/hr.
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
@@ -62,10 +62,10 @@ class DataValidation(object):
 		# Store inputs:
 		if os.path.isdir(todo_file):
 			# If it was just a directory, then append the default todo-file:
-			self.input_folder = todo_file
-			todo_file = os.path.join(todo_file, 'todo.sqlite')
+			self.input_folder = os.path.abspath(todo_file)
+			todo_file = os.path.join(self.input_folder, 'todo.sqlite')
 		else:
-			self.input_folder = os.path.dirname(todo_file)
+			self.input_folder = os.path.abspath(os.path.dirname(todo_file))
 		self.extension = ext
 		self.show = showplots
 		self.outfolder = output_folder

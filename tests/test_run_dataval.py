@@ -37,5 +37,30 @@ def test_run_dataval(PRIVATE_INPUT_DIR, inp, corr, save):
 	#assert False
 
 #--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('method,expected_retcode', [
+	['pixvsmag', 0],
+	['stampsize', 0],
+	['contam', 0],
+	['mag2flux', 0],
+	['noise', 0],
+	['magdist', 0],
+	['calctime', 0],
+	['waittime', 0],
+	['haloswitch', 0],
+	['sumimage', 4],
+	['camera_overlap', 4]
+])
+def test_run_dataval_methods(PRIVATE_INPUT_DIR, method, expected_retcode):
+	"""
+	Try to run DataValidation on different individual methods
+	"""
+	test_dir = os.path.join(PRIVATE_INPUT_DIR, 'with_corr', 'todo.sqlite')
+	out, err, exitcode = capture_run_cli('run_dataval.py', [
+		'--corrected',
+		f'--method={method:s}',
+		test_dir])
+	assert exitcode == expected_retcode
+
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	pytest.main([__file__])

@@ -6,9 +6,7 @@ import os.path
 import numpy as np
 #from scipy.stats import binned_statistic
 from .plots import plt, colorbar
-from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
-from matplotlib.ticker import MultipleLocator
 
 #--------------------------------------------------------------------------------------------------
 def stampsize(dval):
@@ -21,7 +19,7 @@ def stampsize(dval):
 	logger = logging.getLogger('dataval')
 	logger.info('Plotting Stamp sizes...')
 
-	fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows=2, ncols=2, figsize=(15, 10), sharex='all', sharey='row')
+	fig, ((ax1, ax2, ax5), (ax3, ax4, ax6)) = plt.subplots(nrows=2, ncols=3, figsize=(20, 10), sharex='all', sharey='row')
 	fig.subplots_adjust(wspace=0.03, hspace=0.03)
 
 	star_vals = dval.search_database(
@@ -44,38 +42,47 @@ def stampsize(dval):
 	height = np.array([star['stamp_height'] for star in star_vals], dtype='int32')
 	resize = np.array([star['stamp_resizes'] for star in star_vals], dtype='int32')
 	ffi = np.array([star['datasource'] == 'ffi' for star in star_vals], dtype='bool')
+	tpf = np.array([star['datasource'] == 'tpf' for star in star_vals], dtype='bool')
+	secondary = np.array([star['datasource'].startswith('tpf:') for star in star_vals], dtype='bool')
 
 	if dval.color_by_sector:
 		# Color by sector number
 		sec = np.array([star['sector'] for star in star_vals], dtype='int32')
-		sectors = list(set(sec))
-		if len(sectors) > 1:
-			norm = Normalize(vmin=1, vmax=len(sectors))
-			scalarMap = ScalarMappable(norm=norm, cmap=plt.get_cmap('tab10'))
-			col = np.array([scalarMap.to_rgba(s) for s in sec])
-
+		sectors = sorted(list(set(sec)))
+		col = sec
+		norm = Normalize(vmin=-0.5, vmax=len(sectors)-0.5)
+		cmap = plt.get_cmap('tab10', len(sectors))
+		cbar_ticks = np.arange(len(sectors))
+		cbar_ticklabels = sectors
+		cbar_label = 'Sector'
 	else:
 		# Color by number of stamp resizes
 		maxresize = int(np.max(resize))
+		col = resize
 		norm = Normalize(vmin=-0.5, vmax=maxresize+0.5)
 		cmap = plt.get_cmap('tab10', maxresize+1)
-		col = resize
+		cbar_ticks = cbar_ticklabels = None
+		cbar_label = 'Resizes'
 
+	# Plot the heights and widths as a function of magnitude, color-coded
+	# depending on the choices above:
+	im2 = ax1.scatter(tmags[ffi], height[ffi], c=col[ffi], norm=norm, cmap=cmap,
+		marker='o', facecolors='None', label='FFI - h', alpha=0.3)
 
-	ax1.scatter(tmags[ffi], height[ffi], c=col[ffi], norm=norm, cmap=cmap,
-		marker='o', facecolors='None', label='FFI - h', alpha=0.5)
-	ax1.set_title('FFI')
-
-	im2 = ax2.scatter(tmags[~ffi], height[~ffi], c=col[~ffi], norm=norm, cmap=cmap,
-		marker='o', facecolors='None', label='TPF - h', alpha=0.5)
-	ax2.set_title('TPF')
+	ax2.scatter(tmags[tpf], height[tpf], c=col[tpf], norm=norm, cmap=cmap,
+		marker='o', facecolors='None', label='TPF - h', alpha=0.3)
 
 	ax3.scatter(tmags[ffi], width[ffi], c=col[ffi], norm=norm, cmap=cmap,
-		marker='o', facecolors='None', label='FFI - w', alpha=0.5)
+		marker='o', facecolors='None', label='FFI - w', alpha=0.3)
 
-	ax4.scatter(tmags[~ffi], width[~ffi], c=col[~ffi], norm=norm, cmap=cmap,
-		marker='o', facecolors='None', label='TPF- w', alpha=0.5)
+	ax4.scatter(tmags[tpf], width[tpf], c=col[tpf], norm=norm, cmap=cmap,
+		marker='o', facecolors='None', label='TPF- w', alpha=0.3)
 
+	ax5.scatter(tmags[secondary], height[secondary], c=col[secondary], norm=norm, cmap=cmap,
+		marker='o', facecolors='None', label='TPF-sec- w', alpha=0.3)
+
+	ax6.scatter(tmags[secondary], width[secondary], c=col[secondary], norm=norm, cmap=cmap,
+		marker='o', facecolors='None', label='TPF-sec- w', alpha=0.3)
 
 	#bin_means, bin_edges, binnumber = binned_statistic(tmags[ds], height[ds], statistic='median', bins=20, range=(1.5,10))
 	#bin_width = (bin_edges[1] - bin_edges[0])
@@ -114,28 +121,22 @@ def stampsize(dval):
 	#ax12.plot(mags2,nwid2, 'b--')
 	#ax11.plot(mags2,nhei2, 'b--')
 
-	#ax2.set_ylabel('Stamp width (pixels)')
-	#ax4.set_ylabel('Stamp width (pixels)')
+	ax1.set_title('FFI')
+	ax2.set_title('TPF')
+	ax5.set_title('TPF - Secondary')
 	ax1.set_ylabel('Stamp height (pixels)')
 	ax3.set_ylabel('Stamp width (pixels)')
-
-	#ax2.yaxis.set_major_locator(MultipleLocator(20))
-	#ax2.yaxis.set_minor_locator(MultipleLocator(10))
-
-	#ax1.yaxis.set_major_locator(MultipleLocator(50))
-	#ax1.yaxis.set_minor_locator(MultipleLocator(25))
-
 	ax3.set_xlabel('TESS magnitude')
 	ax4.set_xlabel('TESS magnitude')
+	ax6.set_xlabel('TESS magnitude')
 
-	for axx in [ax1, ax2, ax3, ax4]:
+	for axx in [ax1, ax2, ax3, ax4, ax5, ax6]:
 		axx.set_xlim(dval.tmag_limits)
-		axx.xaxis.set_major_locator(MultipleLocator(2))
-		axx.xaxis.set_minor_locator(MultipleLocator(1))
-		#axx.legend(loc='upper right')
+		axx.set_ylim(bottom=0)
 
 	# Add colorbar:
-	colorbar(im2, ax=ax2, label='Resizes')
+	cb = colorbar(im2, ax=ax5, label=cbar_label, ticks=cbar_ticks, ticklabels=cbar_ticklabels)
+	cb.minorticks_off()
 
 	fig.savefig(os.path.join(dval.outfolder, 'stamp_size'))
 	if not dval.show:

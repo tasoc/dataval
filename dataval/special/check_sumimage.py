@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Check sumimages stored in lightcurve FITS files.
@@ -18,7 +18,7 @@ def check_sumimage(dval, warn_abs=5, warn_rel=0.05):
 	Check sumimages stored in lightcurve FITS files.
 
 	Parameters:
-		dval (:py:class:`DataValidation`): DataValidation instance.
+		dval (:class:`DataValidation`): DataValidation instance.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
@@ -28,7 +28,7 @@ def check_sumimage(dval, warn_abs=5, warn_rel=0.05):
 
 	# Settings for tqdm:
 	tqdm_settings = {
-		'disable': not logger.isEnabledFor(logging.INFO)
+		'disable': None if logger.isEnabledFor(logging.INFO) else True
 	}
 
 	# Get list of lightcurves from TODO-file:

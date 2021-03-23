@@ -18,6 +18,9 @@ def mag2flux(dval):
 	Function to plot flux values from apertures against the stellar TESS magnitudes,
 	and determine coefficient describing the relation
 
+	Parameters:
+		dval (:class:`DataValidation`): Data Validation object.
+
 	.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 	"""
 
@@ -31,7 +34,7 @@ def mag2flux(dval):
 	xmin = np.array([0, 1.5, 9, 12.6, 13, 14, 15, 16, 17, 18, 19])
 	ymin = np.array([8e7, 1.8e7, 12500, 250, 59, 5, 1, 1, 1, 1, 1])
 	min_bound_log = InterpolatedUnivariateSpline(xmin, np.log10(ymin), k=1, ext=3)
-	min_bound = lambda x: 10**(min_bound_log(x))
+	min_bound = lambda x: 10**(min_bound_log(x)) # noqa: E731
 
 	norm = colors.Normalize(vmin=0, vmax=1)
 	fig2, ax2 = plt.subplots()

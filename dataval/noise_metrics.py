@@ -18,6 +18,9 @@ def noise_metrics(dval):
 	"""
 	Function to plot the light curve noise against the stellar TESS magnitudes
 
+	Parameters:
+		dval (:class:`DataValidation`): Data Validation object.
+
 	.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
