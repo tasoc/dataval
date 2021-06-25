@@ -2,6 +2,11 @@
 =============================================
 
 .. automodule:: run_package_release
-    :members:
-    :undoc-members:
-    :show-inheritance:
+	:no-members:
+	:no-undoc-members:
+
+Command help
+------------
+
+.. program-output:: python run_package_release.py --help
+	:cwd: ../
