@@ -2,6 +2,11 @@
 =====================================
 
 .. automodule:: run_dataval
-    :members:
-    :undoc-members:
-    :show-inheritance:
+	:no-members:
+	:no-undoc-members:
+
+Command help
+------------
+
+.. program-output:: python run_dataval.py --help
+	:cwd: ../

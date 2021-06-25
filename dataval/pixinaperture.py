@@ -133,21 +133,21 @@ def pixinaperture(dval):
 		if datasource == 'ffi':
 			# Minimum bound on FFI data:
 			xmin = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 11.6, 16])
-			ymin = np.array([2600, 846, 526, 319, 238, 159, 118, 62, 44, 32, 23, 15.7, 11.15, 8, 5, 4, 4])
+			ymin = np.array([30, 30, 30, 30, 29, 28, 27, 26, 25, 22, 20, 15, 11.15, 8, 5, 4, 4])
 			min_bound_log = InterpolatedUnivariateSpline(xmin, np.log10(ymin), k=1, ext=3)
-			min_bound = lambda x: 10**(min_bound_log(x)) # noqa: E731
+			min_bound = lambda x: np.floor(10**(min_bound_log(x))) # noqa: E731
 
 			# Maximum bound on FFI data:
 			xmax = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 12, 12.7, 13.3, 14, 14.5, 15, 16])
 			ymax = np.array([10000, 3200, 2400, 1400, 1200, 900, 800, 470, 260, 200, 170, 130, 120, 100, 94, 86, 76, 67, 59, 54, 50, 50])
 			max_bound_log = InterpolatedUnivariateSpline(xmax, np.log10(ymax), k=1, ext=3)
-			max_bound = lambda x: 10**(max_bound_log(x)) # noqa: E731
+			max_bound = lambda x: np.ceil(10**(max_bound_log(x))) # noqa: E731
 		else:
 			# Minimum bound on TPF data
 			xmin = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 11.6, 16, 19])
 			ymin = np.array([220, 200, 130, 70, 55, 43, 36, 30, 27, 22, 16, 10, 8, 6, 5, 4, 4, 4])
 			min_bound_log = InterpolatedUnivariateSpline(xmin, np.log10(ymin), k=1, ext=3)
-			min_bound = lambda x: 10**(min_bound_log(x)) # noqa: E731
+			min_bound = lambda x: np.floor(10**(min_bound_log(x))) # noqa: E731
 			max_bound = None
 
 		# Plot limits:
