@@ -472,13 +472,15 @@ class DataValidation(object):
 		logger.info('--------------------------------------------------------')
 
 	#----------------------------------------------------------------------------------------------
-	def basic(self, warn_errors_ratio=0.05):
+	def basic(self, errors_ratio_warn=0.05, errors_ratio_err=0.10):
 		"""
 		Perform basic checks of the TODO-file and the lightcurve files.
 
 		Parameters:
-			warn_errors_ratio (float, optional): Fraction of photometry ERRORs to OK and WARNINGs
+			errors_ratio_warn (float, optional): Fraction of ERRORs to OK and WARNINGs
 				to warn about. Default=5%.
+			errors_ratio_err (float, optional): Fraction of ERRORs to OK and WARNINGs
+				to throw error about. Default=10%.
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
@@ -528,8 +530,9 @@ class DataValidation(object):
 			))
 			count_errors = self.cursor.fetchone()[0]
 			ratio = count_errors/(count_good + count_errors) if count_good + count_errors > 0 else 0
-			if ratio > warn_errors_ratio:
-				logger.warning("  CAMERA=%d, CCD=%d: High number of errors detected: %.2f%% (%d errors, %d good)",
+			if ratio > errors_ratio_warn or ratio > errors_ratio_err:
+				loglevel = logging.ERROR if ratio > errors_ratio_err else logging.WARNING
+				logger.log(loglevel, "  CAMERA=%d, CCD=%d: High number of errors detected: %.2f%% (%d errors, %d good)",
 					camera, ccd, 100*ratio, count_errors, count_good)
 			else:
 				logger.info("  CAMERA=%d, CCD=%d: %.2f%% (%d errors, %d good)",
@@ -585,8 +588,9 @@ class DataValidation(object):
 				))
 				count_errors = self.cursor.fetchone()[0]
 				ratio = count_errors/(count_good + count_errors) if count_good + count_errors > 0 else 0
-				if ratio > warn_errors_ratio:
-					logger.warning("  CAMERA=%d, CCD=%d: High number of errors detected: %.2f%% (%d errors, %d good)",
+				if ratio > errors_ratio_warn or ratio > errors_ratio_err:
+					loglevel = logging.ERROR if ratio > errors_ratio_err else logging.WARNING
+					logger.log(loglevel, "  CAMERA=%d, CCD=%d: High number of errors detected: %.2f%% (%d errors, %d good)",
 						camera, ccd, 100*ratio, count_errors, count_good)
 				else:
 					logger.info("  CAMERA=%d, CCD=%d: %.2f%% (%d errors, %d good)",
@@ -606,7 +610,8 @@ class DataValidation(object):
 			'FileNotFoundError',
 			'sqlite3.%',
 			'TargetNotFoundError', # custom "error" set in photometry.TaskManager.save_result
-			'TypeError'
+			'TypeError',
+			'Could not save lightcurve file'
 		]
 
 		logger.info("Checking for specific errors...")
