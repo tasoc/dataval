@@ -26,7 +26,13 @@ def pixinaperture(dval):
 	logger = logging.getLogger('dataval')
 	logger.info('Plotting Pixels in aperture vs. Magnitude...')
 
-	mags = np.linspace(dval.tmag_limits[0], dval.tmag_limits[1], 200)
+	mags = np.linspace(dval.tmag_limits[0], dval.tmag_limits[1], 500)
+
+	# Find the maximim mask size, used as a constant upper limit on the plots:
+	max_masksize = dval.search_database(
+		select=['MAX(diagnostics.mask_size) AS maxsize'],
+		search=["method_used='aperture'", 'diagnostics.mask_size IS NOT NULL'])
+	max_masksize = max_masksize[0]['maxsize']
 
 	# TODO: Does this need to be separated by cadence as well?
 	#       Are there significant differences beween 120s and 20s mask sizes?
@@ -130,25 +136,32 @@ def pixinaperture(dval):
 
 		# The interpolations are linear *in log space* which is the reason
 		# for the stange lambda wrappers in the following code:
+		# Rounding to 13 decimal places is to avoid numerical noise causing single pixel jumps
 		if datasource == 'ffi':
 			# Minimum bound on FFI data:
 			xmin = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 11.6, 16])
 			ymin = np.array([30, 30, 30, 30, 29, 28, 27, 26, 25, 22, 20, 15, 11.15, 8, 5, 4, 4])
 			min_bound_log = InterpolatedUnivariateSpline(xmin, np.log10(ymin), k=1, ext=3)
-			min_bound = lambda x: np.floor(10**(min_bound_log(x))) # noqa: E731
+			min_bound = lambda x: np.clip(np.floor(np.round(10**(min_bound_log(x)), decimals=13)), 4, None) # noqa: E731
 
 			# Maximum bound on FFI data:
 			xmax = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 12, 12.7, 13.3, 14, 14.5, 15, 16])
 			ymax = np.array([10000, 3200, 2400, 1400, 1200, 900, 800, 470, 260, 200, 170, 130, 120, 100, 94, 86, 76, 67, 59, 54, 50, 50])
 			max_bound_log = InterpolatedUnivariateSpline(xmax, np.log10(ymax), k=1, ext=3)
-			max_bound = lambda x: np.ceil(10**(max_bound_log(x))) # noqa: E731
+			max_bound = lambda x: np.ceil(np.round(10**(max_bound_log(x)), decimals=13)) # noqa: E731
 		else:
 			# Minimum bound on TPF data
 			xmin = np.array([0, 2, 2.7, 3.55, 4.2, 4.8, 5.5, 6.8, 7.6, 8.4, 9.1, 10, 10.5, 11, 11.5, 11.6, 16, 19])
 			ymin = np.array([220, 200, 130, 70, 55, 43, 36, 30, 27, 22, 16, 10, 8, 6, 5, 4, 4, 4])
 			min_bound_log = InterpolatedUnivariateSpline(xmin, np.log10(ymin), k=1, ext=3)
-			min_bound = lambda x: np.floor(10**(min_bound_log(x))) # noqa: E731
+			min_bound = lambda x: np.clip(np.floor(np.round(10**(min_bound_log(x)), decimals=13)), 4, None) # noqa: E731
 			max_bound = None
+
+		# Simple sanity check if the bounds are monotonical decresing:
+		if not np.all(np.diff(min_bound(mags)) <= 0):
+			raise RuntimeError("Minimum bound (" + datasource + ") is not monotonically decreasing") # pragma: no cover
+		if max_bound is not None and not np.all(np.diff(max_bound(mags)) <= 0):
+			raise RuntimeError("Maximum bound (" + datasource + ") is not monotonically decreasing") # pragma: no cover
 
 		# Plot limits:
 		ax1.plot(mags, min_bound(mags), 'r-')
@@ -208,8 +221,7 @@ def pixinaperture(dval):
 		#ax2.plot(mags, pix, color='k', ls='-')
 
 		ax1.set_xlim(dval.tmag_limits)
-		ax1.set_ylim([0.99, np.nanmax(masksizes)+500])
-
+		ax1.set_ylim([0.99, max_masksize+500])
 		ax1.set_xlabel('TESS magnitude')
 		ax1.set_ylabel('Pixels in aperture')
 		xtick_major = np.median(np.diff(ax1.get_xticks()))

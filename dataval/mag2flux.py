@@ -27,14 +27,20 @@ def mag2flux(dval):
 	logger = logging.getLogger('dataval')
 	logger.info('Plotting Magnitude to Flux conversion...')
 
-	zp_grid = np.linspace(19.0, 22.0, 100)
-	mags = np.linspace(dval.tmag_limits[0], dval.tmag_limits[1], 200)
+	# Get the maximum median flux to be used to set the plot limits:
+	max_mean_flux = dval.search_database(
+		select=['MAX(mean_flux) AS maxflux'],
+		search=["method_used='aperture'"])
+	max_mean_flux = max_mean_flux[0]['maxflux']
+
+	zp_grid = np.linspace(19.0, 22.0, 300)
+	mags = np.linspace(dval.tmag_limits[0], dval.tmag_limits[1], 300)
 
 	# The interpolation is linear *in log*
 	xmin = np.array([0, 1.5, 9, 12.6, 13, 14, 15, 16, 17, 18, 19])
 	ymin = np.array([8e7, 1.8e7, 12500, 250, 59, 5, 1, 1, 1, 1, 1])
 	min_bound_log = InterpolatedUnivariateSpline(xmin, np.log10(ymin), k=1, ext=3)
-	min_bound = lambda x: 10**(min_bound_log(x)) # noqa: E731
+	min_bound = lambda x: np.clip(10**(min_bound_log(x)), 1, None) # noqa: E731
 
 	norm = colors.Normalize(vmin=0, vmax=1)
 	fig2, ax2 = plt.subplots()
@@ -125,13 +131,14 @@ def mag2flux(dval):
 		#ax31.plot(bin_centers2, 1.4826*3*bin_means2, color='g')
 
 		# Add line with best fit, and the minimim bound:
-		ax1.plot(mags, 10**(-0.4*(mags - cc.x)), color='k', ls='--')
+		ax1.plot(mags, np.clip(10**(-0.4*(mags - cc.x)), 0, None), color='k', ls='--')
 		ax1.plot(mags, min_bound(mags), 'r-')
 
 		ax1.set_yscale('log')
 		ax1.set_xlim(dval.tmag_limits[1], dval.tmag_limits[0])
+		ax1.set_ylim(0.5, 2*max_mean_flux)
 		ax1.set_xlabel('TESS magnitude')
-		ax1.set_ylabel('Median flux')
+		ax1.set_ylabel('Median flux (e$^-$/s)')
 		ax1.xaxis.set_major_locator(MultipleLocator(2))
 		ax1.xaxis.set_minor_locator(MultipleLocator(1))
 		colorbar(im, ax=ax1, label='Contamination')
