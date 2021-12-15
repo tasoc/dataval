@@ -10,6 +10,7 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 import scipy.interpolate as INT
+from .utilities import mag2flux
 
 #--------------------------------------------------------------------------------------------------
 def ZLnoise(gal_lat):
@@ -54,28 +55,6 @@ def Pixinaperture(Tmag, cad=1800):
 	#pixels = (30 + (((3-30)/(14-7)) * (Tmag-7)))*(Tmag<14) + 3*(Tmag>=14)
 
 	return np.asarray(np.maximum(pixels, 3), dtype='int32')
-
-#--------------------------------------------------------------------------------------------------
-def mean_flux_level(Tmag):
-	"""
-	Mean flux from TESS magnitude
-
-	.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
-	"""
-	# Magnitude system based on Sullivan et al.
-	#collecting_area = np.pi*(10.5/2)**2 # square cm
-	#Teff_list = np.array([2450, 3000, 3200, 3400, 3700, 4100, 4500, 5000, 5777, 6500, 7200, 9700]) # Based on Sullivan
-	#Flux_list = np.array([2.38, 1.43, 1.40, 1.38, 1.39, 1.41, 1.43, 1.45, 1.45, 1.48, 1.48, 1.56])*1e6 # photons per sec; Based on Sullivan
-	#Magn_list = np.array([306, -191, -202, -201, -174, -132, -101, -80, -69.5, -40, -34.1, 35])*1e-3 #Ic-Tmag (mmag)
-
-	#Flux_int = INT.UnivariateSpline(Teff_list, Flux_list, k=1, s=0)
-	#Magn_int = INT.UnivariateSpline(Teff_list, Magn_list, k=1, s=0)
-
-	#Imag = Magn_int(Teff)+Tmag
-	#Flux = 10**(-0.4*Imag) * Flux_int(Teff) * collecting_area
-
-	Flux = 10**(-0.4*(Tmag - 20.54))
-	return Flux
 
 #--------------------------------------------------------------------------------------------------
 def phot_noise(Tmag, timescale=3600, coord=None, sysnoise=60, Teff=5775, cadpix=1800):
@@ -136,7 +115,7 @@ def phot_noise(Tmag, timescale=3600, coord=None, sysnoise=60, Teff=5775, cadpix=
 	Flux_factor = np.sqrt(integrations * pixels)
 
 	# Mean flux level in electrons per cadence
-	mean_level_ppm = mean_flux_level(Tmag) * timescale # electrons (based on measurement) #, Teff
+	mean_level_ppm = mag2flux(Tmag) * timescale # electrons (based on measurement) #, Teff
 
 	# Shot noise
 	shot_noise = 1e6/np.sqrt(mean_level_ppm)
@@ -152,8 +131,10 @@ def phot_noise(Tmag, timescale=3600, coord=None, sysnoise=60, Teff=5775, cadpix=
 
 	# Put individual components together in single table:
 	noise_vals = np.column_stack((shot_noise, zodiacal_noise, read_noise, systematic_noise))
+	noise_vals = np.clip(noise_vals, 0, None)
 
 	# Calculate the total noise model by adding up the individual contributions:
 	total_noise = np.sqrt(np.sum(noise_vals**2, axis=1))
+	total_noise = np.clip(total_noise, 0, None)
 
 	return total_noise, noise_vals # ppm per cadence

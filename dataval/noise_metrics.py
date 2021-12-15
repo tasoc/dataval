@@ -28,7 +28,15 @@ def noise_metrics(dval):
 	logger = logging.getLogger('dataval')
 	logger.info('Plotting Noise vs. Magnitude...')
 
-	mags = np.linspace(dval.tmag_limits[0], dval.tmag_limits[1], 200)
+	table_noise = 'diagnostics_corr' if dval.corr else 'diagnostics'
+	factor = 1 if dval.corr else 1e6
+	max_vals = dval.search_database(select=[
+		'MAX(' + table_noise + '.rms_hour) AS max_rms',
+		'MAX(' + table_noise + '.ptp) AS max_ptp'])
+	max_rms = factor*max_vals[0]['max_rms']
+	max_ptp = factor*max_vals[0]['max_ptp']
+
+	mags = np.linspace(dval.tmag_limits[0], dval.tmag_limits[1], 300)
 
 	# Colors for theoretical lines:
 	# Define the colors directly here to avoid having to import
@@ -45,30 +53,16 @@ def noise_metrics(dval):
 
 	for cadence in dval.cadences:
 
-		if dval.corr:
-			factor = 1
-			star_vals = dval.search_database(
-				select=[
-					'todolist.priority',
-					'todolist.sector',
-					'todolist.tmag',
-					'diagnostics_corr.rms_hour',
-					'diagnostics_corr.ptp',
-					'diagnostics.contamination'
-				],
-				search=f'cadence={cadence:d}')
-		else:
-			factor = 1e6
-			star_vals = dval.search_database(
-				select=[
-					'todolist.priority',
-					'todolist.sector',
-					'todolist.tmag',
-					'diagnostics.rms_hour',
-					'diagnostics.ptp',
-					'diagnostics.contamination'
-				],
-				search=f'cadence={cadence:d}')
+		star_vals = dval.search_database(
+			select=[
+				'todolist.priority',
+				'todolist.sector',
+				'todolist.tmag',
+				table_noise + '.rms_hour',
+				table_noise + '.ptp',
+				'diagnostics.contamination'
+			],
+			search=f'cadence={cadence:d}')
 
 		tmags = np.array([star['tmag'] for star in star_vals], dtype='float64')
 		pri = np.array([star['priority'] for star in star_vals], dtype='int64')
@@ -129,6 +123,9 @@ def noise_metrics(dval):
 			axx.xaxis.set_minor_locator(MultipleLocator(1))
 			axx.set_yscale('log')
 			#axx.legend(loc='upper left')
+
+		ax1.set_ylim(0.3*np.min(tot_noise_rms), 2*max_rms)
+		ax2.set_ylim(0.3*np.min(tot_noise_ptp), 2*max_ptp)
 
 		colorbar(im1, ax=ax1, label='Contamination')
 		colorbar(im2, ax=ax2, label='Contamination')
