@@ -185,14 +185,14 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 
 	fname_original = regex_fileend.sub('.original.fits.gz', fname)
 	if os.path.exists(fname_original):
-		raise Exception("ORIGINAL exists: %s" % fname_original)
+		raise RuntimeError(f"ORIGINAL exists: {fname_original}")
 
 	dataval = int(row['dataval'])
 	modification_needed = False
 
 	m = regex_filename.match(os.path.basename(fname))
 	if not m:
-		raise Exception("RegEx doesn't match!")
+		raise RuntimeError("RegEx doesn't match!")
 
 	starid = int(m.group(1))
 	sector = int(m.group(2))
@@ -205,28 +205,30 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 
 	# Basic checks:
 	if starid != row['starid']:
-		raise Exception("STARID")
+		raise RuntimeError("STARID")
 	if sector != row['sector']:
-		raise Exception("SECTOR")
+		raise RuntimeError("SECTOR")
 	if camera != row['camera']:
-		raise Exception("CAMERA")
+		raise RuntimeError("CAMERA")
 	if ccd != row['ccd']:
-		raise Exception("CCD")
+		raise RuntimeError("CCD")
 	#if cadence != row['cadence']:
-	#	raise Exception("CADENCE")
+	#	raise RuntimeError("CADENCE")
 	if force_version is not None and version != force_version:
 		#modification_needed = True
-		raise Exception("Version mismatch!")
+		raise RuntimeError("Version mismatch!")
 	if corrector != check_corrector:
-		raise Exception("CORRECTOR")
+		raise RuntimeError("CORRECTOR")
 
 	# Do we really need to modify the FITS file?
 	openfile_needed = True # FORCE modification check!
 	fix_wcs = False
 
+	# We need to open if there is a dataval to add to the header
 	if dataval > 0:
 		openfile_needed = True
 
+	# Fix for bug with WCS being incorrect in TPF lightcurves
 	if cadence == 120 and version <= 5:
 		openfile_needed = True
 		fix_wcs = True
@@ -254,14 +256,14 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 
 		if fix_wcs:
 			if tpf_rootdir is None:
-				raise Exception("You need to provide a TPF_ROOTDIR")
+				raise RuntimeError("You need to provide a TPF_ROOTDIR")
 			# Find out what the
 			if dependency_tpf is None:
-				raise Exception("We can't fix WCSs of FFI targets!")
+				raise RuntimeError("We can't fix WCSs of FFI targets!")
 			# Find the original TPF file and extract the WCS from its headers:
 			tpf_file = find_tpf_files(tpf_rootdir, starid=dependency_tpf, sector=sector, camera=camera, ccd=ccd, cadence=cadence)
 			if len(tpf_file) != 1:
-				raise Exception("Could not find TPF file: starid=%d, sector=%d" % (dependency_tpf, sector))
+				raise RuntimeError(f"Could not find TPF file: starid={dependency_tpf:d}, sector={sector:d}")
 			# Extract the FITS header with the correct WCS:
 			with warnings.catch_warnings():
 				warnings.filterwarnings('ignore', category=FITSFixedWarning)
@@ -313,7 +315,7 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 				os.remove(fname_original)
 			else:
 				logger.error("File check failed: %s", fname)
-				raise Exception("File check failed: %s" % fname)
+				raise RuntimeError(f"File check failed: {fname}")
 		except: # noqa: E722
 			logger.exception("Whoops: %s", fname)
 			if os.path.isfile(fname_original) and os.path.getsize(fname_original) > 0:
@@ -331,7 +333,7 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 
 	# Check that filesize is not zero:
 	if filesize == 0:
-		raise Exception("File has zero size: %s", fname)
+		raise RuntimeError(f"File has zero size: {fname}")
 
 	return {
 		'priority': row['priority'],
@@ -356,7 +358,7 @@ def process_cbv(fname, input_folder, force_version=None):
 
 	m = re.match(r'^tess-s(\d{4})-c(\d{4})-a(\d{3})-v(\d+)-tasoc_cbv\.fits\.gz$', os.path.basename(fname))
 	if m is None:
-		raise Exception("CBV file does not have the correct file name format!")
+		raise RuntimeError("CBV file does not have the correct file name format!")
 	fname_sector = int(m.group(1))
 	fname_cadence = int(m.group(2))
 	fname_cbvarea = int(m.group(3))
@@ -380,22 +382,22 @@ def process_cbv(fname, input_folder, force_version=None):
 
 	# Check that the filename and headers are consistent:
 	if sector != fname_sector:
-		raise Exception("SECTOR does not match filename.")
+		raise RuntimeError("SECTOR does not match filename.")
 	if camera != fname_camera:
-		raise Exception("CAMERA does not match filename.")
+		raise RuntimeError("CAMERA does not match filename.")
 	if ccd != fname_ccd:
-		raise Exception("CCD does not match filename.")
+		raise RuntimeError("CCD does not match filename.")
 	if cadence != fname_cadence:
-		raise Exception("CADENCE does not match filename.")
+		raise RuntimeError("CADENCE does not match filename.")
 	if cadence != cadence_time:
-		raise Exception("CADENCE does not match TIME.")
+		raise RuntimeError("CADENCE does not match TIME.")
 	if cbv_area != fname_cbvarea:
-		raise Exception("CBV_AREA does not match filename.")
+		raise RuntimeError("CBV_AREA does not match filename.")
 	if version != fname_version:
-		raise Exception("VERSION does not match filename.")
+		raise RuntimeError("VERSION does not match filename.")
 
 	if force_version is not None and version != force_version:
-		raise Exception("Version mismatch!")
+		raise RuntimeError("Version mismatch!")
 
 	path = os.path.relpath(fname, input_folder).replace('\\', '/')
 
@@ -405,7 +407,7 @@ def process_cbv(fname, input_folder, force_version=None):
 
 	# Check that filesize is not zero:
 	if filesize == 0:
-		raise Exception("File has zero size: %s", fname)
+		raise RuntimeError("File has zero size: %s", fname)
 
 	return {
 		'path': path,
