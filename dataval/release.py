@@ -49,7 +49,7 @@ def atomic_copy(src, dst):
 	Copy file (using shutil.copy2), but with higher likelihood of being an atomic operation.
 
 	This is done by first copying to a temp file and then renaming this file to the final name.
-	This is only atmic on POSIX systems.
+	This is only atomic on POSIX systems.
 	"""
 	if os.path.exists(dst):
 		raise FileExistsError(dst)
@@ -233,6 +233,12 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 		openfile_needed = True
 		fix_wcs = True
 
+	# Because of the problem with multiple MJD-OBS keywords
+	# in FITS headers, we have to check files in these cases.
+	# TODO: Modify this when we know the CAUSE of this SYMPTOM
+	if version <= 5:
+		openfile_needed = True
+
 	# We need to open the ensemble files to find the lightcurve dependencies:
 	if corrector == 'ens':
 		openfile_needed = True
@@ -305,6 +311,18 @@ def fix_file(row, input_folder=None, check_corrector=None, force_version=None, t
 				if mjdref_remove:
 					hdu['APERTURE'].header.remove('MJDREF', ignore_missing=True, remove_all=True)
 					hdu['SUMIMAGE'].header.remove('MJDREF', ignore_missing=True, remove_all=True)
+
+			# Fix bug with multiple MJD-OBS keywords in FITS headers:
+			if version <= 5: # TODO: Modify this when we know the CAUSE of this SYMPTOM
+				for extname in ('APERTURE', 'SUMIMAGE'):
+					if list(hdu[extname].header.keys()).count('MJD-OBS') > 1:
+						logger.info("%s: Multiple MJD-OBS in %s", fname, extname)
+						mjdobs = hdu[extname].header['MJD-OBS']
+						indx = hdu[extname].header.index('MJD-OBS')
+						hdu[extname].header.remove('MJD-OBS', remove_all=True)
+						hdu[extname].header.insert(indx, ('MJD-OBS', mjdobs, '[d] MJD at start of observation'))
+						allow_change += ['MJD-OBS']
+						modification_needed = True
 
 			if modification_needed:
 				hdu.writeto(fname, output_verify='exception', checksum=True, overwrite=True)
