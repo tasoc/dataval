@@ -12,6 +12,7 @@ import logging
 import sys
 import dataval
 from dataval.plots import plt
+from dataval.utilities import TqdmLoggingHandler
 
 #--------------------------------------------------------------------------------------------------
 def main():
@@ -30,8 +31,9 @@ def main():
 		'calctime',
 		'waittime',
 		'haloswitch',
+		'camera_overlap',
 		'sumimage',
-		'camera_overlap'
+		'duplicate_headers',
 	]
 
 	# Parse command line arguments:
@@ -64,7 +66,7 @@ def main():
 
 	# Setup logging:
 	formatter = logging.Formatter('%(asctime)s - %(levelname)-7s - %(funcName)-10.10s - %(message)s')
-	console = logging.StreamHandler()
+	console = TqdmLoggingHandler()
 	console.setFormatter(formatter)
 	logger = logging.getLogger('dataval')
 	logger.addHandler(console)
@@ -109,6 +111,8 @@ def main():
 		# Special methods:
 		if 'sumimage' in args.method:
 			dataval.special.check_sumimage(dval)
+		if 'duplicate_headers' in args.method:
+			dataval.special.check_duplicate_headers(dval)
 
 		# Run validation
 		if not args.method:

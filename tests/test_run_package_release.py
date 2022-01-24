@@ -139,6 +139,12 @@ def test_run_release(PRIVATE_INPUT_DIR, jobs, corrector):
 
 				assert row['cadence'] == int(np.round(hdu[1].header['TIMEDEL']*86400))
 
+				# Check that no header keywords are duplicated:
+				for k, h in enumerate(hdu):
+					keys = list(h.header.keys())
+					nonunique_keys = set([r for r in keys if keys.count(r) > 1])
+					assert len(nonunique_keys) == 0, f"Non-unique keys found in header #{k:d}: {nonunique_keys}"
+
 				# Check the fix of invalid header in ENSEMBLE extension:
 				if corrector == 'ensemble':
 					# Check the fix of invalid header in ENSEMBLE extension:
