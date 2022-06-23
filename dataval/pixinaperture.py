@@ -10,6 +10,7 @@ from .plots import plt, colorbar
 from matplotlib.colors import Normalize
 from matplotlib.ticker import MultipleLocator
 from .quality import DatavalQualityFlags
+from .noise_model import Pixinaperture
 
 #--------------------------------------------------------------------------------------------------
 def pixinaperture(dval):
@@ -103,7 +104,7 @@ def pixinaperture(dval):
 		#bin_width = (bin_edges[1] - bin_edges[0])
 		#bin_centers = bin_edges[1:] - bin_width/2
 		#bin_var = bin_mad*1.4826
-		#var_vs_mag = INT.InterpolatedUnivariateSpline(bin_centers, bin_var)
+		#var_vs_mag = InterpolatedUnivariateSpline(bin_centers, bin_var)
 
 		#plt.figure()
 		#plt.scatter(tmags[idx_lc], normed1/var_vs_mag(tmags[idx_lc]), color=rgba_color[idx_lc], alpha=0.5)
@@ -164,9 +165,16 @@ def pixinaperture(dval):
 			raise RuntimeError("Maximum bound (" + datasource + ") is not monotonically decreasing") # pragma: no cover
 
 		# Plot limits:
-		ax1.plot(mags, min_bound(mags), 'r-')
+		ax1.plot(mags, min_bound(mags), 'r-', label='Lower limit')
 		if max_bound is not None:
-			ax1.plot(mags, max_bound(mags), 'r-')
+			ax1.plot(mags, max_bound(mags), 'r-', label='Upper limit')
+
+		# Overplot the values used in the noise model:
+		# NOTE: The exact values of the cadence is not important,
+		#       since they are just mapped to FFI or TPF anyway.
+		cadence = {'ffi': 1800, 'tpf': 120}[datasource]
+		meanpix = Pixinaperture(mags, cad=cadence)
+		ax1.plot(mags, meanpix, 'r--', label='Noise model')
 
 		#idx_lc2 = (source == 'ffi') & (masksizes>4) & (tmags>8)
 		#idx_sort = np.argsort(tmags[idx_lc2])

@@ -9,7 +9,7 @@ Noise model as a function of magnitude and position
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-import scipy.interpolate as INT
+from scipy.interpolate import InterpolatedUnivariateSpline
 from .utilities import mag2flux
 
 #--------------------------------------------------------------------------------------------------
@@ -30,31 +30,55 @@ def Pixinaperture(Tmag, cad=1800):
 	.. codeauthor:: Mikkel N. Lund <mikkelnl@phys.au.dk>
 	"""
 
-	if cad == 1800:
-		ffi_tmag = np.array([2.05920002, 2.95159999, 3.84399996, 4.73639993, 5.6287999,
-			6.52119987, 7.41359984, 8.30599982, 9.19839979, 10.09079976,
-			10.98319973, 11.8755997, 12.76799967, 13.66039964, 14.55279961])
-		ffi_mask = np.array([1484.5, 715., 447., 282.5, 185., 126., 98., 76.,
-			61., 49., 38., 28., 20., 14., 8.])
-		ffi_pix = INT.InterpolatedUnivariateSpline(ffi_tmag, ffi_mask, k=1)
-		pixels = ffi_pix(Tmag)
+	# Approximate relation for pixels in aperture (based on plot in Sullivan et al.)
+	#pixels = (30 + (((3-30)/(14-7)) * (Tmag-7)))*(Tmag<14) + 3*(Tmag>=14)
 
-	elif cad == 120:
-		tpf_tmag = np.array([2.48170001, 3.56310005, 4.6445001, 5.72590014, 6.80730019,
-			7.88870023, 8.97010028, 10.05150032, 11.13290037, 12.21430041,
-			13.29570045, 14.3771005, 15.45850054, 16.53990059, 17.62130063])
-		tpf_mask = np.array([473., 188., 82., 61., 55., 49., 43., 38., 31., 23., 18.,
-			13., 10., 12., 11.])
-		tpf_pix = INT.InterpolatedUnivariateSpline(tpf_tmag, tpf_mask, k=1)
-		pixels = tpf_pix(Tmag)
+	if cad in (1800, 600, 200):
+		masksize = np.array([
+			[2.05920002, 1484.5],
+			[2.95159999, 715],
+			[3.84399996, 447],
+			[4.73639993, 282.5],
+			[5.62879990, 185],
+			[6.52119987, 126],
+			[7.41359984, 98],
+			[8.30599982, 76],
+			[9.19839979, 61],
+			[10.09079976, 49],
+			[10.98319973, 38],
+			[11.8755997, 28],
+			[12.76799967, 20],
+			[13.66039964, 14],
+			[14.55279961, 8]
+		])
+
+	elif cad in (120, 20):
+		masksize = np.array([
+			[2.48170001, 473],
+			[3.56310005, 210],
+			[4, 174],
+			[5.72590014, 85],
+			[6.80730019, 69],
+			[7.88870023, 61],
+			[8.97010028, 50],
+			[10.05150032, 38],
+			[11.13290037, 26],
+			[12.5, 13],
+			[15.0, 4]
+		])
 
 	else:
 		raise NotImplementedError()
 
-	# Approximate relation for pixels in aperture (based on plot in Sullivan et al.)
-	#pixels = (30 + (((3-30)/(14-7)) * (Tmag-7)))*(Tmag<14) + 3*(Tmag>=14)
+	# Interpolate linearly in log-space:
+	pix_log = InterpolatedUnivariateSpline(masksize[:,0], np.log10(masksize[:,1]), k=1, ext=0)
+	pix = lambda x: np.round(10**(pix_log(x)), decimals=13) # noqa: E731
+	pixels = pix(Tmag)
 
-	return np.asarray(np.maximum(pixels, 3), dtype='int32')
+	# Ensure lower limit of 4 pixels:
+	pixels = np.clip(pixels, 4, None)
+
+	return np.asarray(pixels, dtype='int32')
 
 #--------------------------------------------------------------------------------------------------
 def phot_noise(Tmag, timescale=3600, coord=None, sysnoise=60, Teff=5775, cadpix=1800):

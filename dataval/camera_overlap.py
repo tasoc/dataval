@@ -31,7 +31,7 @@ def camera_overlap(dval):
 	dval.cursor.execute("SELECT * FROM todolist GROUP BY sector,starid,datasource,camera,ccd HAVING COUNT(*) > 1;")
 	results = dval.cursor.fetchall()
 	if len(results) > 0:
-		logger.error("  Duplicate targets detected: %d", len(results))
+		logger.info("  Duplicate targets detected: %d", len(results))
 	else:
 		logger.info("  No duplicate targets.")
 
